@@ -1,0 +1,231 @@
+#!/usr/bin/python3
+
+import io
+import queue
+import threading
+import time
+import wave
+from typing import Optional
+
+import numpy
+import pyaudio
+
+# For clicks due to discontinuities in waveforms, see
+# https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
+
+
+class Sample:
+    def __init__(self, player: "Player", description: str):
+        self.player = player
+        self.buffer = io.BytesIO()
+        self.description = description
+        self.is_silence = False
+
+    @property
+    def data(self):
+        return self.buffer.getvalue()
+
+    def add_silence(self, *, duration: float):
+        wave = numpy.zeros(round(duration * self.player.sample_rate), dtype=self.player.numpy_type)
+        self.buffer.write(self.player.array_to_bytes_mono(wave))
+        self.player.wave_delta_arcsin = 0
+
+    def add_wave(self, *, volume: float = 1.0, duration: float = 1.0, freq: float = 440.0):
+        if not duration:
+            return
+
+        samples_count = round(duration * self.player.sample_rate)
+        factor = 2.0 * numpy.pi * freq / self.player.sample_rate
+        wave = numpy.sin(
+                numpy.arange(samples_count, dtype=self.player.numpy_type)
+                * factor + self.player.wave_delta_arcsin)
+        self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
+
+        self.buffer.write(self.player.array_to_bytes_mono(volume * wave))
+
+
+class Silence(Sample):
+    def __init__(self, player: "Player", *, duration: float = 1.0):
+        super().__init__(player, f"{duration:.2f}s of silence")
+        self.add_silence(duration=duration)
+        self.is_silence = True
+
+
+class Wave(Sample):
+    def __init__(
+            self, player: "Player", *,
+            volume: float = 1.0,
+            duration: float = 1.0,
+            freq: float = 440.0):
+        """
+        Wave `duration` seconds long
+        """
+        super().__init__(player, f"wave {duration=:.2f}s {volume=} {freq=}")
+        self.add_wave(volume=volume, duration=duration, freq=freq)
+
+
+class Pulses(Sample):
+    def __init__(
+            self, player: "Player", *,
+            volume: float = 1.0,
+            duration: float = 1.0,
+            freq: float = 440.0,
+            gap: float = 0.1,
+            count: int = 1):
+        """
+        Train of pulses, each `duration` seconds long, followed by a `gap` with
+        the given length in seconds
+        """
+        super().__init__(player, f"{count} pulses {duration=:.2f}s {volume=} {freq=} {gap=}s")
+        for i in range(count):
+            if i > 0:
+                self.add_silence(duration=gap)
+            self.add_wave(volume=volume, duration=duration, freq=freq)
+
+
+class Player:
+    def __init__(self, sample_rate: int = 44100, channels: int = 1, numpy_type=numpy.float32):
+        super().__init__()
+        # sampling rate, Hz, must be integer
+        self.sample_rate = sample_rate
+        self.channels = channels
+        self.numpy_type = numpy_type
+        # See https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
+        # This is used to seamlessly join consecutive waveforms
+        self.wave_delta_arcsin: int = 0
+
+    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
+        raise NotImplementedError(f"{self.__class__.__name__}.array_to_bytes_mono not implemented")
+
+    def announce(self, sample: Sample):
+        if sample.is_silence:
+            return
+        print("⚡️", sample.description)
+
+
+class Stim(Player, threading.Thread):
+    def __init__(self) -> None:
+        super().__init__()
+        self.audio = pyaudio.PyAudio()
+
+        self.send_queue: queue.Queue[Sample] = queue.Queue(maxsize=4)
+        self.current_sample: Optional[Sample] = None
+        self.current_sample_offset: int = 0
+        self.stream: Optional[pyaudio.Stream] = None
+
+        self.start()
+        self.shutting_down = False
+
+        # self.fade_out = numpy.arange(1.0, 0.0, -1/200, dtype=numpy.float32)
+
+    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
+        return array.tobytes()
+
+    def shutdown(self):
+        self.shutting_down = True
+        if self.stream:
+            while self.stream.is_active():
+                time.sleep(0.1)
+            self.stream.stop_stream()
+            self.stream.close()
+        self.join()
+
+        self.audio.terminate()
+
+    def _stream_callback(self, in_data, frame_count: int, time_info, status) -> tuple[bytes, int]:
+        chunk_size = frame_count * self.channels * 4  # currently float32 frames
+        out_data = bytes()
+
+        while chunk_size:
+            if self.shutting_down:
+                return bytes(), pyaudio.paComplete
+
+            if self.current_sample is None:
+                self.current_sample = self.send_queue.get()
+                self.current_sample_offset = 0
+                self.announce(self.current_sample)
+
+            chunk = self.current_sample.data[self.current_sample_offset:self.current_sample_offset + chunk_size]
+            out_data += chunk
+            self.current_sample_offset += len(chunk)
+            chunk_size -= len(chunk)
+            if self.current_sample_offset >= len(self.current_sample.data):
+                # current_sample is exausted, set it to None to fetch the next one
+                self.current_sample = None
+
+        return out_data, pyaudio.paContinue
+
+    def run(self):
+        # for paFloat32 sample values must be in range [-1.0, 1.0]
+        self.stream = self.audio.open(
+                format=pyaudio.paFloat32,
+                channels=self.channels,
+                rate=self.sample_rate,
+                output=True,
+                stream_callback=self._stream_callback)
+
+        # while (sample := self.send_queue.get()):
+        #     print(sample.description)
+        #     if not sample.data:
+        #         continue
+        #     self.stream.write(sample.data)
+
+    def enqueue(self, sample: Sample):
+        self.send_queue.put(sample)
+
+
+class WaveWriter(Player):
+    def __init__(self, filename: str):
+        super().__init__()
+        self.wav = wave.open(filename, "wb")
+        self.wav.setnchannels(1)
+        self.wav.setsampwidth(4)
+        self.wav.setframerate(self.sample_rate)
+        self.written: int = 0
+
+    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
+        return (array * 128).astype(numpy.int8).tobytes()
+
+    def enqueue(self, sample: Sample):
+        self.announce(sample)
+        self.wav.writeframesraw(sample.data)
+        self.written += len(sample.data)
+
+    def shutdown(self):
+        self.wav.close()
+
+
+player = Stim()
+# player = WaveWriter("test.wav")
+
+
+def ramp_up():
+    yield from range(20)
+    for i in range(20, 30):
+        yield i
+        yield i
+    while True:
+        yield 30
+
+
+def pulse_wave_escalate():
+    while True:
+        for i in ramp_up():
+            player.enqueue(Pulses(player, count=i * 2, duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0))
+            player.enqueue(Wave(player, volume=1.0, duration=i / 2, freq=220.0))
+            player.enqueue(Silence(player, duration=5.0/100.0))
+
+
+def freq_escalate():
+    for freq in range(50, 1100, 50):
+        player.enqueue(Wave(player, volume=1.0, duration=0.1, freq=freq))
+
+
+try:
+    pulse_wave_escalate()
+    # freq_escalate()
+except KeyboardInterrupt:
+    print("Shutting down...")
+
+finally:
+    player.shutdown()
