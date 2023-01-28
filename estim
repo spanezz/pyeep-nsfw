@@ -12,11 +12,8 @@ from typing import Optional
 import numpy
 import pyaudio
 
-# For clicks due to discontinuities in waveforms, see
-# https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
 
-
-class Sample:
+class Pattern:
     def __init__(self, player: "Player", description: str):
         self.player = player
         self.buffer = io.BytesIO()
@@ -46,14 +43,14 @@ class Sample:
         self.buffer.write(self.player.array_to_bytes_mono(volume * wave))
 
 
-class Silence(Sample):
+class Silence(Pattern):
     def __init__(self, player: "Player", *, duration: float = 1.0):
         super().__init__(player, f"{duration:.2f}s of silence")
         self.add_silence(duration=duration)
         self.is_silence = True
 
 
-class Wave(Sample):
+class Wave(Pattern):
     def __init__(
             self, player: "Player", *,
             volume: float = 1.0,
@@ -66,7 +63,7 @@ class Wave(Sample):
         self.add_wave(volume=volume, duration=duration, freq=freq)
 
 
-class Pulses(Sample):
+class Pulses(Pattern):
     def __init__(
             self, player: "Player", *,
             volume: float = 1.0,
@@ -99,10 +96,10 @@ class Player:
     def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
         raise NotImplementedError(f"{self.__class__.__name__}.array_to_bytes_mono not implemented")
 
-    def announce(self, sample: Sample):
-        if sample.is_silence:
+    def announce(self, pattern: Pattern):
+        if pattern.is_silence:
             return
-        print("⚡️", sample.description)
+        print("〜", pattern.description)
 
 
 class Stim(Player, threading.Thread):
@@ -110,9 +107,9 @@ class Stim(Player, threading.Thread):
         super().__init__()
         self.audio = pyaudio.PyAudio()
 
-        self.send_queue: queue.Queue[Sample] = queue.Queue(maxsize=4)
-        self.current_sample: Optional[Sample] = None
-        self.current_sample_offset: int = 0
+        self.send_queue: queue.Queue[Pattern] = queue.Queue(maxsize=4)
+        self.current_pattern: Optional[Pattern] = None
+        self.current_pattern_offset: int = 0
         self.stream: Optional[pyaudio.Stream] = None
 
         self.start()
@@ -142,18 +139,18 @@ class Stim(Player, threading.Thread):
             if self.shutting_down:
                 return bytes(), pyaudio.paComplete
 
-            if self.current_sample is None:
-                self.current_sample = self.send_queue.get()
-                self.current_sample_offset = 0
-                self.announce(self.current_sample)
+            if self.current_pattern is None:
+                self.current_pattern = self.send_queue.get()
+                self.current_pattern_offset = 0
+                self.announce(self.current_pattern)
 
-            chunk = self.current_sample.data[self.current_sample_offset:self.current_sample_offset + chunk_size]
+            chunk = self.current_pattern.data[self.current_pattern_offset:self.current_pattern_offset + chunk_size]
             out_data += chunk
-            self.current_sample_offset += len(chunk)
+            self.current_pattern_offset += len(chunk)
             chunk_size -= len(chunk)
-            if self.current_sample_offset >= len(self.current_sample.data):
-                # current_sample is exausted, set it to None to fetch the next one
-                self.current_sample = None
+            if self.current_pattern_offset >= len(self.current_pattern.data):
+                # current_pattern is exausted, set it to None to fetch the next one
+                self.current_pattern = None
 
         return out_data, pyaudio.paContinue
 
@@ -166,14 +163,14 @@ class Stim(Player, threading.Thread):
                 output=True,
                 stream_callback=self._stream_callback)
 
-        # while (sample := self.send_queue.get()):
-        #     print(sample.description)
-        #     if not sample.data:
+        # while (pattern := self.send_queue.get()):
+        #     print(pattern.description)
+        #     if not pattern.data:
         #         continue
-        #     self.stream.write(sample.data)
+        #     self.stream.write(pattern.data)
 
-    def enqueue(self, sample: Sample):
-        self.send_queue.put(sample)
+    def enqueue(self, pattern: Pattern):
+        self.send_queue.put(pattern)
 
 
 class WaveWriter(Player):
@@ -188,10 +185,10 @@ class WaveWriter(Player):
     def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
         return (array * 128).astype(numpy.int8).tobytes()
 
-    def enqueue(self, sample: Sample):
-        self.announce(sample)
-        self.wav.writeframesraw(sample.data)
-        self.written += len(sample.data)
+    def enqueue(self, pattern: Pattern):
+        self.announce(pattern)
+        self.wav.writeframesraw(pattern.data)
+        self.written += len(pattern.data)
 
     def shutdown(self):
         self.wav.close()
