@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 
+import argparse
 import io
 import queue
+import sys
 import threading
 import time
 import wave
@@ -195,10 +197,6 @@ class WaveWriter(Player):
         self.wav.close()
 
 
-player = Stim()
-# player = WaveWriter("test.wav")
-
-
 def ramp_up():
     yield from range(20)
     for i in range(20, 30):
@@ -208,7 +206,7 @@ def ramp_up():
         yield 30
 
 
-def pulse_wave_escalate():
+def pulse_wave_escalate(player):
     while True:
         for i in ramp_up():
             player.enqueue(Pulses(player, count=i * 2, duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0))
@@ -216,16 +214,31 @@ def pulse_wave_escalate():
             player.enqueue(Silence(player, duration=5.0/100.0))
 
 
-def freq_escalate():
+def freq_escalate(player):
     for freq in range(50, 1100, 50):
         player.enqueue(Wave(player, volume=1.0, duration=0.1, freq=freq))
 
 
-try:
-    pulse_wave_escalate()
-    # freq_escalate()
-except KeyboardInterrupt:
-    print("Shutting down...")
+def main():
+    parser = argparse.ArgumentParser(description="Tone pattern generator")
+    parser.add_argument("-o", "--output", action="store", metavar="file.wav",
+                        help="write the generated audio to the given file instead of playing it")
+    args = parser.parse_args()
 
-finally:
-    player.shutdown()
+    if args.output:
+        player = WaveWriter(args.output)
+    else:
+        player = Stim()
+
+    try:
+        pulse_wave_escalate(player)
+        # freq_escalate(player)
+    except KeyboardInterrupt:
+        print("Shutting down...")
+
+    finally:
+        player.shutdown()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
