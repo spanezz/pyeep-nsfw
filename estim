@@ -161,6 +161,8 @@ class Stim(Player, threading.Thread):
                 channels=self.channels,
                 rate=self.sample_rate,
                 output=True,
+                # See https://stackoverflow.com/questions/31391766/pyaudio-outputs-slow-crackling-garbled-audio
+                frames_per_buffer=4096,
                 stream_callback=self._stream_callback)
 
         # while (pattern := self.send_queue.get()):
