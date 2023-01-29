@@ -196,11 +196,8 @@ class Stim(Player, threading.Thread):
 
         self.shutting_down = False
 
-    def start_mono(self, pattern: Pattern):
-        super().start_mono(pattern)
-        self.start()
-
     def loop(self):
+        self.start()
         while not self.channels[0].ended:
             time.sleep(0.1)
 
