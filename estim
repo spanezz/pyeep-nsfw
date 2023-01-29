@@ -7,31 +7,100 @@ import sys
 import threading
 import time
 import wave
-from typing import Optional
+from typing import Generator, Iterator, Optional
 
 import numpy
 import pyaudio
 
 
 class Pattern:
+    """
+    Abstract interface for a wave generator
+    """
     def __init__(self, player: "Player", description: str):
         self.player = player
         self.buffer = io.BytesIO()
         self.description = description
         self.is_silence = False
+        self._iter_waves: Optional[Iterator[numpy.ndarray]] = None
+        self.current_wave: Optional[numpy.ndarray] = None
+        self.read_offset: int = 0
+        self.ended: bool = False
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        raise NotImplementedError(f"{self.__class__.__name__}.generate not implemented")
+
+    def _next_wave(self) -> bool:
+        """
+        Move self.current_wave to the next wave, or set self.ended if the
+        generator is done.
+
+        Returns True if there is a current wave to be read
+        """
+        if self._iter_waves is None:
+            self._iter_waves = iter(self.generate())
+        try:
+            self.current_wave = next(self._iter_waves)
+            self.read_offset = 0
+            return True
+        except StopIteration:
+            self.ended = True
+            return False
+
+    def announce(self):
+        if self.is_silence:
+            return
+        print("〜", self.description)
+
+    def read(self, nsamples: int) -> numpy.ndarray:
+        """
+        Return an array of at most `nsamples` samples from this pattern.
+
+        If the pattern terminates before the given number of samples, the
+        returned array may be shorter than nsamples
+        """
+        # Shortcut: wave queue is empty
+        if self.ended:
+            return numpy.empty(0, dtype=self.player.numpy_type)
+
+        if self.current_wave is None:
+            if not self._next_wave():
+                return numpy.empty(0, dtype=self.player.numpy_type)
+
+        # Shortcut: first wave has enough data
+        if len(self.current_wave) >= self.read_offset + nsamples:
+            res = self.current_wave[self.read_offset:self.read_offset + nsamples]
+            self.read_offset += nsamples
+            return res
+
+        # Incrementally build a samples array
+        res = numpy.empty(0, self.player.numpy_type)
+        while (size := nsamples - len(res)) > 0:
+            if self.ended:
+                # No more waves available
+                return res
+            elif self.read_offset >= len(self.current_wave):
+                # Current wave is exausted, skip to the next one
+                self._next_wave()
+            else:
+                # Take from current wave
+                chunk = self.current_wave[self.read_offset:self.read_offset + size]
+                self.read_offset += len(chunk)
+                res = numpy.append(res, chunk)
+
+        return res
 
     @property
     def data(self):
         return self.buffer.getvalue()
 
-    def add_silence(self, *, duration: float):
-        wave = numpy.zeros(round(duration * self.player.sample_rate), dtype=self.player.numpy_type)
-        self.buffer.write(self.player.array_to_bytes_mono(wave))
+    def silence(self, *, duration: float) -> numpy.ndarray:
         self.player.wave_delta_arcsin = 0
+        return numpy.zeros(round(duration * self.player.sample_rate), dtype=self.player.numpy_type)
 
-    def add_wave(self, *, volume: float = 1.0, duration: float = 1.0, freq: float = 440.0):
+    def wave(self, *, volume: float = 1.0, duration: float = 1.0, freq: float = 440.0) -> numpy.ndarray:
         if not duration:
-            return
+            return numpy.empty(0, dtype=self.player.numpy_type)
 
         samples_count = round(duration * self.player.sample_rate)
         factor = 2.0 * numpy.pi * freq / self.player.sample_rate
@@ -39,15 +108,17 @@ class Pattern:
                 numpy.arange(samples_count, dtype=self.player.numpy_type)
                 * factor + self.player.wave_delta_arcsin)
         self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
-
-        self.buffer.write(self.player.array_to_bytes_mono(volume * wave))
+        return wave
 
 
 class Silence(Pattern):
     def __init__(self, player: "Player", *, duration: float = 1.0):
         super().__init__(player, f"{duration:.2f}s of silence")
-        self.add_silence(duration=duration)
         self.is_silence = True
+        self.duration = duration
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        yield self.silence(duration=self.duration)
 
 
 class Wave(Pattern):
@@ -60,7 +131,12 @@ class Wave(Pattern):
         Wave `duration` seconds long
         """
         super().__init__(player, f"wave {duration=:.2f}s {volume=} {freq=}")
-        self.add_wave(volume=volume, duration=duration, freq=freq)
+        self.volume = volume
+        self.duration = duration
+        self.freq = freq
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        yield self.wave(volume=self.volume, duration=self.duration, freq=self.freq)
 
 
 class Pulses(Pattern):
@@ -76,30 +152,36 @@ class Pulses(Pattern):
         the given length in seconds
         """
         super().__init__(player, f"{count} pulses {duration=:.2f}s {volume=} {freq=} {gap=}s")
-        for i in range(count):
+        self.volume = volume
+        self.duration = duration
+        self.freq = freq
+        self.gap = gap
+        self.count = count
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        for i in range(self.count):
             if i > 0:
-                self.add_silence(duration=gap)
-            self.add_wave(volume=volume, duration=duration, freq=freq)
+                yield self.silence(duration=self.gap)
+            yield self.wave(volume=self.volume, duration=self.duration, freq=self.freq)
 
 
 class Player:
-    def __init__(self, sample_rate: int = 44100, channels: int = 1, numpy_type=numpy.float32):
+    def __init__(self, sample_rate: int = 44100, numpy_type=numpy.float32):
         super().__init__()
         # sampling rate, Hz, must be integer
         self.sample_rate = sample_rate
-        self.channels = channels
+        self.channels: list[Pattern] = []
         self.numpy_type = numpy_type
         # See https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
         # This is used to seamlessly join consecutive waveforms
         self.wave_delta_arcsin: int = 0
 
-    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
-        raise NotImplementedError(f"{self.__class__.__name__}.array_to_bytes_mono not implemented")
+    def start_mono(self, pattern: Pattern):
+        pattern.announce()
+        self.channels.append(pattern)
 
-    def announce(self, pattern: Pattern):
-        if pattern.is_silence:
-            return
-        print("〜", pattern.description)
+    def loop(self):
+        pass
 
 
 class Stim(Player, threading.Thread):
@@ -112,15 +194,18 @@ class Stim(Player, threading.Thread):
         self.current_pattern_offset: int = 0
         self.stream: Optional[pyaudio.Stream] = None
 
-        self.start()
         self.shutting_down = False
 
-        # self.fade_out = numpy.arange(1.0, 0.0, -1/200, dtype=numpy.float32)
+    def start_mono(self, pattern: Pattern):
+        super().start_mono(pattern)
+        self.start()
 
-    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
-        return array.tobytes()
+    def loop(self):
+        while not self.channels[0].ended:
+            time.sleep(0.1)
 
     def shutdown(self):
+        print("shutting down")
         self.shutting_down = True
         if self.stream:
             while self.stream.is_active():
@@ -132,25 +217,14 @@ class Stim(Player, threading.Thread):
         self.audio.terminate()
 
     def _stream_callback(self, in_data, frame_count: int, time_info, status) -> tuple[bytes, int]:
-        chunk_size = frame_count * self.channels * 4  # currently float32 frames
-        out_data = bytes()
+        if self.shutting_down:
+            return bytes(), pyaudio.paComplete
 
-        while chunk_size:
-            if self.shutting_down:
-                return bytes(), pyaudio.paComplete
-
-            if self.current_pattern is None:
-                self.current_pattern = self.send_queue.get()
-                self.current_pattern_offset = 0
-                self.announce(self.current_pattern)
-
-            chunk = self.current_pattern.data[self.current_pattern_offset:self.current_pattern_offset + chunk_size]
-            out_data += chunk
-            self.current_pattern_offset += len(chunk)
-            chunk_size -= len(chunk)
-            if self.current_pattern_offset >= len(self.current_pattern.data):
-                # current_pattern is exausted, set it to None to fetch the next one
-                self.current_pattern = None
+        wave = self.channels[0].read(frame_count)
+        if wave.size < frame_count:
+            # Pad with silence
+            wave.resize(frame_count)
+        out_data = wave.tobytes()
 
         return out_data, pyaudio.paContinue
 
@@ -158,21 +232,12 @@ class Stim(Player, threading.Thread):
         # for paFloat32 sample values must be in range [-1.0, 1.0]
         self.stream = self.audio.open(
                 format=pyaudio.paFloat32,
-                channels=self.channels,
+                channels=len(self.channels),
                 rate=self.sample_rate,
                 output=True,
                 # See https://stackoverflow.com/questions/31391766/pyaudio-outputs-slow-crackling-garbled-audio
                 frames_per_buffer=4096,
                 stream_callback=self._stream_callback)
-
-        # while (pattern := self.send_queue.get()):
-        #     print(pattern.description)
-        #     if not pattern.data:
-        #         continue
-        #     self.stream.write(pattern.data)
-
-    def enqueue(self, pattern: Pattern):
-        self.send_queue.put(pattern)
 
 
 class WaveWriter(Player):
@@ -183,9 +248,6 @@ class WaveWriter(Player):
         self.wav.setsampwidth(4)
         self.wav.setframerate(self.sample_rate)
         self.written: int = 0
-
-    def array_to_bytes_mono(self, array: numpy.ndarray) -> bytes:
-        return (array * 128).astype(numpy.int8).tobytes()
 
     def enqueue(self, pattern: Pattern):
         self.announce(pattern)
@@ -205,12 +267,21 @@ def ramp_up():
         yield 30
 
 
-def pulse_wave_escalate(player):
-    while True:
+class PulseWaveEscalate(Pattern):
+    def __init__(self, player: "Player"):
+        super().__init__(player, "pulse wave escalate")
+        self.waves = self.generate()
+
+    def patterns(self) -> Generator[Pattern, None, None]:
         for i in ramp_up():
-            player.enqueue(Pulses(player, count=i * 2, duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0))
-            player.enqueue(Wave(player, volume=1.0, duration=i / 2, freq=220.0))
-            player.enqueue(Silence(player, duration=5.0/100.0))
+            yield Pulses(self.player, count=i * 2, duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0)
+            yield Wave(self.player, volume=1.0, duration=i / 2, freq=220.0)
+            yield Silence(self.player, duration=5.0/100.0)
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        for pattern in self.patterns():
+            pattern.announce()
+            yield from pattern.generate()
 
 
 def freq_escalate(player):
@@ -230,7 +301,8 @@ def main():
         player = Stim()
 
     try:
-        pulse_wave_escalate(player)
+        player.start_mono(PulseWaveEscalate(player))
+        player.loop()
         # freq_escalate(player)
     except KeyboardInterrupt:
         print("Shutting down...")
