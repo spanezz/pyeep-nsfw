@@ -110,7 +110,7 @@ class Pattern:
         factor = 2.0 * numpy.pi * freq / self.player.sample_rate
         wave = numpy.sin(
                 numpy.arange(samples_count, dtype=self.player.numpy_type)
-                * factor + self.player.wave_delta_arcsin)
+                * factor + self.player.wave_delta_arcsin) * volume
         self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
         return wave
 
