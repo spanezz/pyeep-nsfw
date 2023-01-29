@@ -2,7 +2,6 @@
 
 import argparse
 import io
-import queue
 import sys
 import threading
 import time
@@ -217,9 +216,6 @@ class Stim(Player, threading.Thread):
         super().__init__()
         self.audio = pyaudio.PyAudio()
 
-        self.send_queue: queue.Queue[Pattern] = queue.Queue(maxsize=4)
-        self.current_pattern: Optional[Pattern] = None
-        self.current_pattern_offset: int = 0
         self.stream: Optional[pyaudio.Stream] = None
 
         self.shutting_down = False
