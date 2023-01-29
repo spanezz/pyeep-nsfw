@@ -180,6 +180,12 @@ class Player:
         pattern.announce()
         self.channels.append(pattern)
 
+    def start_stereo(self, left: Pattern, right: Pattern):
+        left.announce()
+        self.channels.append(left)
+        right.announce()
+        self.channels.append(right)
+
     def loop(self):
         pass
 
@@ -217,13 +223,24 @@ class Stim(Player, threading.Thread):
         if self.shutting_down:
             return bytes(), pyaudio.paComplete
 
-        wave = self.channels[0].read(frame_count)
-        if wave.size < frame_count:
-            # Pad with silence
-            wave.resize(frame_count)
-        out_data = wave.tobytes()
+        # See https://stackoverflow.com/questions/5347065/interweaving-two-numpy-arrays
+        if len(self.channels) == 1:
+            # Shortcut for mono output
+            wave = self.channels[0].read(frame_count)
+            if wave.size < frame_count:
+                # Pad with silence
+                wave.resize(frame_count)
+            return wave.tobytes(), pyaudio.paContinue
 
-        return out_data, pyaudio.paContinue
+        # General case for an arbitrary number of channels
+        waves = numpy.empty(frame_count * len(self.channels), dtype=self.numpy_type)
+        for idx, channel in enumerate(self.channels):
+            wave = self.channels[idx].read(frame_count)
+            if wave.size < frame_count:
+                # Pad with silence
+                wave.resize(frame_count)
+            waves[idx::len(self.channels)] = wave
+        return waves.tobytes(), pyaudio.paContinue
 
     def run(self):
         # for paFloat32 sample values must be in range [-1.0, 1.0]
@@ -267,7 +284,6 @@ def ramp_up():
 class PulseWaveEscalate(Pattern):
     def __init__(self, player: "Player"):
         super().__init__(player, "pulse wave escalate")
-        self.waves = self.generate()
 
     def patterns(self) -> Generator[Pattern, None, None]:
         for i in ramp_up():
@@ -281,9 +297,18 @@ class PulseWaveEscalate(Pattern):
             yield from pattern.generate()
 
 
-def freq_escalate(player):
-    for freq in range(50, 1100, 50):
-        player.enqueue(Wave(player, volume=1.0, duration=0.1, freq=freq))
+class FrequencySwing(Pattern):
+    def __init__(self, player: "Player"):
+        super().__init__(player, "frequency swing")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        for freq in range(50, 1100, 50):
+            yield Wave(self.player, volume=1.0, duration=0.1, freq=freq)
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        for pattern in self.patterns():
+            pattern.announce()
+            yield from pattern.generate()
 
 
 def main():
@@ -298,9 +323,12 @@ def main():
         player = Stim()
 
     try:
-        player.start_mono(PulseWaveEscalate(player))
+        # player.start_mono(PulseWaveEscalate(player))
+        player.start_stereo(
+                left=PulseWaveEscalate(player),
+                right=FrequencySwing(player),
+        )
         player.loop()
-        # freq_escalate(player)
     except KeyboardInterrupt:
         print("Shutting down...")
 
