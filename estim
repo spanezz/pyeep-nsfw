@@ -304,14 +304,82 @@ def ramp_up():
 
 
 class PulseWaveEscalate(PatternSequence):
+    FREQ = 1000
+
     def __init__(self):
         super().__init__("pulse wave escalate")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         for i in ramp_up():
-            yield Pulses(count=i * 2, duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0)
-            yield Wave(volume=1.0, duration=i / 2, freq=220.0)
+            yield Pulses(count=i * 2, duration=0.1, freq=self.FREQ, volume=0.9, gap=5.0/100.0)
+            yield Wave(volume=1.0, duration=i / 2, freq=self.FREQ)
             yield Silence(duration=5.0/100.0)
+
+
+class PulseWaveEscalate2(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self):
+        super().__init__("pulse wave escalate 2")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        for i in ramp_up():
+            yield Pulses(count=i * 2, duration=0.6, freq=self.FREQ, volume=1, gap=10.0/100.0)
+            yield Wave(volume=1.0, duration=i, freq=self.FREQ)
+            yield Silence(duration=5.0/100.0)
+
+
+class VolumeSwing(PatternSequence):
+    def __init__(self):
+        super().__init__("frequency swing")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            for volume in range(50, 100, 5):
+                yield Wave(volume=volume / 100.0, duration=0.1, freq=220)
+            yield Wave(volume=1, duration=5, freq=220)
+            for volume in range(100, 50, -5):
+                yield Wave(volume=volume / 100.0, duration=0.1, freq=220)
+            yield Wave(volume=0.5, duration=2, freq=220)
+
+
+class FrequencyDifference(PatternSequence):
+    def __init__(self):
+        super().__init__("frequency swing")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            # yield Wave(volume=1.0, duration=1, freq=200)
+            yield Wave(volume=1.0, duration=1, freq=1000)
+
+
+class Caress(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self):
+        super().__init__("caress")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.5, freq=self.FREQ)
+        peak_size = 1
+        while True:
+            for i in range(60, 100):
+                yield Wave(volume=i / 100.0, duration=i / 1000.0, freq=self.FREQ)
+            yield Wave(volume=1, duration=peak_size, freq=self.FREQ)
+            peak_size = min(peak_size + 1, 10)
+            for i in range(100, 60, -3):
+                yield Wave(volume=i / 100.0, duration=i / 1000.0, freq=self.FREQ)
+
+
+class Calibrate(PatternSequence):
+    FREQ = 1000.0
+
+    def __init__(self):
+        super().__init__("calibration tune")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            yield Wave(volume=1.0, duration=10, freq=self.FREQ)
 
 
 class FrequencySwing(PatternSequence):
@@ -319,14 +387,61 @@ class FrequencySwing(PatternSequence):
         super().__init__("frequency swing")
 
     def patterns(self) -> Generator[Pattern, None, None]:
-        for freq in range(50, 1100, 50):
-            yield Wave(volume=1.0, duration=0.1, freq=freq)
+        for freq in range(50, 1000, 100):
+            yield Wave(volume=1.0, duration=1, freq=freq)
+
+
+class RandomPulseWave(PatternSequence):
+    def __init__(self):
+        super().__init__("random")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        import random
+        while True:
+            yield Pulses(count=random.randrange(2, 20), duration=0.1, freq=200.0, volume=0.9, gap=5.0/100.0)
+            yield Wave(volume=1.0, duration=random.randrange(1, 15) / 2.0, freq=220.0)
+            yield Silence(duration=5.0/100.0)
+
+
+class NumberSequencePulseWave(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self, number: str):
+        super().__init__(f"random {number}")
+        self.number = number
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            for val in [int(n) for n in self.number]:
+                yield Pulses(count=val, duration=0.1, freq=self.FREQ, volume=0.9, gap=5.0/100.0)
+                yield Wave(volume=1.0, duration=val, freq=self.FREQ)
+                yield Silence(duration=5.0/100.0)
+
+
+class RandomPauseWave(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self):
+        super().__init__("wave with random pause")
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        import random
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        while True:
+            yield Wave(volume=1.0, duration=random.randrange(1, 10), freq=self.FREQ)
+            yield Silence(duration=30.0/100.0)
 
 
 def main():
+    # TODO: allow to use a function for intensity
+    # TODO: implement a slow start
+
     parser = argparse.ArgumentParser(description="Tone pattern generator")
     parser.add_argument("-o", "--output", action="store", metavar="file.wav",
                         help="write the generated audio to the given file instead of playing it")
+    parser.add_argument("-c", "--calibrate", action="store_true",
+                        help="play a constant full volume calibration sound")
     args = parser.parse_args()
 
     if args.output:
@@ -335,13 +450,22 @@ def main():
         player = Stim()
 
     try:
-        player.start_mono(PulseWaveEscalate())
-        # player.start_mono(FrequencySwing())
-        # player.start_stereo(left=FrequencySwing(), right=FrequencySwing())
-        # player.start_stereo(
-        #         left=PulseWaveEscalate(),
-        #         right=FrequencySwing(),
-        # )
+        if args.calibrate:
+            player.start_mono(Calibrate())
+        else:
+            player.start_mono(PulseWaveEscalate())
+            # player.start_mono(PulseWaveEscalate2())
+            # player.start_mono(FrequencySwing())
+            # player.start_mono(FrequencyDifference())
+            # player.start_mono(Caress())
+            # player.start_mono(RandomPulseWave())
+            # player.start_mono(RandomPauseWave())
+            # player.start_mono(NumberSequencePulseWave("1234124312"))
+            # player.start_stereo(left=FrequencySwing(), right=FrequencySwing())
+            # player.start_stereo(
+            #         left=PulseWaveEscalate(),
+            #         right=VolumeSwing(),
+            # )
         player.loop()
     except KeyboardInterrupt:
         print("Shutting down...")
