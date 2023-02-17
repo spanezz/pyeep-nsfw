@@ -197,8 +197,9 @@ class HeartRatePlot(HeartRateMonitor):
             self.plot, = self.ax.plot([0] * self.history_size)
 
     async def stop(self):
+        import matplotlib.pyplot as plt
         await super().stop()
-        self.figure.close()
+        plt.close("all")
 
     def on_sample(self, sample: Sample):
         dt = datetime.datetime.fromtimestamp(sample.time/1000_000_000)
@@ -259,6 +260,7 @@ async def aio_main():
         except KeyboardInterrupt:
             interrupted = True
         except Exception:
+            # Try to reconnect. This still doesn't work well
             pass
 
 
