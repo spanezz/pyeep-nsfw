@@ -153,34 +153,6 @@ async def aio_main():
         except KeyboardInterrupt:
             pass
 
-    # device = await BleakScanner.find_device_by_address(
-    #     MAC, cb=dict(use_bdaddr=False)
-    # )
-    # if device is None:
-    #     log.error("could not find device with address '%s'", MAC)
-    #     return
-
-    # log.info("connecting to device...")
-
-    # async with BleakClient(device) as client:
-    #     log.info("Connected")
-
-    #     for service in client.services:
-    #         log.info("service %s", service.uuid)
-    #         for characteristic in service.characteristics:
-    #             log.info(
-    #                 "  characteristic %r %s %x (%d descriptors)",
-    #                 characteristic.uuid, characteristic.description,
-    #                 characteristic.handle, len(characteristic.descriptors))
-
-    #     await client.start_notify(SENSOR_UUID, notification_handler)
-    #     try:
-    #         while True:
-    #             await asyncio.sleep(5.0)
-    #     except KeyboardInterrupt:
-    #         pass
-    #     await client.stop_notify(SENSOR_UUID)
-
 
 def main():
     parser = argparse.ArgumentParser(description="Read TLE heart rate sensor")
