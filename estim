@@ -2,16 +2,27 @@
 
 import argparse
 import asyncio
+import json
+import math
 import random
 import sys
 import threading
 import time
-from typing import Generator, Optional
+from collections import deque
+from typing import Generator, NamedTuple, Optional
 
 import pyaudio
 
-from stim.pattern import ChaosPulses, Pattern, PatternSequence, Pulses, Silence, Wave
+from stim.pattern import (ChaosPulses, Pattern, PatternSequence, Pulses,
+                          Silence, Wave)
 from stim.player import Player, WaveWriter
+
+
+class HeartSample(NamedTuple):
+    # UNIX timestamp in nanoseconds
+    time: int
+    rate: float
+    rr: tuple[float] = ()
 
 
 class Stim(Player, threading.Thread):
@@ -20,11 +31,34 @@ class Stim(Player, threading.Thread):
         self.audio = pyaudio.PyAudio()
         self.stream: Optional[pyaudio.Stream] = None
         self.shutting_down = False
+        self.heartbeat_socket: Optional[str] = None
+        self.heart_min: Optional[float] = None
+        self.heart_max: Optional[float] = None
+        self.heart_last: Optional[float] = None
+
+    async def monitor_heartbeat(self):
+        if self.heartbeat_socket is None:
+            return
+        reader, writer = await asyncio.open_unix_connection(self.heartbeat_socket)
+        status = json.loads(await reader.readline())
+        self.heart_min = status["min"]
+        self.heart_max = status["max"]
+        self.heart_last = status["last"]
+        while (line := await reader.readline()):
+            sample = HeartSample(*json.loads(line))
+            if self.heart_min is None or sample.rate < self.heart_min:
+                self.heart_min = sample.rate
+            if self.heart_max is None or sample.rate > self.heart_max:
+                self.heart_max = sample.rate
+            self.heart_last = sample.rate
+
+    async def wait_for_patterns(self):
+        while not all(c.ended for c in self.channels):
+            await asyncio.sleep(0.2)
 
     async def loop(self):
         self.start()
-        while not self.channels[0].ended:
-            await asyncio.sleep(1)
+        await asyncio.gather(self.monitor_heartbeat(), self.wait_for_patterns())
 
     def shutdown(self):
         print("shutting down")
@@ -218,6 +252,86 @@ class RandomPauseWave(PatternSequence):
             yield Silence(duration=random.uniform(3.0/10.0, 1))
 
 
+class HeartBeat(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self, stim: Stim):
+        super().__init__("sync pulses with heart beat")
+        self.stim = stim
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        while True:
+            if self.stim.heart_last is None:
+                yield Silence(duration=0.2)
+            else:
+                pause = 3.0/10.0
+                duration = 60.0 / self.stim.heart_last
+                yield Wave(volume=1.0, freq=self.FREQ, duration=duration - pause)
+                yield Silence(duration=pause)
+
+
+class HeartBeat1(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self, stim: Stim):
+        super().__init__("sync pulses with heart beat variation")
+        self.stim = stim
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        window = deque(maxlen=60)
+        while True:
+            if self.stim.heart_last is None:
+                yield Silence(duration=0.2)
+            else:
+                val_last = self.stim.heart_last
+                window.append(val_last)
+                val_min = min(window)
+                val_max = max(window)
+                # val_mid = (val_min + val_max) / 2.0
+                # Value between -1 and 1
+                if val_min == val_max:
+                    val_norm = 0
+                else:
+                    val_norm = (val_last - val_min) / (val_max - val_min)
+                pause = 3.0 / 10.0
+                volume = 1.0
+
+                import scipy.stats
+                last_samples = list(window)[-5:]
+                res = scipy.stats.linregress(list(range(len(last_samples))), last_samples)
+                print(last_samples, res.slope)
+                if res.slope > 0:
+                    duration = 1
+                    pause = 0
+                elif res.slope == 0:
+                    duration = 2
+                else:
+                    duration = 60.0 / self.stim.heart_last * 2
+                    volume = 0.9
+
+                # duration = math.asin(val_norm * 2 - 1) + math.pi / 2 + 1
+
+                # duration = val_norm ** 2 * 2 + 1
+
+                # duration = 3 - val_norm ** 2 * 2.5
+
+                # duration = val_norm ** 2 * 2.5 + 0.5
+
+                # if val_norm < 0.5:
+                #     duration = 60.0 / self.stim.heart_last
+                # else:
+                #     duration = 60.0 / self.stim.heart_last
+                #     duration *= ((val_norm + 0.5) * 3) ** 2
+                print(f"{val_last=} {val_min=} {val_max=} {val_norm=}")
+                yield Wave(volume=volume, freq=self.FREQ, duration=duration - pause)
+                if pause:
+                    yield Silence(duration=pause)
+
+
 async def amain(player: Player):
     await player.loop()
 
@@ -231,26 +345,31 @@ def main():
                         help="write the generated audio to the given file instead of playing it")
     parser.add_argument("-c", "--calibrate", action="store_true",
                         help="play a constant full volume calibration sound")
+    parser.add_argument("--heart", metavar="socket", action="store",
+                        help="UNIX socket to use to listen for heartbeat")
     args = parser.parse_args()
 
     if args.output:
         player = WaveWriter(args.output)
     else:
         player = Stim()
+        if args.heart:
+            player.heartbeat_socket = args.heart
 
     try:
         if args.calibrate:
             player.start_mono(Calibrate())
         else:
+            player.start_mono(HeartBeat1(player))
             # player.start_mono(PulseWaveEscalate())
             # player.start_mono(PulseWaveEscalateChaotic())
-            player.start_stereo(
-                    left=PulseWaveEscalate(),
-                    # left=PulseWaveEscalateChaotic(),
-                    # left=RandomPauseWave(),
-                    # right=RandomPauseWave())
-                    # right=FrequencySwing())
-                    right=PulseWaveEscalateChaotic())
+            # player.start_stereo(
+            #         left=PulseWaveEscalate(),
+            #         # left=PulseWaveEscalateChaotic(),
+            #         # left=RandomPauseWave(),
+            #         # right=RandomPauseWave())
+            #         # right=FrequencySwing())
+            #         right=PulseWaveEscalateChaotic())
             # player.start_mono(PulseWaveEscalate2())
             # player.start_mono(FrequencySwing())
             # player.start_mono(FrequencyDifference())
