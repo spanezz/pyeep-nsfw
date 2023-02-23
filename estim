@@ -43,7 +43,7 @@ class Stim(Player, threading.Thread):
         status = json.loads(await reader.readline())
         self.heart_min = status["min"]
         self.heart_max = status["max"]
-        self.heart_last = status["last"]
+        self.heart_last = HeartSample(*status["last"][-1]).rate
         while (line := await reader.readline()):
             sample = HeartSample(*json.loads(line))
             if self.heart_min is None or sample.rate < self.heart_min:
