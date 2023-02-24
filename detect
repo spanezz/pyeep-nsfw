@@ -18,94 +18,107 @@ class HeartSample(NamedTuple):
     rr: tuple[float] = ()
 
 
+class Climb:
+    def __init__(self, samples: list[HeartSample], slope: float):
+        self.samples = list(samples)
+        self.min_slope: float = slope
+        self.max_slope: float = slope
+        self.last_slope: float = slope
+        self.min_rate: float = min(s.rate for s in samples)
+        self.max_rate: float = max(s.rate for s in samples)
+
+    @property
+    def duration(self) -> float:
+        return (self.samples[-1].time - self.samples[0].time) / 1_000_000_000
+
+    def extend(self, samples: list[HeartSample], slope: float):
+        new_samples = [s for s in samples if s.time > self.samples[-1].time]
+        self.samples.extend(new_samples)
+        for s in new_samples:
+            if s.rate < self.min_rate:
+                self.min_rate = s.rate
+            if s.rate > self.max_rate:
+                self.max_rate = s.rate
+        if slope < self.min_slope:
+            self.min_slope = slope
+        if slope > self.max_slope:
+            self.max_slope = slope
+        self.last_slope = slope
+
+
+class Window:
+    def __init__(self, name: str, width_seconds: float, slope_threshold: float):
+        self.name = name
+        self.width_seconds = width_seconds
+        # Minimum value for tracking slopes
+        self.slope_threshold = slope_threshold
+        self.climbs: list[Climb] = []
+        self.current_climb: Optional[Climb] = None
+        self.last_slope: float = 0.0
+
+    def sample(self, samples: list[HeartSample]):
+        last_time = samples[-1].time
+        threshold = last_time - self.width_seconds * 1_000_000_000
+        window_samples = [s for s in samples if s.time >= threshold]
+        data = numpy.array([
+            [(s.time - last_time) / 1_000_000_000 for s in window_samples],
+            [s.rate for s in window_samples]])
+        reg = scipy.stats.linregress(data)
+        if reg.slope > self.slope_threshold:
+            if self.current_climb is None:
+                self.current_climb = Climb(window_samples, reg.slope)
+            else:
+                self.current_climb.extend(window_samples, reg.slope)
+        else:
+            if self.current_climb and self.current_climb.duration > 3.0:
+                self.climbs.append(self.current_climb)
+            self.current_climb = None
+        self.last_slope = reg.slope
+
+    def summary_char(self) -> str:
+        if self.current_climb is None:
+            return "-"
+        elif self.current_climb.last_slope > 0.3:
+            return "*"
+        else:
+            return "+"
+
+
 class Detector:
     def __init__(self, socket_name: str) -> None:
         super().__init__()
         self.heartbeat_socket = socket_name
         self.history: deque[HeartSample] = deque(maxlen=20)
-        self.rate_min: Optional[float] = None
-        self.rate_max: Optional[float] = None
-
-    def update_minmax(self, sample: HeartSample):
-        if self.rate_min is None or self.rate_min > sample.rate:
-            self.rate_min = sample.rate
-        if self.rate_max is None or self.rate_max < sample.rate:
-            self.rate_max = sample.rate
+        self.windows = [
+            Window("15s", 15, slope_threshold=0.1),
+            Window("10s", 10, slope_threshold=0.1),
+            Window("05s", 5, slope_threshold=0.1),
+        ]
 
     def check_history(self):
-        data = numpy.array([
-                [(s.time - self.history[-1].time) / 1_000_000_000 for s in self.history],
-                [s.rate for s in self.history],
-            ])
+        samples = list(self.history)
+        desc = ""
+        for win in self.windows:
+            win.sample(samples)
+            desc += win.summary_char()
 
-        samplings = {
-            "20s": data[:, data[0, :] > -20],
-            "10s": data[:, data[0, :] > -10],
-            "05s": data[:, data[0, :] > -5],
-        }
-        slopes = {}
-        for name, samples in samplings.items():
-            reg = scipy.stats.linregress(samples)
-            slopes[name] = reg.slope
+        # long_samples = data[:, data[0, :] > -15]
+        cur_rate = samples[-1].rate
 
-        span = self.rate_max - self.rate_min
-        if span == 0:
-            mid = 0
-            avg = 0
-            place = 0
-        else:
-            mid = (self.rate_min + self.rate_max) / 2
-            avg = numpy.average(samplings["05s"][1, :])
-            place = (avg - mid) / ((self.rate_max - self.rate_min) / 2)
-        desc = f"{place:+.02f} "
+        if self.windows[0].climbs:
+            last_climb = self.windows[0].climbs[-1]
+            if cur_rate >= last_climb.max_rate:
+                desc += "!"
 
-        if slopes["20s"] > 0.3:
-            desc += "*"
-        elif slopes["20s"] > 0.1:
-            desc += "+"
-        else:
-            desc += "-"
+        # TODO: detect when the slopes are maximum and store the samples, to
+        # keep a reference of the span of the last climb(s)
 
-        if slopes["10s"] > 0.3:
-            desc += "*"
-        elif slopes["10s"] > 0.1:
-            desc += "+"
-        else:
-            desc += "-"
-
-        if slopes["05s"] > 0.3:
-            desc += "*"
-        elif slopes["05s"] > 0.1:
-            desc += "+"
-        else:
-            desc += "-"
-
-        # ST20 = 0.4
-        # ST10a = 0.3
-        # ST10b = 0.5
-        # ST05a = 0.1
-        # ST05b = 1.0
-
-        # state = "unknown"
-        # if slopes["10s"] > ST10a:
-        #     if slopes["05s"] > ST05a:
-        #         if slopes["05s"] > ST05b:
-        #             state = ".* very close"
-        #         else:
-        #             state = "++ climbing"
-        #     else:
-        #         state = "+- cooling"
-        # else:
-        #     if slopes["05s"] > ST05a:
-        #         if slopes["05s"] > ST05b:
-        #             state = "-* climbing fast"
-        #         else:
-        #             state = "-+ getting interested"
-        #     else:
-        #         state = "-- chill"
+        # TODO: when increasing, detect when the beat is going above the
+        # average or the span of the last climb
 
         print("History", [f"{s.rate:3.0f}" for s in self.history], end=" ")
-        print(f"20s: {slopes['20s']:+.04f}, 10s: {slopes['10s']:+.04f}, 05s: {slopes['05s']:+.04f}: {desc}")
+        slopes = ", ".join(f"{w.name}: {w.last_slope:+.04f}" for w in self.windows)
+        print(f"{slopes}: {desc}")
         sys.stdout.flush()
         # return
         # samplings = {
@@ -120,13 +133,11 @@ class Detector:
         initial = json.loads(await reader.readline())
         for sample in (HeartSample(*s) for s in initial["last"]):
             self.history.append(sample)
-            self.update_minmax(sample)
         self.check_history()
 
         while (line := await reader.readline()):
             sample = HeartSample(*json.loads(line))
             self.history.append(sample)
-            self.update_minmax(sample)
             self.check_history()
 
     async def loop(self):
