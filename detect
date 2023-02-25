@@ -85,9 +85,8 @@ class Window:
 
 
 class Detector:
-    def __init__(self, socket_name: str) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.heartbeat_socket = socket_name
         self.history: deque[HeartSample] = deque(maxlen=20)
         self.windows = [
             Window("15s", 15, slope_threshold=0.1),
@@ -128,8 +127,8 @@ class Detector:
         # }
         # slopes = {}
 
-    async def monitor_heartbeat(self):
-        reader, writer = await asyncio.open_unix_connection(self.heartbeat_socket)
+    async def read_socket(self, socket_name: str):
+        reader, writer = await asyncio.open_unix_connection(socket_name)
         initial = json.loads(await reader.readline())
         for sample in (HeartSample(*s) for s in initial["last"]):
             self.history.append(sample)
@@ -140,12 +139,19 @@ class Detector:
             self.history.append(sample)
             self.check_history()
 
-    async def loop(self):
-        await self.monitor_heartbeat()
+    async def read_file(self, pathname: str):
+        with open(pathname, "rt") as fd:
+            for line in fd:
+                sample = HeartSample(*json.loads(line))
+                self.history.append(sample)
+                self.check_history()
 
 
-async def amain(detector: Detector):
-    await detector.loop()
+async def amain(detector: Detector, input: str):
+    if input.endswith(".socket"):
+        await detector.read_socket(input)
+    else:
+        await detector.read_file(input)
 
 
 def main():
@@ -153,14 +159,14 @@ def main():
     # TODO: implement a slow start
 
     parser = argparse.ArgumentParser(description="Tone pattern generator")
-    parser.add_argument("--heart", metavar="socket", action="store",
-                        help="UNIX socket to use to listen for heartbeat")
+    parser.add_argument("input", metavar="file.{socket,json}", action="store",
+                        help="UNIX socket or JSONl history file to use to read heartbeat data")
     args = parser.parse_args()
 
-    detector = Detector(args.heart)
+    detector = Detector()
 
     try:
-        asyncio.run(amain(detector))
+        asyncio.run(amain(detector, args.input))
     except KeyboardInterrupt:
         print("Shutting down...")
     finally:
