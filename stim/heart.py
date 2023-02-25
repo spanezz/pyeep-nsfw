@@ -139,15 +139,22 @@ class Excitement:
         self.interesting = False
 
     @property
-    def climbing(self):
+    def last_rate(self) -> float:
+        if self.history:
+            return self.history[-1].rate
+        else:
+            return 0.0
+
+    @property
+    def climbing(self) -> bool:
         return self.window.climbs.current is not None
 
     @property
-    def falling(self):
+    def falling(self) -> bool:
         return self.window.falls.current is not None
 
     @property
-    def coasting(self):
+    def coasting(self) -> bool:
         return self.window.quiets.current is not None
 
     def check_history(self):
@@ -218,9 +225,10 @@ class Excitement:
         self.figure, self.ax = plt.subplots(figsize=(8, 6))
 
         last_time = all_samples[-1].time
+        time_scale = 60_000_000_000
 
         def graph_x(sample: HeartSample) -> float:
-            return (sample.time - last_time) / 1_000_000_000
+            return (sample.time - last_time) / time_scale
 
         plot_x = numpy.array([graph_x(s) for s in all_samples])
 
@@ -237,7 +245,7 @@ class Excitement:
                     ecolor="red")
             self.ax.errorbar(
                     graph_x(slope.samples[0]), slope.min_rate,
-                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / 1_000_000_000,
+                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / time_scale,
                     ecolor="red")
         for slope in self.window.falls.slopes:
             self.ax.errorbar(
@@ -246,7 +254,7 @@ class Excitement:
                     ecolor="blue")
             self.ax.errorbar(
                     graph_x(slope.samples[0]), slope.max_rate,
-                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / 1_000_000_000,
+                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / time_scale,
                     ecolor="blue")
         for slope in self.window.quiets.slopes:
             self.ax.errorbar(
@@ -255,7 +263,7 @@ class Excitement:
                     ecolor="green")
             self.ax.errorbar(
                     graph_x(slope.samples[0]), slope.mid_rate,
-                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / 1_000_000_000,
+                    xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / time_scale,
                     ecolor="green")
 
         # Plot areas of the graph where the last sample was triggering '!'
