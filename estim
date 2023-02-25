@@ -2,27 +2,18 @@
 
 import argparse
 import asyncio
-import json
-import math
 import random
 import sys
 import threading
 import time
-from collections import deque
-from typing import Generator, NamedTuple, Optional
+from typing import Generator, Optional
 
 import pyaudio
 
 from stim.pattern import (ChaosPulses, Pattern, PatternSequence, Pulses,
-                          Silence, Wave)
+                          Silence, Wave, WavyWave)
 from stim.player import Player, WaveWriter
-
-
-class HeartSample(NamedTuple):
-    # UNIX timestamp in nanoseconds
-    time: int
-    rate: float
-    rr: tuple[float] = ()
+from stim.heart import Excitement
 
 
 class Stim(Player, threading.Thread):
@@ -32,25 +23,19 @@ class Stim(Player, threading.Thread):
         self.stream: Optional[pyaudio.Stream] = None
         self.shutting_down = False
         self.heartbeat_socket: Optional[str] = None
-        self.heart_min: Optional[float] = None
-        self.heart_max: Optional[float] = None
-        self.heart_last: Optional[float] = None
+        self.excitement: Optional[Excitement] = None
+
+    def on_heartbeat_sample(self):
+        for pattern in self.channels:
+            pattern.on_heartbeat_sample()
 
     async def monitor_heartbeat(self):
         if self.heartbeat_socket is None:
             return
-        reader, writer = await asyncio.open_unix_connection(self.heartbeat_socket)
-        status = json.loads(await reader.readline())
-        self.heart_min = status["min"]
-        self.heart_max = status["max"]
-        self.heart_last = HeartSample(*status["last"][-1]).rate
-        while (line := await reader.readline()):
-            sample = HeartSample(*json.loads(line))
-            if self.heart_min is None or sample.rate < self.heart_min:
-                self.heart_min = sample.rate
-            if self.heart_max is None or sample.rate > self.heart_max:
-                self.heart_max = sample.rate
-            self.heart_last = sample.rate
+
+        self.excitement = Excitement(quiet=False)
+        self.excitement.on_sample = self.on_heartbeat_sample
+        await self.excitement.read_socket(self.heartbeat_socket)
 
     async def wait_for_patterns(self):
         while not all(c.ended for c in self.channels):
@@ -263,11 +248,12 @@ class HeartBeat(PatternSequence):
         yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
         yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
         while True:
-            if self.stim.heart_last is None:
+            if self.stim.excitement is None:
                 yield Silence(duration=0.2)
             else:
+                rate = self.stim.excitement.last_rate
                 pause = 3.0/10.0
-                duration = 60.0 / self.stim.heart_last
+                duration = 60.0 / rate
                 yield Wave(volume=1.0, freq=self.FREQ, duration=duration - pause)
                 yield Silence(duration=pause)
 
@@ -282,35 +268,20 @@ class HeartBeat1(PatternSequence):
     def patterns(self) -> Generator[Pattern, None, None]:
         yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
         yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
-        window = deque(maxlen=60)
         while True:
-            if self.stim.heart_last is None:
+            if (e := self.stim.excitement) is None:
                 yield Silence(duration=0.2)
             else:
-                val_last = self.stim.heart_last
-                window.append(val_last)
-                val_min = min(window)
-                val_max = max(window)
-                # val_mid = (val_min + val_max) / 2.0
-                # Value between -1 and 1
-                if val_min == val_max:
-                    val_norm = 0
-                else:
-                    val_norm = (val_last - val_min) / (val_max - val_min)
                 pause = 3.0 / 10.0
                 volume = 1.0
 
-                import scipy.stats
-                last_samples = list(window)[-5:]
-                res = scipy.stats.linregress(list(range(len(last_samples))), last_samples)
-                print(last_samples, res.slope)
-                if res.slope > 0:
+                if e.last_slope > 0:
                     duration = 1
                     pause = 0
-                elif res.slope == 0:
+                elif e.last_slope == 0:
                     duration = 2
                 else:
-                    duration = 60.0 / self.stim.heart_last * 2
+                    duration = 60.0 / e.last_rate * 2
                     volume = 0.9
 
                 # duration = math.asin(val_norm * 2 - 1) + math.pi / 2 + 1
@@ -326,10 +297,112 @@ class HeartBeat1(PatternSequence):
                 # else:
                 #     duration = 60.0 / self.stim.heart_last
                 #     duration *= ((val_norm + 0.5) * 3) ** 2
-                print(f"{val_last=} {val_min=} {val_max=} {val_norm=}")
                 yield Wave(volume=volume, freq=self.FREQ, duration=duration - pause)
                 if pause:
                     yield Silence(duration=pause)
+
+
+class HeartBeatFrustration(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self, stim: Stim):
+        super().__init__("sync pulses with heart beat variation")
+        self.stim = stim
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        while True:
+            duration = 1.0
+
+            if (e := self.stim.excitement) is None:
+                yield Silence(duration=0.2)
+                continue
+
+            if e.interesting:
+                yield Silence(duration=0.3)
+                continue
+
+            if e.climbing:
+                volume = 0.8
+                pause = 0.4
+                print("climbing", end=" ")
+            elif e.falling:
+                duration = 0.5
+                volume = 1.0
+                pause = 0
+                print("falling", end=" ")
+            elif e.coasting:
+                volume = 1.0
+                pause = 0.3
+                print("coasting", end=" ")
+            else:
+                volume = 1.0
+                pause = 0.3
+                print("none?", end=" ")
+
+            yield Wave(volume=volume, freq=self.FREQ, duration=duration - pause)
+            if pause:
+                yield Silence(duration=pause)
+
+
+class HeartBeatStimulation(PatternSequence):
+    FREQ = 1000
+
+    def __init__(self, stim: Stim):
+        super().__init__("sync pulses with heart beat variation")
+        self.stim = stim
+        self.last_volume = 0
+
+    def set_volume(self, target: float, step: float = 0.1) -> float:
+        if self.last_volume < target:
+            self.last_volume = max(1, self.last_volume + step)
+        elif self.last_volume > target:
+            self.last_volume = min(target, self.last_volume - step)
+        else:
+            self.last_volume = target
+        return self.last_volume
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            if (e := self.stim.excitement) is None:
+                yield Silence(duration=0.2)
+                continue
+
+            duration = 1.0
+            if e.interesting:
+                # TODO: increase gradually
+                volume = self.set_volume(1.0)
+                if volume < 1.0:
+                    duration = 0.5
+                else:
+                    duration = 10
+                pause = 0
+                print("interesting", end=" ")
+            elif e.climbing:
+                volume = self.set_volume(0.85)
+                duration = 0.5
+                pause = 0
+                print("climbing", end=" ")
+            elif e.falling:
+                volume = self.set_volume(0.6)
+                duration = 1.0
+                pause = 0.3
+                print("falling", end=" ")
+            elif e.coasting:
+                # TODO: volume variations/modulations in the pulse
+                volume = self.set_volume(0.7)
+                duration = 1.0
+                pause = 0.3
+                print("coasting", end=" ")
+            else:
+                volume = 0.7
+                pause = 0.3
+                print("none?", end=" ")
+
+            yield WavyWave(volume_min=volume - 0.1, volume_max=volume, freq=self.FREQ, duration=duration - pause)
+            if pause:
+                yield Silence(duration=pause)
 
 
 async def amain(player: Player):
@@ -360,8 +433,9 @@ def main():
         if args.calibrate:
             player.start_mono(Calibrate())
         else:
-            player.start_mono(HeartBeat1(player))
-            # player.start_mono(PulseWaveEscalate())
+            # player.start_mono(HeartBeatStimulation(player))
+            # player.start_mono(HeartBeatFrustration(player))
+            player.start_mono(PulseWaveEscalate())
             # player.start_mono(PulseWaveEscalateChaotic())
             # player.start_stereo(
             #         left=PulseWaveEscalate(),

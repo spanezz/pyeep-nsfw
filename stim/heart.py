@@ -146,6 +146,14 @@ class Excitement:
             return 0.0
 
     @property
+    def last_slope(self) -> float:
+        return self.window.last_slope
+
+    @property
+    def slope_climbing(self) -> float:
+        return self.window.slope_climbing
+
+    @property
     def climbing(self) -> bool:
         return self.window.climbs.current is not None
 
