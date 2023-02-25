@@ -19,6 +19,7 @@ class Player:
         # sampling rate, Hz, must be integer
         self.sample_rate = sample_rate
         self.channels: list[Pattern] = []
+        self.overrides: list[Pattern] = []
         self.numpy_type = numpy_type
         # See https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
         # This is used to seamlessly join consecutive waveforms
@@ -31,6 +32,7 @@ class Player:
         pattern.set_player(self, "mono")
         pattern.announce()
         self.channels.append(pattern)
+        self.overrides.append(None)
 
     def start_stereo(self, left: Pattern, right: Pattern):
         """
@@ -39,9 +41,11 @@ class Player:
         left.set_player(self, "left")
         left.announce()
         self.channels.append(left)
+        self.overrides.append(None)
         right.set_player(self, "right")
         right.announce()
         self.channels.append(right)
+        self.overrides.append(None)
 
     def get_samples(self, frame_count: int) -> numpy.ndarray:
         """
@@ -50,7 +54,12 @@ class Player:
         # See https://stackoverflow.com/questions/5347065/interweaving-two-numpy-arrays
         if len(self.channels) == 1:
             # Shortcut for mono output
-            wave = self.channels[0].read(frame_count)
+            if self.overrides[0] is not None:
+                wave = self.overrides[0].read(frame_count)
+                if wave.size < frame_count:
+                    self.overrides[0] = None
+            else:
+                wave = self.channels[0].read(frame_count)
             if wave.size < frame_count:
                 # Pad with silence
                 wave.resize(frame_count)
@@ -59,7 +68,12 @@ class Player:
         # General case for an arbitrary number of channels
         waves = numpy.empty(frame_count * len(self.channels), dtype=self.numpy_type)
         for idx, channel in enumerate(self.channels):
-            wave = self.channels[idx].read(frame_count)
+            if self.overrides[idx] is not None:
+                wave = self.overrides[idx].read(frame_count)
+                if wave.size < frame_count:
+                    self.overrides[idx] = None
+            else:
+                wave = self.channels[idx].read(frame_count)
             if wave.size < frame_count:
                 # Pad with silence
                 wave.resize(frame_count)
