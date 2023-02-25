@@ -2,207 +2,12 @@
 
 import argparse
 import asyncio
-import json
 import sys
-from collections import deque
-from typing import NamedTuple, Optional
 
-import numpy
-import scipy.stats
+from stim.heart import Excitement
 
 
-class HeartSample(NamedTuple):
-    # UNIX timestamp in nanoseconds
-    time: int
-    rate: float
-    rr: tuple[float] = ()
-
-
-class Climb:
-    def __init__(self, samples: list[HeartSample], slope: float):
-        self.samples = list(samples)
-        self.min_slope: float = slope
-        self.max_slope: float = slope
-        self.last_slope: float = slope
-        self.min_rate: float = min(s.rate for s in samples)
-        self.max_rate: float = max(s.rate for s in samples)
-
-    @property
-    def duration(self) -> float:
-        return (self.samples[-1].time - self.samples[0].time) / 1_000_000_000
-
-    def extend(self, samples: list[HeartSample], slope: float):
-        new_samples = [s for s in samples if s.time > self.samples[-1].time]
-        self.samples.extend(new_samples)
-        for s in new_samples:
-            if s.rate < self.min_rate:
-                self.min_rate = s.rate
-            if s.rate > self.max_rate:
-                self.max_rate = s.rate
-        if slope < self.min_slope:
-            self.min_slope = slope
-        if slope > self.max_slope:
-            self.max_slope = slope
-        self.last_slope = slope
-
-
-class Window:
-    def __init__(self, name: str, width_seconds: float, slope_threshold: float, color: str):
-        self.name = name
-        self.color = color
-        self.width_seconds = width_seconds
-        # Minimum value for tracking slopes
-        self.slope_threshold = slope_threshold
-        self.climbs: list[Climb] = []
-        self.current_climb: Optional[Climb] = None
-        self.last_slope: float = 0.0
-
-    def sample(self, samples: list[HeartSample]):
-        last_time = samples[-1].time
-        threshold = last_time - self.width_seconds * 1_000_000_000
-        window_samples = [s for s in samples if s.time >= threshold]
-        if len(window_samples) <= 1:
-            return
-        data = numpy.array([
-            [(s.time - last_time) / 1_000_000_000 for s in window_samples],
-            [s.rate for s in window_samples]])
-        reg = scipy.stats.linregress(data)
-        if reg.slope > self.slope_threshold:
-            if self.current_climb is None:
-                self.current_climb = Climb(window_samples, reg.slope)
-            else:
-                self.current_climb.extend(window_samples, reg.slope)
-        else:
-            if self.current_climb and self.current_climb.duration > 3.0:
-                self.climbs.append(self.current_climb)
-            self.current_climb = None
-        self.last_slope = reg.slope
-
-    def summary_char(self) -> str:
-        if self.current_climb is None:
-            return "-"
-        elif self.current_climb.last_slope > 0.3:
-            return "*"
-        else:
-            return "+"
-
-
-class HSpan:
-    def __init__(self, sample: HeartSample):
-        self.min_sample = sample
-        self.max_sample = sample
-
-    def add(self, sample: HeartSample):
-        self.max_sample = sample
-
-
-class Detector:
-    def __init__(self) -> None:
-        super().__init__()
-        self.history: deque[HeartSample] = deque(maxlen=20)
-        self.windows = [
-            Window("15s", 15, slope_threshold=0.1, color="red"),
-            Window("10s", 10, slope_threshold=0.1, color="darkorange"),
-            Window("05s", 5, slope_threshold=0.1, color="gold"),
-        ]
-        self.hspans: list[HSpan] = []
-        self.current_hspan: Optional[HSpan] = None
-
-    def check_history(self, quiet: bool = False):
-        samples = list(self.history)
-        desc = ""
-        for win in self.windows:
-            win.sample(samples)
-            desc += win.summary_char()
-
-        # long_samples = data[:, data[0, :] > -15]
-        cur_rate = samples[-1].rate
-
-        if self.windows[0].climbs:
-            last_climb = self.windows[0].climbs[-1]
-            if cur_rate >= last_climb.max_rate:
-                desc += "!"
-                if self.current_hspan is None:
-                    self.current_hspan = HSpan(samples[-1])
-                else:
-                    self.current_hspan.add(samples[-1])
-            elif self.current_hspan is not None:
-                self.hspans.append(self.current_hspan)
-                self.current_hspan = None
-
-        # TODO: detect when the slopes are maximum and store the samples, to
-        # keep a reference of the span of the last climb(s)
-
-        # TODO: when increasing, detect when the beat is going above the
-        # average or the span of the last climb
-
-        if not quiet:
-            print("History", [f"{s.rate:3.0f}" for s in self.history], end=" ")
-            slopes = ", ".join(f"{w.name}: {w.last_slope:+.04f}" for w in self.windows)
-            print(f"{slopes}: {desc}")
-            sys.stdout.flush()
-        # return
-        # samplings = {
-        #     "last20": last20,
-        #     "last10": last20[-10:],
-        #     "last05": last20[-5:],
-        # }
-        # slopes = {}
-
-    async def read_socket(self, socket_name: str):
-        reader, writer = await asyncio.open_unix_connection(socket_name)
-        initial = json.loads(await reader.readline())
-        for sample in (HeartSample(*s) for s in initial["last"]):
-            self.history.append(sample)
-        self.check_history()
-
-        while (line := await reader.readline()):
-            sample = HeartSample(*json.loads(line))
-            self.history.append(sample)
-            self.check_history()
-
-    async def read_file(self, pathname: str):
-        all_samples: list[HeartSample] = []
-        with open(pathname, "rt") as fd:
-            for line in fd:
-                sample = HeartSample(*json.loads(line))
-                all_samples.append(sample)
-                self.history.append(sample)
-                self.check_history(quiet=True)
-
-        import matplotlib.pyplot as plt
-        self.figure, self.ax = plt.subplots(figsize=(8, 6))
-
-        last_time = all_samples[-1].time
-
-        def graph_x(sample: HeartSample) -> float:
-            return (sample.time - last_time) / 1_000_000_000
-
-        plot_x = numpy.array([graph_x(s) for s in all_samples])
-
-        # plot all_samples
-        plot_y = numpy.array([s.rate for s in all_samples])
-        self.ax.set_ylim([numpy.nanmin(plot_y) - 10, numpy.nanmax(plot_y) + 1])
-        self.ax.plot(plot_x, plot_y)
-
-        # TODO: highlight slopes for all window sizes (colored vertical bar from the slope starting point)
-        for window in self.windows:
-            for climb in window.climbs:
-                self.ax.errorbar(graph_x(climb.samples[0]), climb.min_rate, lolims=True, yerr=climb.max_rate - climb.min_rate, ecolor=window.color)
-                self.ax.errorbar(graph_x(climb.samples[0]), climb.min_rate, xlolims=True, xerr=(climb.samples[-1].time - climb.samples[0].time) / 1_000_000_000, ecolor=window.color)
-
-        # Plot areas of the graph where the last sample was triggering '!'
-        for hspan in self.hspans:
-            self.ax.axvspan(graph_x(hspan.min_sample), graph_x(hspan.max_sample), color="crimson", alpha=0.3)
-            # self.ax.axvspan(graph_x(climb.samples[0]), graph_x(climb.samples[-1]), climb.min_rate, climb.max_rate, color="red", alpha=0.2)
-
-
-            # self.ax.axvspan(graph_x(climb.samples[0]), graph_x(climb.samples[-1]), climb.min_rate, climb.max_rate, color="red", alpha=0.2)
-
-        plt.show()
-
-
-async def amain(detector: Detector, input: str):
+async def amain(detector: Excitement, input: str):
     if input.endswith(".socket"):
         await detector.read_socket(input)
     else:
@@ -216,9 +21,11 @@ def main():
     parser = argparse.ArgumentParser(description="Tone pattern generator")
     parser.add_argument("input", metavar="file.{socket,json}", action="store",
                         help="UNIX socket or JSONl history file to use to read heartbeat data")
+    parser.add_argument("--quiet", "-q", action="store_true",
+                        help="do not print values as they are processed")
     args = parser.parse_args()
 
-    detector = Detector()
+    detector = Excitement(quiet=args.quiet)
 
     try:
         asyncio.run(amain(detector, args.input))
