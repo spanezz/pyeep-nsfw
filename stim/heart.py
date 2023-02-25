@@ -76,6 +76,7 @@ class Slopes:
                 self.current = None
                 return 3
             else:
+                self.current = None
                 return 0
 
 
