@@ -4,7 +4,7 @@ import asyncio
 import json
 import sys
 from collections import deque
-from typing import NamedTuple, Optional
+from typing import Callable, NamedTuple, Optional
 
 import numpy
 import scipy.stats
@@ -110,7 +110,7 @@ class Window:
         f = self.falls.check(window_samples, reg.slope, reg.slope < -0.3)
         q = self.quiets.check(window_samples, reg.slope, variance < 1.0 or (reg.slope < 0.1 and reg.slope > -0.1))
         # q = self.quiets.check(window_samples, reg.slope, variance < 1.0)
-        self.summary = " ↑↗⇥"[c] + " ↓↘⇥"[f] + " ↦-↤"[q]
+        self.summary = ".↑↗⇥"[c] + ".↓↘⇥"[f] + ".↦-↤"[q]
         self.slope_climbing = reg.slope > 0 and reg.slope >= self.last_slope
         if self.slope_climbing:
             self.summary += "↺"
@@ -138,6 +138,7 @@ class Excitement:
         self.hspans: list[HSpan] = []
         self.current_hspan: Optional[HSpan] = None
         self.interesting = False
+        self.on_sample: Optional[Callable[[], None]] = None
 
     @property
     def last_rate(self) -> float:
@@ -220,6 +221,8 @@ class Excitement:
             sample = HeartSample(*json.loads(line))
             self.history.append(sample)
             self.check_history()
+            if self.on_sample:
+                self.on_sample()
 
     async def read_file(self, pathname: str):
         all_samples: list[HeartSample] = []

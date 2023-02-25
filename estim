@@ -77,9 +77,9 @@ class Stim(Player, threading.Thread):
 class PulseWaveEscalateBase(PatternSequence):
     PULSE_VOLUME = 0.9
     WAVE_VOLUME = 1
-    # MIN_DURATION = 0
-    MIN_DURATION = 20
-    # START = 1
+    MIN_DURATION = 0
+    # MIN_DURATION = 20
+    START = 1
     START = 20
 
     def duration_pattern(self) -> Generator[float, None, None]:
@@ -96,13 +96,35 @@ class PulseWaveEscalateBase(PatternSequence):
 
 
 class PulseWaveEscalate(PulseWaveEscalateBase):
+    PULSE_VOLUME = 0.9
+    WAVE_VOLUME = 0.95
+
     def __init__(self):
         super().__init__("pulse wave escalate")
 
+    def on_heartbeat_sample(self):
+        e = self.player.excitement
+
+        if e.interesting:
+            for idx in range(len(self.player.channels)):
+                # print("things are getting interesting!")
+                pattern = WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=15.0)
+                # pattern = Silence(duration=2.0)
+                self.player.overrides[idx] = pattern
+                pattern.set_player(self.player, self.player.channels[idx].channel_name)
+                pattern.announce()
+
     def patterns(self) -> Generator[Pattern, None, None]:
+        # TODO: implement adding an override pattern in the player, which gets
+        # played instead of the current one, with the current one getting
+        # paused.
+        # With a callback from the heart rate monitor, enqueue override
+        # patterns in case things get interesting
         for i, f in zip(self.duration_pattern(), self.freq_pattern()):
             yield Pulses(count=i * 2, duration=0.1, freq=f, volume=self.PULSE_VOLUME, gap=5.0/100.0)
-            yield Wave(volume=self.WAVE_VOLUME, duration=self.MIN_DURATION + i / 2, freq=f)
+            yield WavyWave(
+                    volume_min=self.WAVE_VOLUME * 0.93, volume_max=self.WAVE_VOLUME, volume_freq=3,
+                    duration=self.MIN_DURATION + i / 2, freq=f)
             yield Silence(duration=5.0/100.0)
 
 
