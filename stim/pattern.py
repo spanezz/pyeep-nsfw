@@ -15,11 +15,14 @@ class Pattern:
     """
     Abstract interface for a wave generator
     """
-    def __init__(self, description: str):
+    def __init__(self, description: Optional[str] = None):
         self.player: "Player"
         self.channel_name: str
         self.buffer = io.BytesIO()
-        self.description = description
+        if description is None:
+            self.description = self.__doc__.strip().splitlines()[0].strip()
+        else:
+            self.description = description
         self.is_silence = False
         self._iter_waves: Optional[Iterator[numpy.ndarray]] = None
         self.current_wave: Optional[numpy.ndarray] = None
