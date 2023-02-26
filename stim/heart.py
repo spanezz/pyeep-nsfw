@@ -205,10 +205,13 @@ class Excitement:
         # keep a reference of the span of the last climb(s)
 
         if not self.quiet:
-            print("History", [f"{s.rate:3.0f}" for s in self.history], end=" ")
-            w = self.window
-            print(f"{w.name}: {w.last_slope:+.04f}: {desc}")
-            sys.stdout.flush()
+            self.print_status(desc)
+
+    def print_status(self, desc: str):
+        print("History", [f"{s.rate:3.0f}" for s in self.history], end=" ")
+        w = self.window
+        print(f"{w.name}: {w.last_slope:+.04f}: {desc}")
+        sys.stdout.flush()
 
     async def read_socket(self, socket_name: str):
         reader, writer = await asyncio.open_unix_connection(socket_name)
