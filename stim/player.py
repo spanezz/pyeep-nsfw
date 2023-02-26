@@ -47,6 +47,28 @@ class Player:
         self.channels.append(right)
         self.overrides.append(None)
 
+    def announce_pattern(self, pattern: Pattern) -> None:
+        print("〜", pattern.channel_name, pattern.description)
+
+    def set_override(self, channel_name: str, pattern: Pattern, replace: bool = False):
+        """
+        Set a pattern to temporarily suspend the one for the current channel
+        and play instead.
+
+        The current pattern will resume once the overriding pattern terminates.
+
+        If `replace` is True, an existing override will be replaced.
+        """
+        if channel_name in ("mono", "left"):
+            index = 0
+        elif channel_name == "right":
+            index = 1
+
+        if self.overrides[index] is None or replace:
+            pattern.set_player(self, channel_name)
+            self.overrides[index] = pattern
+            pattern.announce()
+
     def get_samples(self, frame_count: int) -> numpy.ndarray:
         """
         Get the next `frame_count` frames of audio data to be played

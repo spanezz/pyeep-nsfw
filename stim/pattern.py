@@ -59,7 +59,7 @@ class Pattern:
     def announce(self):
         if self.is_silence:
             return
-        print("〜", self.channel_name, self.description)
+        self.player.announce_pattern(self)
 
     def read(self, nsamples: int) -> numpy.ndarray:
         """
