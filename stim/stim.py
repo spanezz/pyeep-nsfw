@@ -10,7 +10,6 @@ from typing import Optional
 import pyaudio
 
 from stim.player import Player
-from stim.heart import Excitement
 
 
 @contextlib.contextmanager
@@ -42,20 +41,6 @@ class Stim(Player, threading.Thread):
             self.audio = pyaudio.PyAudio()
         self.stream: Optional[pyaudio.Stream] = None
         self.shutting_down = False
-        self.heartbeat_socket: Optional[str] = None
-        self.excitement: Optional[Excitement] = None
-
-    def on_heartbeat_sample(self):
-        for pattern in self.channels:
-            pattern.on_heartbeat_sample()
-
-    async def monitor_heartbeat(self):
-        if self.heartbeat_socket is None:
-            return
-
-        self.excitement = Excitement(quiet=False)
-        self.excitement.on_sample = self.on_heartbeat_sample
-        await self.excitement.read_socket(self.heartbeat_socket)
 
     async def wait_for_patterns(self):
         while not all(c.ended for c in self.channels):
@@ -63,7 +48,7 @@ class Stim(Player, threading.Thread):
 
     async def loop(self):
         self.start()
-        await asyncio.gather(self.monitor_heartbeat(), self.wait_for_patterns())
+        await self.wait_for_patterns()
 
     def shutdown(self):
         print("shutting down")

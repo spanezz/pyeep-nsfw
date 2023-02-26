@@ -8,6 +8,7 @@ import numpy
 
 if TYPE_CHECKING:
     from .player import Player
+    from .excitement import Excitement
 
 
 class Pattern:
@@ -29,7 +30,7 @@ class Pattern:
         self.player = player
         self.channel_name = channel_name
 
-    def on_heartbeat_sample(self):
+    def on_heartbeat_sample(self, excitement: Excitement):
         """
         Hook called when a new heartbeat sample arrives
         """

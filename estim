@@ -4,12 +4,13 @@ import argparse
 import asyncio
 import random
 import sys
-from typing import Generator
+from typing import Generator, Optional
 
 from stim.stim import Stim
 from stim.pattern import (ChaosPulses, Pattern, PatternSequence, Pulses,
                           Silence, Wave, WavyWave)
-from stim.player import Player, WaveWriter
+from stim.player import WaveWriter
+from stim.heart import Excitement
 
 
 class PulseWaveEscalateBase(PatternSequence):
@@ -40,9 +41,8 @@ class PulseWaveEscalate(PulseWaveEscalateBase):
     def __init__(self):
         super().__init__("pulse wave escalate")
 
-    def on_heartbeat_sample(self):
-        e = self.player.excitement
-
+    def on_heartbeat_sample(self, excitement: Excitement):
+        e = excitement
         if e.interesting:
             for idx in range(len(self.player.channels)):
                 # print("things are getting interesting!")
@@ -370,16 +370,26 @@ class App:
             self.player = WaveWriter(args.output)
         else:
             self.player = Stim()
+        self.excitement: Optional[Excitement] = None
+
+    def on_heartbeat_sample(self):
+        for pattern in self.player.channels:
+            pattern.on_heartbeat_sample(self.excitement)
+
+    async def monitor_heartbeat(self):
+        if self.args.heart is None:
+            return
+
+        self.excitement = Excitement(quiet=False)
+        self.excitement.on_sample = self.on_heartbeat_sample
+        await self.excitement.read_socket(self.args.heart)
 
     async def calibrate(self):
         self.player.start_mono(Calibrate())
         await self.player.loop()
 
     async def stim(self):
-        if self.args.heart:
-            self.player.heartbeat_socket = self.args.heart
-
-        await self.player.loop()
+        await asyncio.gather(self.monitor_heartbeat(), self.player.loop())
 
     def main(self):
         try:
