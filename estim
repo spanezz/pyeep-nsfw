@@ -34,20 +34,29 @@ class PulseWaveEscalateBase(PatternSequence):
             yield random.choice([1000, 2000, 5000])
 
 
+class TeaseAndDenial(PatternSequence):
+    """
+    Tease and denial
+    """
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=1.0)
+        yield Silence(duration=2.0)
+
+
 class PulseWaveEscalate(PulseWaveEscalateBase):
+    """
+    Pulse wave escalate
+    """
     PULSE_VOLUME = 0.9
     WAVE_VOLUME = 0.95
-
-    def __init__(self):
-        super().__init__("pulse wave escalate")
 
     def on_heartbeat_sample(self, excitement: Excitement):
         e = excitement
         if e.interesting:
             for idx in range(len(self.player.channels)):
                 # print("things are getting interesting!")
-                pattern = WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=15.0)
-                # pattern = Silence(duration=2.0)
+                # pattern = WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=15.0)
+                pattern = TeaseAndDenial()
                 self.player.set_override(self.channel_name, pattern)
 
     def patterns(self) -> Generator[Pattern, None, None]:
