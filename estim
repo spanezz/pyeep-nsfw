@@ -74,10 +74,10 @@ class PulseWaveEscalate(PulseWaveEscalateBase):
 
 
 class PulseWaveEscalateChaotic(PulseWaveEscalateBase):
+    """
+    Pulse wave escalate with chaotic pulses
+    """
     FREQ = 1000
-
-    def __init__(self):
-        super().__init__("pulse wave escalate with chaotic pulses")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         for i, f in zip(self.duration_pattern(), self.freq_pattern()):
@@ -87,11 +87,11 @@ class PulseWaveEscalateChaotic(PulseWaveEscalateBase):
 
 
 class PulseWaveEscalate2(PulseWaveEscalateBase):
+    """
+    Pulse wave escalate 2
+    """
     FREQ = 1000
     PULSE_VOLUME = 1.0
-
-    def __init__(self):
-        super().__init__("pulse wave escalate 2")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         for i in self.duration_pattern():
@@ -101,9 +101,9 @@ class PulseWaveEscalate2(PulseWaveEscalateBase):
 
 
 class VolumeSwing(PatternSequence):
-    def __init__(self):
-        super().__init__("frequency swing")
-
+    """
+    Volume swing
+    """
     def patterns(self) -> Generator[Pattern, None, None]:
         while True:
             for volume in range(50, 100, 5):
@@ -115,9 +115,9 @@ class VolumeSwing(PatternSequence):
 
 
 class FrequencyDifference(PatternSequence):
-    def __init__(self):
-        super().__init__("frequency swing")
-
+    """
+    Frequency difference
+    """
     def patterns(self) -> Generator[Pattern, None, None]:
         while True:
             # yield Wave(volume=1.0, duration=1, freq=200)
@@ -125,10 +125,10 @@ class FrequencyDifference(PatternSequence):
 
 
 class Caress(PatternSequence):
+    """
+    Caress
+    """
     FREQ = 1000
-
-    def __init__(self):
-        super().__init__("caress")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         yield Wave(volume=0.3, duration=0.5, freq=self.FREQ)
@@ -143,10 +143,10 @@ class Caress(PatternSequence):
 
 
 class Calibrate(PatternSequence):
+    """
+    Calibration tune
+    """
     FREQ = 1000.0
-
-    def __init__(self):
-        super().__init__("calibration tune")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         while True:
@@ -154,9 +154,9 @@ class Calibrate(PatternSequence):
 
 
 class FrequencySwing(PatternSequence):
-    def __init__(self):
-        super().__init__("frequency swing")
-
+    """
+    Frequency swing
+    """
     def patterns(self) -> Generator[Pattern, None, None]:
         for freq in range(50, 1000, 100):
             yield Wave(volume=1.0, duration=1, freq=freq)
@@ -190,10 +190,10 @@ class NumberSequencePulseWave(PatternSequence):
 
 
 class RandomPauseWave(PatternSequence):
+    """
+    Wave with random pause
+    """
     FREQ = 1000
-
-    def __init__(self):
-        super().__init__("wave with random pause")
 
     def patterns(self) -> Generator[Pattern, None, None]:
         import random
@@ -204,77 +204,88 @@ class RandomPauseWave(PatternSequence):
             yield Silence(duration=random.uniform(3.0/10.0, 1))
 
 
-class HeartBeat(PatternSequence):
-    FREQ = 1000
+class ContinuousHeartMonitorMixin:
+    """
+    Mixin for patterns that continuously take decisions based on heart rate
+    """
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.excitement: Optional[Excitement] = None
 
-    def __init__(self, stim: Stim):
-        super().__init__("sync pulses with heart beat")
-        self.stim = stim
+    def on_heartbeat_sample(self, excitement: Excitement):
+        self.excitement = excitement
+
+
+class HeartBeat(ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    Sync pulses with heart beat
+    """
+    FREQ = 1000
 
     def patterns(self) -> Generator[Pattern, None, None]:
         yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
         yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
         while True:
-            if self.stim.excitement is None:
+            if self.excitement is None:
                 yield Silence(duration=0.2)
+                continue
+
+            rate = self.excitement.last_rate
+            pause = 3.0/10.0
+            duration = 60.0 / rate
+            yield Wave(volume=1.0, freq=self.FREQ, duration=duration - pause)
+            yield Silence(duration=pause)
+
+
+class HeartBeat1(ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    sync pulses with heart beat variation
+    """
+    FREQ = 1000
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        while True:
+            if (e := self.excitement) is None:
+                yield Silence(duration=0.2)
+                continue
+
+            pause = 3.0 / 10.0
+            volume = 1.0
+
+            if e.last_slope > 0:
+                duration = 1
+                pause = 0
+            elif e.last_slope == 0:
+                duration = 2
             else:
-                rate = self.stim.excitement.last_rate
-                pause = 3.0/10.0
-                duration = 60.0 / rate
-                yield Wave(volume=1.0, freq=self.FREQ, duration=duration - pause)
+                duration = 60.0 / e.last_rate * 2
+                volume = 0.9
+
+            # duration = math.asin(val_norm * 2 - 1) + math.pi / 2 + 1
+
+            # duration = val_norm ** 2 * 2 + 1
+
+            # duration = 3 - val_norm ** 2 * 2.5
+
+            # duration = val_norm ** 2 * 2.5 + 0.5
+
+            # if val_norm < 0.5:
+            #     duration = 60.0 / self.stim.heart_last
+            # else:
+            #     duration = 60.0 / self.stim.heart_last
+            #     duration *= ((val_norm + 0.5) * 3) ** 2
+            yield Wave(volume=volume, freq=self.FREQ, duration=duration - pause)
+            if pause:
                 yield Silence(duration=pause)
 
 
-class HeartBeat1(PatternSequence):
+class HeartBeatFrustration(ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    Lower stimulation when excitement increases
+    """
     FREQ = 1000
-
-    def __init__(self, stim: Stim):
-        super().__init__("sync pulses with heart beat variation")
-        self.stim = stim
-
-    def patterns(self) -> Generator[Pattern, None, None]:
-        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
-        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
-        while True:
-            if (e := self.stim.excitement) is None:
-                yield Silence(duration=0.2)
-            else:
-                pause = 3.0 / 10.0
-                volume = 1.0
-
-                if e.last_slope > 0:
-                    duration = 1
-                    pause = 0
-                elif e.last_slope == 0:
-                    duration = 2
-                else:
-                    duration = 60.0 / e.last_rate * 2
-                    volume = 0.9
-
-                # duration = math.asin(val_norm * 2 - 1) + math.pi / 2 + 1
-
-                # duration = val_norm ** 2 * 2 + 1
-
-                # duration = 3 - val_norm ** 2 * 2.5
-
-                # duration = val_norm ** 2 * 2.5 + 0.5
-
-                # if val_norm < 0.5:
-                #     duration = 60.0 / self.stim.heart_last
-                # else:
-                #     duration = 60.0 / self.stim.heart_last
-                #     duration *= ((val_norm + 0.5) * 3) ** 2
-                yield Wave(volume=volume, freq=self.FREQ, duration=duration - pause)
-                if pause:
-                    yield Silence(duration=pause)
-
-
-class HeartBeatFrustration(PatternSequence):
-    FREQ = 1000
-
-    def __init__(self, stim: Stim):
-        super().__init__("sync pulses with heart beat variation")
-        self.stim = stim
 
     def patterns(self) -> Generator[Pattern, None, None]:
         yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
@@ -282,7 +293,7 @@ class HeartBeatFrustration(PatternSequence):
         while True:
             duration = 1.0
 
-            if (e := self.stim.excitement) is None:
+            if (e := self.excitement) is None:
                 yield Silence(duration=0.2)
                 continue
 
@@ -313,13 +324,11 @@ class HeartBeatFrustration(PatternSequence):
                 yield Silence(duration=pause)
 
 
-class HeartBeatStimulation(PatternSequence):
+class HeartBeatStimulation(ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    Intensify stimulation when excitement increases
+    """
     FREQ = 1000
-
-    def __init__(self, stim: Stim):
-        super().__init__("sync pulses with heart beat variation")
-        self.stim = stim
-        self.last_volume = 0
 
     def set_volume(self, target: float, step: float = 0.1) -> float:
         if self.last_volume < target:
@@ -331,8 +340,9 @@ class HeartBeatStimulation(PatternSequence):
         return self.last_volume
 
     def patterns(self) -> Generator[Pattern, None, None]:
+        self.last_volume = 0
         while True:
-            if (e := self.stim.excitement) is None:
+            if (e := self.excitement) is None:
                 yield Silence(duration=0.2)
                 continue
 
@@ -367,7 +377,9 @@ class HeartBeatStimulation(PatternSequence):
                 pause = 0.3
                 print("none?", end=" ")
 
-            yield WavyWave(volume_min=volume - 0.1, volume_max=volume, freq=self.FREQ, duration=duration - pause)
+            yield WavyWave(
+                    volume_min=volume - 0.1, volume_max=volume, volume_freq=3,
+                    freq=self.FREQ, duration=duration - pause)
             if pause:
                 yield Silence(duration=pause)
 
@@ -405,9 +417,10 @@ class App:
             if self.args.calibrate:
                 asyncio.run(self.calibrate())
             else:
-                # player.start_mono(HeartBeatStimulation(player))
-                # player.start_mono(HeartBeatFrustration(player))
-                self.player.start_mono(PulseWaveEscalate())
+                # self.player.start_mono(HeartBeat1())
+                # self.player.start_mono(HeartBeatStimulation())
+                self.player.start_mono(HeartBeatFrustration())
+                # self.player.start_mono(PulseWaveEscalate())
                 # player.start_mono(PulseWaveEscalateChaotic())
                 # player.start_stereo(
                 #         left=PulseWaveEscalate(),
