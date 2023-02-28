@@ -237,6 +237,7 @@ class HeartBeat(ContinuousHeartMonitorMixin, PatternSequence):
             yield Silence(duration=pause)
 
 
+# https://pages.mtu.edu/~suits/notefreqs.html
 C4 = 261.63
 E4 = 329.63
 G4 = 392.00
