@@ -478,7 +478,7 @@ class App:
                 # self.player.start_mono(HeartBeatStimulation())
                 # self.player.start_mono(HeartBeatFrustration())
                 # self.player.start_mono(HeartBeatProportional())
-                self.player.start_mono(FrequencySwing())
+                self.player.start_mono(TestVolumeSlide())
                 # self.player.start_mono(PulseWaveEscalate())
                 # player.start_mono(PulseWaveEscalateChaotic())
                 # player.start_stereo(

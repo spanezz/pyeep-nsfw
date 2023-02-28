@@ -7,7 +7,7 @@ class Volume:
     def __repr__(self):
         return self.__str__()
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
         raise NotImplementedError(f"{self.__class__.__name__}.make_array not implemented")
 
 
@@ -22,13 +22,18 @@ class Sine(Volume):
     def __str__(self):
         return f"sine({self.vmin}-{self.vmax}, {self.freq}Hz)"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
         """
+        if last_value is not None:
+            sync_factor = numpy.arcsin(last_value)
+        else:
+            sync_factor = 0.0
+
         volume_factor = 2.0 * numpy.pi * self.freq / sample_rate
-        return numpy.sin(x * volume_factor) * (self.vmax - self.vmin) + self.vmin
+        return numpy.sin(x * volume_factor + sync_factor) * (self.vmax - self.vmin) + self.vmin
 
 
 class RampUp(Volume):
@@ -41,7 +46,7 @@ class RampUp(Volume):
     def __str__(self):
         return f"ramp_up({self.vmin}-{self.vmax})"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
@@ -59,7 +64,7 @@ class RampDown(Volume):
     def __str__(self):
         return f"ramp_down({self.vmin}-{self.vmax})"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
