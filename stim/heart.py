@@ -89,7 +89,7 @@ class Window:
         self.width_seconds = width_seconds
         self.climbs = Slopes(min_slope_duration=3.0, min_slope_height=6)
         self.falls = Slopes(min_slope_duration=3.0, min_slope_height=6)
-        self.quiets = Slopes(min_slope_duration=8, min_slope_height=0)
+        self.coasts = Slopes(min_slope_duration=8, min_slope_height=0)
         self.last_slope: float = 0.0
         self.last_variance: float = 0.0
         self.slope_climbing: bool = False
@@ -108,8 +108,8 @@ class Window:
         variance = numpy.var(data[1, :])
         c = self.climbs.check(window_samples, reg.slope, reg.slope > 0.3)
         f = self.falls.check(window_samples, reg.slope, reg.slope < -0.3)
-        q = self.quiets.check(window_samples, reg.slope, variance < 1.0 or (reg.slope < 0.1 and reg.slope > -0.1))
-        # q = self.quiets.check(window_samples, reg.slope, variance < 1.0)
+        q = self.coasts.check(window_samples, reg.slope, variance < 1.0 or (reg.slope < 0.1 and reg.slope > -0.1))
+        # q = self.coasts.check(window_samples, reg.slope, variance < 1.0)
         self.summary = ".↑↗⇥"[c] + ".↓↘⇥"[f] + ".↦-↤"[q]
         self.slope_climbing = reg.slope > 0 and reg.slope >= self.last_slope
         if self.slope_climbing:
@@ -165,7 +165,34 @@ class Excitement:
 
     @property
     def coasting(self) -> bool:
-        return self.window.quiets.current is not None
+        return self.window.coasts.current is not None
+
+    @property
+    def current_slope(self) -> str:
+        """
+        Return "climb", "fall", "coast", or "none" depending on what is the
+        most recent current slope
+        """
+        max_start: float | None = None
+
+        res = "none"
+
+        if (slope := self.window.climbs.current) is not None:
+            if max_start is None or max_start < slope.samples[0].time:
+                max_start = slope.samples[0].time
+                res = "climb"
+
+        if (slope := self.window.coasts.current) is not None:
+            if max_start is None or max_start < slope.samples[0].time:
+                max_start = slope.samples[0].time
+                res = "coast"
+
+        if (slope := self.window.falls.current) is not None:
+            if max_start is None or max_start < slope.samples[0].time:
+                max_start = slope.samples[0].time
+                res = "fall"
+
+        return res
 
     def check_history(self):
         samples = list(self.history)
@@ -177,17 +204,17 @@ class Excitement:
         cur_rate = samples[-1].rate
 
         last_fall: Optional[Slope] = self.window.falls.slopes[-1] if self.window.falls.slopes else None
-        last_quiet: Optional[Slope] = self.window.quiets.slopes[-1] if self.window.quiets.slopes else None
+        last_coast: Optional[Slope] = self.window.coasts.slopes[-1] if self.window.coasts.slopes else None
         self.interesting = False
-        if self.window.slope_climbing and (last_fall or last_quiet):
+        if self.window.slope_climbing and (last_fall or last_coast):
             if last_fall is None:
-                threshold = last_quiet.mid_rate
-            elif last_quiet is None:
+                threshold = last_coast.mid_rate
+            elif last_coast is None:
                 threshold = last_fall.min_rate
-            elif last_quiet.samples[-1].time < last_fall.samples[-1].time:
+            elif last_coast.samples[-1].time < last_fall.samples[-1].time:
                 threshold = last_fall.min_rate
             else:
-                threshold = last_quiet.mid_rate
+                threshold = last_coast.mid_rate
             if cur_rate >= threshold and self.window.falls.current is None:
                 self.interesting = True
 
@@ -271,7 +298,7 @@ class Excitement:
                     graph_x(slope.samples[0]), slope.max_rate,
                     xlolims=True, xerr=(slope.samples[-1].time - slope.samples[0].time) / time_scale,
                     ecolor="blue")
-        for slope in self.window.quiets.slopes:
+        for slope in self.window.coasts.slopes:
             self.ax.errorbar(
                     graph_x(slope.samples[0]), slope.mid_rate,
                     yerr=(slope.max_rate - slope.min_rate) / 2,
