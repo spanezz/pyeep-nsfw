@@ -237,6 +237,54 @@ class HeartBeat(ContinuousHeartMonitorMixin, PatternSequence):
             yield Silence(duration=pause)
 
 
+C4 = 261.63
+E4 = 329.63
+G4 = 392.00
+C5 = 523.25
+E5 = 659.25
+G5 = 783.99
+
+
+class HeartBeatMonitorExcitement(PatternSequence):
+    """
+    Small celebratory tune
+    """
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=G4)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=E4)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=G4)
+        yield Silence(duration=0.3)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=G4)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=E4)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), duration=0.3, freq=G4)
+
+
+class HeartBeatMonitor(ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    Sync pulse duration with speed of heart beat
+    """
+
+    def on_heartbeat_sample(self, excitement: Excitement):
+        super().on_heartbeat_sample(excitement)
+        if not excitement.interesting:
+            return
+        for idx in range(len(self.player.channels)):
+            pattern = HeartBeatMonitorExcitement()
+            self.player.set_override(self.channel_name, pattern)
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            if self.excitement is None:
+                yield Silence(duration=0.2)
+                continue
+
+            rate = self.excitement.last_rate
+            pause = 3.0/10.0
+            duration = 60.0 / rate
+            yield Wave(volume=1.0, freq=C4, duration=duration - pause)
+            yield Silence(duration=pause)
+
+
 class HeartBeatProportional(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PatternSequence):
     """
     Sync pulse duration with speed of heart beat
@@ -474,11 +522,12 @@ class App:
             if self.args.calibrate:
                 asyncio.run(self.calibrate())
             else:
+                self.player.start_mono(HeartBeatMonitor())
                 # self.player.start_mono(HeartBeat())
                 # self.player.start_mono(HeartBeatStimulation())
                 # self.player.start_mono(HeartBeatFrustration())
                 # self.player.start_mono(HeartBeatProportional())
-                self.player.start_mono(TestVolumeSlide())
+                # self.player.start_mono(HeartBeatMonitor())
                 # self.player.start_mono(PulseWaveEscalate())
                 # player.start_mono(PulseWaveEscalateChaotic())
                 # player.start_stereo(
