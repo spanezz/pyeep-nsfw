@@ -1,17 +1,28 @@
 #!/usr/bin/python3
 
+# TODO: pass a Volume object instead of int for non-constant volumes
+# TODO: do the same for waveforms?
+# TODO: Excitement: method to return the last current Slope (which of the
+#       current slopes has the most recent start time)
+# TODO: make a pattern which is ok for listening. Use the heart rhythm for
+#       pulse. Use increasing or decreasing volume in pulses to mark when we
+#       are in a climb or fall slope. Use a different pattern to mark
+#       interesting moments
+
+
 import argparse
 import asyncio
+import math
 import random
 import sys
 from typing import Generator, Optional
 
-from stim.stim import Stim
 from stim import volume
+from stim.heart import Excitement
 from stim.pattern import (ChaosPulses, Pattern, PatternSequence, Pulses,
                           Silence, Wave)
 from stim.player import WaveWriter
-from stim.heart import Excitement
+from stim.stim import Stim
 
 
 class PulseWaveEscalateBase(PatternSequence):
@@ -20,7 +31,7 @@ class PulseWaveEscalateBase(PatternSequence):
     MIN_DURATION = 0
     # MIN_DURATION = 20
     START = 1
-    START = 20
+    # START = 20
 
     def duration_pattern(self) -> Generator[float, None, None]:
         yield from range(self.START, 20)
@@ -40,25 +51,33 @@ class TeaseAndDenial(PatternSequence):
     Tease and denial
     """
     def patterns(self) -> Generator[Pattern, None, None]:
-        yield WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=1.0)
-        yield Silence(duration=2.0)
+        yield Wave(volume=volume.Sine(vmin=0.8, vmax=1.0, freq=8), freq=2000, duration=2.0)
+        # yield Wave(volume=1.0, freq=2000, duration=5.0)
+        # yield WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=2.0)
+        # yield Silence(duration=3.0)
+        # Longer is more interesting but needs a gradual increase of volume when restarting
+        # yield Silence(duration=4.0)
 
 
-class PulseWaveEscalate(PulseWaveEscalateBase):
+class TeaseAndDenialMixin(PatternSequence):
+    def on_heartbeat_sample(self, excitement: Excitement):
+        super().on_heartbeat_sample(excitement)
+        e = excitement
+        if e.interesting:
+            for idx in range(len(self.player.channels)):
+                # print("things are getting interesting!")
+                # pattern = Wave(volume=1.0, freq=2000, duration=10.0)
+                # pattern = WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=15.0)
+                pattern = TeaseAndDenial()
+                self.player.set_override(self.channel_name, pattern)
+
+
+class PulseWaveEscalate(TeaseAndDenialMixin, PulseWaveEscalateBase):
     """
     Pulse wave escalate
     """
     PULSE_VOLUME = 0.9
     WAVE_VOLUME = 0.95
-
-    def on_heartbeat_sample(self, excitement: Excitement):
-        e = excitement
-        if e.interesting:
-            for idx in range(len(self.player.channels)):
-                # print("things are getting interesting!")
-                # pattern = WavyWave(volume_min=0.95, volume_max=1.0, volume_freq=0.5, freq=2000, duration=15.0)
-                pattern = TeaseAndDenial()
-                self.player.set_override(self.channel_name, pattern)
 
     def patterns(self) -> Generator[Pattern, None, None]:
         # TODO: implement adding an override pattern in the player, which gets
@@ -238,6 +257,33 @@ class HeartBeat(ContinuousHeartMonitorMixin, PatternSequence):
             yield Silence(duration=pause)
 
 
+class HeartBeatProportional(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PatternSequence):
+    """
+    Sync pulse duration with speed of heart beat
+    """
+    FREQ = 1000
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        yield Wave(volume=0.3, duration=0.3, freq=self.FREQ)
+        yield Wave(volume=0.6, duration=0.3, freq=self.FREQ)
+        rate_min = None
+        while True:
+            if self.excitement is None:
+                yield Silence(duration=0.2)
+                continue
+
+            rate = self.excitement.last_rate
+            if rate_min is None or rate_min > rate:
+                rate_min = rate
+            pause = 0.5
+            duration = math.log(1.5 + rate - rate_min) * 2
+            yield Wave(
+                    # volume=volume.Sine(vmin=0.9, vmax=1.0, freq=60/rate),
+                    volume=volume.RampUp(vmin=0.5, vmax=1.0),
+                    freq=self.FREQ, duration=duration - pause)
+            yield Silence(duration=pause)
+
+
 class HeartBeat1(ContinuousHeartMonitorMixin, PatternSequence):
     """
     sync pulses with heart beat variation
@@ -358,23 +404,23 @@ class HeartBeatStimulation(ContinuousHeartMonitorMixin, PatternSequence):
                 pause = 0
                 print("interesting", end=" ")
             elif e.climbing:
-                volume = self.set_volume(0.85)
+                volume = self.set_volume(0.9)
                 duration = 0.5
                 pause = 0
                 print("climbing", end=" ")
             elif e.falling:
-                volume = self.set_volume(0.6)
+                volume = self.set_volume(0.8)
                 duration = 1.0
                 pause = 0.3
                 print("falling", end=" ")
             elif e.coasting:
                 # TODO: volume variations/modulations in the pulse
-                volume = self.set_volume(0.7)
+                volume = self.set_volume(0.8)
                 duration = 1.0
                 pause = 0.3
                 print("coasting", end=" ")
             else:
-                volume = 0.7
+                volume = 0.8
                 pause = 0.3
                 print("none?", end=" ")
 
@@ -428,9 +474,11 @@ class App:
             if self.args.calibrate:
                 asyncio.run(self.calibrate())
             else:
-                # self.player.start_mono(HeartBeat1())
+                # self.player.start_mono(HeartBeat())
                 # self.player.start_mono(HeartBeatStimulation())
-                self.player.start_mono(HeartBeatFrustration())
+                # self.player.start_mono(HeartBeatFrustration())
+                # self.player.start_mono(HeartBeatProportional())
+                self.player.start_mono(TestVolumeSlide())
                 # self.player.start_mono(PulseWaveEscalate())
                 # player.start_mono(PulseWaveEscalateChaotic())
                 # player.start_stereo(
@@ -453,11 +501,9 @@ class App:
                 #         right=VolumeSwing(),
                 # )
                 asyncio.run(self.stim())
-            print("AMAIN END")
         except KeyboardInterrupt:
             print("Shutting down...")
         finally:
-            print("CLEANUP")
             self.player.shutdown()
 
 
