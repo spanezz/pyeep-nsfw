@@ -162,26 +162,6 @@ class Caress(PatternSequence):
                 yield Wave(volume=i / 100.0, duration=i / 1000.0, freq=self.FREQ)
 
 
-class Calibrate(PatternSequence):
-    """
-    Calibration tune
-    """
-    FREQ = 1000.0
-
-    def patterns(self) -> Generator[Pattern, None, None]:
-        while True:
-            yield Wave(volume=1.0, duration=10, freq=self.FREQ)
-
-
-class FrequencySwing(PatternSequence):
-    """
-    Frequency swing
-    """
-    def patterns(self) -> Generator[Pattern, None, None]:
-        for freq in range(50, 1000, 100):
-            yield Wave(volume=1.0, duration=1, freq=freq)
-
-
 class RandomPulseWave(PatternSequence):
     def __init__(self):
         super().__init__("random")
@@ -431,6 +411,26 @@ class HeartBeatStimulation(ContinuousHeartMonitorMixin, PatternSequence):
                 yield Silence(duration=pause)
 
 
+class Calibrate(PatternSequence):
+    """
+    Calibration tune
+    """
+    FREQ = 1000.0
+
+    def patterns(self) -> Generator[Pattern, None, None]:
+        while True:
+            yield Wave(volume=1.0, duration=10, freq=self.FREQ)
+
+
+class FrequencySwing(PatternSequence):
+    """
+    Frequency swing
+    """
+    def patterns(self) -> Generator[Pattern, None, None]:
+        for freq in range(50, 1000, 100):
+            yield Wave(volume=1.0, duration=1, freq=freq)
+
+
 class TestVolumeSlide(PatternSequence):
     """
     Frequency difference
@@ -478,7 +478,7 @@ class App:
                 # self.player.start_mono(HeartBeatStimulation())
                 # self.player.start_mono(HeartBeatFrustration())
                 # self.player.start_mono(HeartBeatProportional())
-                self.player.start_mono(TestVolumeSlide())
+                self.player.start_mono(FrequencySwing())
                 # self.player.start_mono(PulseWaveEscalate())
                 # player.start_mono(PulseWaveEscalateChaotic())
                 # player.start_stereo(

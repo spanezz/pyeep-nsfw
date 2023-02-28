@@ -23,7 +23,7 @@ class Player:
         self.numpy_type = numpy_type
         # See https://stackoverflow.com/questions/42192239/remove-control-clicking-sound-using-pyaudio-as-an-oscillator
         # This is used to seamlessly join consecutive waveforms
-        self.wave_delta_arcsin: int = 0
+        self.last_wave_value: float | None = None
 
     def start_mono(self, pattern: Pattern):
         """

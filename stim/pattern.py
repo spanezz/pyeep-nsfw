@@ -111,7 +111,7 @@ class Pattern:
         return self.buffer.getvalue()
 
     def silence(self, *, duration: float) -> numpy.ndarray:
-        self.player.wave_delta_arcsin = 0
+        self.player.last_wave_value = None
         return numpy.zeros(round(duration * self.player.sample_rate), dtype=self.player.numpy_type)
 
     def wave(self, *, volume: float | Volume = 1.0, duration: float = 1.0, freq: float = 440.0) -> numpy.ndarray:
@@ -129,9 +129,14 @@ class Pattern:
             case Volume():
                 volume_scaling = volume.make_array(x, self.player.sample_rate)
 
+        if self.player.last_wave_value is not None:
+            sync_factor = numpy.arcsin(self.player.last_wave_value)
+        else:
+            sync_factor = 0.0
+
         factor = 2.0 * numpy.pi * freq / self.player.sample_rate
-        wave = numpy.sin(x * factor + self.player.wave_delta_arcsin) * volume_scaling
-        self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
+        wave = numpy.sin(x * factor + sync_factor) * volume_scaling
+        self.player.last_wave_value = wave[-1]
         return wave
 
 
