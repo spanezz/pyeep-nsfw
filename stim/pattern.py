@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, Generator, Iterator, Optional
 
 import numpy
 
+from .volume import Volume
+
+
 if TYPE_CHECKING:
     from .player import Player
     from .excitement import Excitement
@@ -111,31 +114,23 @@ class Pattern:
         self.player.wave_delta_arcsin = 0
         return numpy.zeros(round(duration * self.player.sample_rate), dtype=self.player.numpy_type)
 
-    def wave(self, *, volume: float = 1.0, duration: float = 1.0, freq: float = 440.0) -> numpy.ndarray:
-        if not duration:
-            return numpy.empty(0, dtype=self.player.numpy_type)
-
-        samples_count = round(duration * self.player.sample_rate)
-        factor = 2.0 * numpy.pi * freq / self.player.sample_rate
-        wave = numpy.sin(
-                numpy.arange(samples_count, dtype=self.player.numpy_type)
-                * factor + self.player.wave_delta_arcsin) * volume
-        self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
-        return wave
-
-    def wavy_wave(
-            self, *,
-            volume_min: float = 0.9, volume_max: float = 1.0, volume_freq: float = 1.0,
-            duration: float = 1.0, freq: float = 440.0) -> numpy.ndarray:
+    def wave(self, *, volume: float | Volume = 1.0, duration: float = 1.0, freq: float = 440.0) -> numpy.ndarray:
         if not duration:
             return numpy.empty(0, dtype=self.player.numpy_type)
 
         samples_count = round(duration * self.player.sample_rate)
         x = numpy.arange(samples_count, dtype=self.player.numpy_type)
-        volume_factor = 2.0 * numpy.pi * volume_freq / self.player.sample_rate
-        volume = numpy.sin(x * volume_factor) * (volume_max - volume_min) + volume_min
+
+        match volume:
+            case int():
+                volume_scaling = float(volume)
+            case float():
+                volume_scaling = volume
+            case Volume():
+                volume_scaling = volume.make_array(x, self.player.sample_rate)
+
         factor = 2.0 * numpy.pi * freq / self.player.sample_rate
-        wave = numpy.sin(x * factor + self.player.wave_delta_arcsin) * volume
+        wave = numpy.sin(x * factor + self.player.wave_delta_arcsin) * volume_scaling
         self.player.wave_delta_arcsin = numpy.arcsin(wave[-1])
         return wave
 
@@ -153,7 +148,7 @@ class Silence(Pattern):
 class Wave(Pattern):
     def __init__(
             self, *,
-            volume: float = 1.0,
+            volume: float | Volume = 1.0,
             duration: float = 1.0,
             freq: float = 440.0):
         """
@@ -166,30 +161,6 @@ class Wave(Pattern):
 
     def generate(self) -> Generator[numpy.ndarray, None, None]:
         yield self.wave(volume=self.volume, duration=self.duration, freq=self.freq)
-
-
-class WavyWave(Pattern):
-    def __init__(
-            self, *,
-            volume_min: float = 0.9,
-            volume_max: float = 1.0,
-            volume_freq: 1.0,
-            duration: float = 1.0,
-            freq: float = 440.0):
-        """
-        Wave `duration` seconds long
-        """
-        super().__init__(f"wavy_wave {duration=:.2f}s {volume_min=} {volume_max=} {freq=}")
-        self.volume_min = volume_min
-        self.volume_max = volume_max
-        self.volume_freq = volume_freq
-        self.duration = duration
-        self.freq = freq
-
-    def generate(self) -> Generator[numpy.ndarray, None, None]:
-        yield self.wavy_wave(
-                volume_min=self.volume_min, volume_max=self.volume_max, volume_freq=self.volume_freq,
-                duration=self.duration, freq=self.freq)
 
 
 class Pulses(Pattern):
