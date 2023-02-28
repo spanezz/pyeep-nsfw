@@ -281,7 +281,24 @@ class HeartBeatMonitor(ContinuousHeartMonitorMixin, PatternSequence):
             rate = self.excitement.last_rate
             pause = 3.0/10.0
             duration = 60.0 / rate
-            yield Wave(volume=1.0, freq=C4, duration=duration - pause)
+            vol = 1.0
+
+            match self.excitement.current_slope:
+                case "climb":
+                    # vol = volume.RampUp(vmin=0.0, vmax=1.0)
+                    yield Wave(volume=vol, freq=C4, duration=(duration - pause) / 2.0)
+                    yield Wave(volume=vol, freq=E4, duration=(duration - pause) / 2.0)
+                    print("climb")
+                case "fall":
+                    # vol = volume.RampDown(vmin=0.0, vmax=1.0)
+                    yield Wave(volume=vol, freq=E4, duration=(duration - pause) / 2.0)
+                    yield Wave(volume=vol, freq=C4, duration=(duration - pause) / 2.0)
+                    print("fall")
+                case _:
+                    # vol = 1.0
+                    print("other")
+                    yield Wave(volume=vol, freq=E4, duration=duration - pause)
+
             yield Silence(duration=pause)
 
 
