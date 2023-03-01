@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy
+
+if TYPE_CHECKING:
+    from .player import Player
 
 
 class Volume:
@@ -22,17 +27,17 @@ class Sine(Volume):
     def __str__(self):
         return f"sine({self.vmin}-{self.vmax}, {self.freq}Hz)"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, player: Player) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
         """
-        if last_value is not None:
-            sync_factor = numpy.arcsin(last_value)
+        if player.last_volume_value is not None:
+            sync_factor = numpy.arcsin(player.last_volume_value)
         else:
             sync_factor = 0.0
 
-        volume_factor = 2.0 * numpy.pi * self.freq / sample_rate
+        volume_factor = 2.0 * numpy.pi * self.freq / player.sample_rate
         return numpy.sin(x * volume_factor + sync_factor) * (self.vmax - self.vmin) + self.vmin
 
 
@@ -46,12 +51,12 @@ class RampUp(Volume):
     def __str__(self):
         return f"ramp_up({self.vmin}-{self.vmax})"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, player: Player) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
         """
-        return numpy.linspace(self.vmin, self.vmax, len(x), dtype=numpy.float32)
+        return numpy.linspace(self.vmin, self.vmax, len(x), dtype=player.numpy_type)
 
 
 class RampDown(Volume):
@@ -64,9 +69,9 @@ class RampDown(Volume):
     def __str__(self):
         return f"ramp_down({self.vmin}-{self.vmax})"
 
-    def make_array(self, x: numpy.ndarray, sample_rate: int, last_value: float | None) -> numpy.ndarray:
+    def make_array(self, x: numpy.ndarray, player: Player) -> numpy.ndarray:
         """
         Compute the volume scaling factor function (from 0 to 1) corresponding
         to the given array (generally generated with `arange(samples_count)`)
         """
-        return numpy.linspace(self.vmax, self.vmin, len(x), dtype=numpy.float32)
+        return numpy.linspace(self.vmax, self.vmin, len(x), dtype=player.numpy_type)

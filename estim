@@ -1,7 +1,15 @@
 #!/usr/bin/python3
 
-# TODO: pass a Volume object instead of int for non-constant volumes
-# TODO: do the same for waveforms?
+# TODO: extract new library 'pyeep' for python audio generation (pattern, player)
+# TODO: Don't hardcode float32, get dtype from player
+# TODO: Stim -> audio player class
+# TODO: Pattern: if it yields a Sequence, sum (average? multiply?) the
+#       waveforms to make chords
+# TODO: chord-generating function
+# TODO: Function to compute note frequency (note, octave: int, semitone_shift:
+#       int)
+# TODO: use chords for heartbeat monitor (major, minor, 7th)
+# TODO: pass a Volume-like object also for waveforms
 # TODO: Excitement: method to return the last current Slope (which of the
 #       current slopes has the most recent start time)
 # TODO: make a pattern which is ok for listening. Use the heart rhythm for
@@ -540,7 +548,8 @@ class App:
             if self.args.calibrate:
                 asyncio.run(self.calibrate())
             else:
-                self.player.start_mono(HeartBeatMonitor())
+                self.player.start_mono(TestVolumeSlide())
+                # self.player.start_mono(HeartBeatMonitor())
                 # self.player.start_mono(HeartBeat())
                 # self.player.start_mono(HeartBeatStimulation())
                 # self.player.start_mono(HeartBeatFrustration())

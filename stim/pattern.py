@@ -130,7 +130,7 @@ class Pattern:
                 volume_scaling = volume
                 self.player.last_volume_value = volume_scaling
             case Volume():
-                volume_scaling = volume.make_array(x, self.player.sample_rate, self.player.last_volume_value)
+                volume_scaling = volume.make_array(x, self.player)
                 self.player.last_volume_value = volume_scaling[-1]
 
         if self.player.last_wave_value is not None:
