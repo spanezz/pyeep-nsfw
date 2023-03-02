@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 
-# TODO: extract new library 'pyeep' for python audio generation (pattern, player)
-# TODO: Don't hardcode float32, get dtype from player
-# TODO: Stim -> audio player class
 # TODO: Pattern: if it yields a Sequence, sum (average? multiply?) the
 #       waveforms to make chords
 # TODO: chord-generating function
@@ -16,7 +13,10 @@
 #       pulse. Use increasing or decreasing volume in pulses to mark when we
 #       are in a climb or fall slope. Use a different pattern to mark
 #       interesting moments
-
+# Other projects:
+#  - https://github.com/nogasm/nogasm
+#  - https://github.com/buttplugio/buttplug
+#  - https://stpihkal.docs.buttplug.io/docs/stpihkal/protocols/lovense
 
 import argparse
 import asyncio
@@ -25,12 +25,68 @@ import random
 import sys
 from typing import Generator, Optional
 
-from stim import volume
+import numpy
+
+from pyeep import volume
+from pyeep.pattern import Pattern, PatternSequence, Silence, Wave
+from pyeep.wav import WaveWriter
+from pyeep.audio import PyAudioPlayer
 from stim.heart import Excitement
-from stim.pattern import (ChaosPulses, Pattern, PatternSequence, Pulses,
-                          Silence, Wave)
-from stim.player import WaveWriter
-from stim.stim import Stim
+
+
+class Pulses(Pattern):
+    def __init__(
+            self, *,
+            volume: float = 1.0,
+            duration: float = 1.0,
+            freq: float = 440.0,
+            gap: float = 0.1,
+            count: int = 1):
+        """
+        Train of pulses, each `duration` seconds long, followed by a `gap` with
+        the given length in seconds
+        """
+        super().__init__(f"{count} pulses {duration=:.2f}s {volume=} {freq=} {gap=}s")
+        self.volume = volume
+        self.duration = duration
+        self.freq = freq
+        self.gap = gap
+        self.count = count
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        for i in range(self.count):
+            if i > 0:
+                yield self.silence(duration=self.gap)
+            yield self.wave(volume=self.volume, duration=self.duration, freq=self.freq)
+
+
+class ChaosPulses(Pattern):
+    def __init__(
+            self, *,
+            volume: tuple[float, float] = (0.9, 1.0, 1.0),
+            duration: tuple[float, float] = (1.0, 1.0),
+            freq: tuple[float, float] = [200.0, 5000.0],
+            gap: tuple[float, float] = [0.1, 0.1],
+            count: int = 1):
+        """
+        Train of pulses, with duration, volume, frequency and gap randomly
+        selected from the given intervals
+        """
+        super().__init__(f"{count} chaotic pulses {duration=}s {volume=} {freq=} {gap=}s")
+        self.volume = volume
+        self.duration = duration
+        self.freq = freq
+        self.gap = gap
+        self.count = count
+
+    def generate(self) -> Generator[numpy.ndarray, None, None]:
+        for i in range(self.count):
+            if i > 0:
+                yield self.silence(duration=self.gap)
+            yield self.wave(
+                    volume=random.triangular(*self.volume),
+                    duration=random.uniform(*self.duration),
+                    freq=random.uniform(*self.freq))
 
 
 class PulseWaveEscalateBase(PatternSequence):
@@ -521,12 +577,14 @@ class App:
         if self.args.output:
             self.player = WaveWriter(args.output)
         else:
-            self.player = Stim()
+            self.player = PyAudioPlayer()
         self.excitement: Optional[Excitement] = None
 
     def on_heartbeat_sample(self):
         for pattern in self.player.channels:
-            pattern.on_heartbeat_sample(self.excitement)
+            if (cb := getattr(pattern, "on_heartbeat_sample", None)) is None:
+                continue
+            cb(self.excitement)
 
     async def monitor_heartbeat(self):
         if self.args.heart is None:
