@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 
-# TODO: move player test patterns as pyeep example scripts
+# TODO: heartbeat as jack midi source (one drum beat per heart beat, with
+#       configurable drum kit and instrument)
+# TODO: pattern generator generating midi events
+# TODO: midi sink to control estim
+# TODO: midi sink to control vibrator
 # TODO: different waveforms than sawtooth
 # TODO: different attenuation envelopes
 # TODO: use chords for heartbeat monitor (major, minor, 7th)
 # TODO: use drumming samples for heartbeat monitor? (with crash cymbal, two
 #       beats bass drum, bass and closed high hat, bass and high tom tom
-# TODO: Excitement: method to return the last current Slope (which of the
-#       current slopes has the most recent start time)
 # TODO: make a pattern which is ok for listening. Use the heart rhythm for
 #       pulse. Use increasing or decreasing volume in pulses to mark when we
 #       are in a climb or fall slope. Use a different pattern to mark
