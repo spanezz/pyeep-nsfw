@@ -120,7 +120,7 @@ class App(pyeep.app.App):
             pass
 
     def main(self, score_cls: Type[GenerativeScore]):
-        with MidiPlayer("MIDIStim") as player:
+        with MidiPlayer(self.args.name) as player:
             self.player = player
             self.set_score(score_cls)
             super().main()
@@ -187,6 +187,8 @@ class OnOff(HeartGenerativeScore):
 def main():
     parser = pyeep.app.App.argparser("Generate a drum pattern based on heart beat")
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
+    parser.add_argument("--name", action="store", default="MIDIStim",
+                        help_text="JACK name to use")
     parser.add_argument("--drums", action="store_true",
                         help="play a drum loop")
     args = parser.parse_args()
