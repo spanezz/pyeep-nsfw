@@ -3,9 +3,9 @@
 import argparse
 import asyncio
 import sys
-import threading
 from typing import NamedTuple
 
+import pyeep.app
 from pyeep.jackmidi import MidiPlayer
 from stim.heart import Excitement
 
@@ -55,17 +55,16 @@ class Player(MidiPlayer):
         self.play("program_change", channel=channel, program=program, delay_sec=delay)
 
 
-class App:
+class App(pyeep.app.App):
     def __init__(self, args: argparse.Namespace):
-        self.args = args
+        super().__init__(args)
         self.player: MidiPlayer
         # self.heart = Heart(self.args.socket)
         self.heart = Excitement(quiet=False)
-        self.shutting_down: bool = False
         self.beat_number: int = 0
 
     def shutdown(self):
-        self.shutting_down = True
+        super().shutdown()
         self.heart.shutting_down = True
 
     async def composer(self):
@@ -91,29 +90,22 @@ class App:
     def stop_notes(self) -> bool:
         return False
 
-    async def amain(self):
+    async def aio_main(self):
         # await asyncio.gather(self.heart.read_socket(), self.composer())
         await asyncio.gather(self.heart.read_socket(self.args.socket), self.composer())
 
-    def aio_thread(self):
-        asyncio.run(self.amain())
+    def ui_main(self):
+        try:
+            while True:
+                cmd = input("> ")
+                if cmd.startswith("q"):
+                    break
+        except EOFError:
+            pass
 
     def main(self):
         with Player("MIDIStim") as player:
             self.player = player
-            aio_thread = threading.Thread(target=self.aio_thread, name="aio")
-            aio_thread.start()
-            try:
-                while True:
-                    cmd = input("> ")
-                    if cmd.startswith("q"):
-                        break
-            except (EOFError, KeyboardInterrupt):
-                pass
-            finally:
-                print("Shutting down...")
-                self.shutdown()
-                aio_thread.join()
 
 
 class AudibleDrums(App):
@@ -170,7 +162,7 @@ class OnOff(App):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate a drum pattern based on heart beat")
+    parser = pyeep.app.App.argparser("Generate a drum pattern based on heart beat")
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
     parser.add_argument("--drums", action="store_true",
                         help="play a drum loop")

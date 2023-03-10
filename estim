@@ -1,27 +1,5 @@
 #!/usr/bin/python3
 
-# TODO: heartbeat as jack midi source (one drum beat per heart beat, with
-#       configurable drum kit and instrument)
-# TODO: pattern generator generating midi events
-# TODO: midi sink to control estim
-# TODO: midi sink to control vibrator
-# TODO: different waveforms than sawtooth
-# TODO: different attenuation envelopes
-# TODO: use chords for heartbeat monitor (major, minor, 7th)
-# TODO: use drumming samples for heartbeat monitor? (with crash cymbal, two
-#       beats bass drum, bass and closed high hat, bass and high tom tom
-# TODO: make a pattern which is ok for listening. Use the heart rhythm for
-#       pulse. Use increasing or decreasing volume in pulses to mark when we
-#       are in a climb or fall slope. Use a different pattern to mark
-#       interesting moments
-# TODO: cleaning cycle for sodium-potassium channels
-#        - detect when heartbeat slows?
-#        - pauses, gradual ramp ups?
-# Other projects:
-#  - https://github.com/nogasm/nogasm
-#  - https://github.com/buttplugio/buttplug
-#  - https://stpihkal.docs.buttplug.io/docs/stpihkal/protocols/lovense
-
 import argparse
 import asyncio
 import math
@@ -31,10 +9,11 @@ from typing import Generator, Optional
 
 import numpy
 
-from pyeep import volume, shape
+import pyeep.app
+from pyeep import shape, volume
+from pyeep.audio import PyAudioPlayer
 from pyeep.pattern import Pattern, PatternSequence, Silence, Wave
 from pyeep.wav import WaveWriter
-from pyeep.audio import PyAudioPlayer
 from stim.heart import Excitement
 
 
@@ -577,14 +556,23 @@ class TestVolumeSlide(PatternSequence):
         yield Wave(volume=volume.RampDown(0.0, 1.0), duration=1, freq=1000)
 
 
-class App:
+class App(pyeep.app.App):
     def __init__(self, args: argparse.Namespace):
+        super().__init__(args)
         self.args = args
         if self.args.output:
             self.player = WaveWriter(args.output)
         else:
             self.player = PyAudioPlayer()
         self.excitement: Optional[Excitement] = None
+
+    def shutdown(self):
+        if self.shutting_down:
+            return
+        super().shutdown()
+        self.player.shutdown()
+        if self.excitement is not None:
+            self.excitement.shutdown()
 
     def on_heartbeat_sample(self):
         for pattern in self.player.channels:
@@ -604,54 +592,56 @@ class App:
         self.player.start_mono(Calibrate())
         await self.player.loop()
 
-    async def stim(self):
-        await asyncio.gather(self.monitor_heartbeat(), self.player.loop())
+    async def aio_main(self):
+        if self.args.calibrate:
+            await self.calibrate()
+        else:
+            # self.player.start_mono(TestVolumeSlide())
+            self.player.start_mono(HeartBeatMonitor())
+            # self.player.start_mono(HeartBeat())
+            # self.player.start_mono(HeartBeatStimulation())
+            # self.player.start_mono(HeartBeatFrustration())
+            # self.player.start_mono(HeartBeatProportional())
+            # self.player.start_mono(HeartBeatMonitor())
+            # self.player.start_mono(PulseWaveEscalate())
+            # player.start_mono(PulseWaveEscalateChaotic())
+            # player.start_stereo(
+            #         left=PulseWaveEscalate(),
+            #         # left=PulseWaveEscalateChaotic(),
+            #         # left=RandomPauseWave(),
+            #         # right=RandomPauseWave())
+            #         # right=FrequencySwing())
+            #         right=PulseWaveEscalateChaotic())
+            # player.start_mono(PulseWaveEscalate2())
+            # player.start_mono(FrequencySwing())
+            # player.start_mono(FrequencyDifference())
+            # player.start_mono(Caress())
+            # player.start_mono(RandomPulseWave())
+            # player.start_mono(RandomPauseWave())
+            # player.start_mono(NumberSequencePulseWave("1234124312"))
+            # player.start_stereo(left=FrequencySwing(), right=FrequencySwing())
+            # player.start_stereo(
+            #         left=PulseWaveEscalate(),
+            #         right=VolumeSwing(),
+            # )
+            await asyncio.gather(self.monitor_heartbeat(), self.player.loop())
+        self.shutdown()
 
-    def main(self):
+    def ui_main(self):
         try:
-            if self.args.calibrate:
-                asyncio.run(self.calibrate())
-            else:
-                # self.player.start_mono(TestVolumeSlide())
-                self.player.start_mono(HeartBeatMonitor())
-                # self.player.start_mono(HeartBeat())
-                # self.player.start_mono(HeartBeatStimulation())
-                # self.player.start_mono(HeartBeatFrustration())
-                # self.player.start_mono(HeartBeatProportional())
-                # self.player.start_mono(HeartBeatMonitor())
-                # self.player.start_mono(PulseWaveEscalate())
-                # player.start_mono(PulseWaveEscalateChaotic())
-                # player.start_stereo(
-                #         left=PulseWaveEscalate(),
-                #         # left=PulseWaveEscalateChaotic(),
-                #         # left=RandomPauseWave(),
-                #         # right=RandomPauseWave())
-                #         # right=FrequencySwing())
-                #         right=PulseWaveEscalateChaotic())
-                # player.start_mono(PulseWaveEscalate2())
-                # player.start_mono(FrequencySwing())
-                # player.start_mono(FrequencyDifference())
-                # player.start_mono(Caress())
-                # player.start_mono(RandomPulseWave())
-                # player.start_mono(RandomPauseWave())
-                # player.start_mono(NumberSequencePulseWave("1234124312"))
-                # player.start_stereo(left=FrequencySwing(), right=FrequencySwing())
-                # player.start_stereo(
-                #         left=PulseWaveEscalate(),
-                #         right=VolumeSwing(),
-                # )
-                asyncio.run(self.stim())
-        except KeyboardInterrupt:
-            print("Shutting down...")
-        finally:
-            self.player.shutdown()
+            while True:
+                cmd = input("> ")
+                if cmd.startswith("q"):
+                    break
+        except EOFError:
+            pass
 
 
 def main():
     # TODO: allow to use a function for intensity
     # TODO: implement a slow start
 
-    parser = argparse.ArgumentParser(description="Tone pattern generator")
+    parser = App.argparser("Tone pattern generator")
     parser.add_argument("-o", "--output", action="store", metavar="file.wav",
                         help="write the generated audio to the given file instead of playing it")
     parser.add_argument("-c", "--calibrate", action="store_true",
