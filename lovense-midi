@@ -7,10 +7,12 @@
 import argparse
 import asyncio
 import logging
-# import signal
+import queue
 import sys
 
-import pyeep.app
+import mido
+
+import pyeep.gtk
 from pyeep import midisynth
 from stim.lovense import Lovense
 
@@ -62,10 +64,54 @@ class LovenseSynth(midisynth.MidiSynth):
             self.lovense.pattern_queue.append(int(round(val * 20)))
 
 
-class App(pyeep.app.App):
+class LovenseCommandLogView(pyeep.gtk.LogView):
+    def __init__(self, max_lines: int = 10):
+        super().__init__(max_lines)
+        self.queue: queue.Queue[str] = queue.Queue()
+
+    def attach(self, lovense: Lovense):
+        lovense.notify_command = self.on_command
+
+    def on_command(self, cmd):
+        # Executed in the aio thread
+        self.queue.put(cmd)
+        pyeep.gtk.GLib.idle_add(self.process_queues)
+
+    def process_queues(self):
+        while not self.queue.empty():
+            self.append(self.queue.get())
+        return False
+
+
+class MidiSynthLogView(pyeep.gtk.LogView):
+    def __init__(self, max_lines: int = 10):
+        super().__init__(max_lines)
+        self.queue: queue.Queue[list[mido.Message]] = queue.Queue()
+
+    def attach(self, synth: midisynth.MidiSynth):
+        synth.midi_snoop = self.on_midi
+
+    def on_midi(self, msgs: list[mido.Message]):
+        # Executed in the JACK thread
+        self.queue.put(msgs)
+        pyeep.gtk.GLib.idle_add(self.process_queues)
+
+    def process_queues(self):
+        while not self.queue.empty():
+            for msg in self.queue.get():
+                self.append(str(msg))
+        return False
+
+
+class App(pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
-        super().__init__(args)
+        super().__init__(args, "Lovense MIDI")
         self.lovense: Lovense | None = None
+
+        self.log_midi = MidiSynthLogView()
+        self.vbox.pack_start(self.log_midi, True, True, 0)
+        self.log_lovense = LovenseCommandLogView()
+        self.vbox.pack_start(self.log_lovense, True, True, 0)
 
     def shutdown(self):
         super().shutdown()
@@ -81,22 +127,30 @@ class App(pyeep.app.App):
                 read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
                 write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as lovense:
             # print(f"Battery level: {await dev.read_battery_level()}%")
+            self.log_lovense.attach(lovense)
             await lovense.start()
             self.lovense = lovense
             await self.lovense.send_command("Vibrate:0;")
 
-            with LovenseSynth(asyncio.get_event_loop(), self.lovense):
+            with LovenseSynth(asyncio.get_event_loop(), self.lovense) as synth:
                 # await asyncio.gather(
                 #     # command_loop(dev, receiver),
                 #     dev.play_pattern(),
                 # )
+                self.log_midi.attach(synth)
                 await self.lovense.play_pattern()
 
-    def ui_main(self):
+    def curses_main(self, stdscr):
+        import curses
+        super().curses_main(stdscr)
         try:
             while True:
-                cmd = input("> ")
-                if cmd.startswith("q"):
+                curses.echo()
+                self.command_window.addstr("> ")
+                self.stdscr.refresh()
+                line = self.command_window.getstr().decode()
+                log.info("NEW LINE %s", line)
+                if line.startswith("q"):
                     break
         except EOFError:
             pass

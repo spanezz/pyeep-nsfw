@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from collections import deque
+from typing import Callable
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -40,6 +41,7 @@ class Lovense:
         self.sample_rate: int = 20
         self.frame_nsecs: int = int(round(1_000_000_000 / self.sample_rate))
         self.shutting_down = False
+        self.notify_command: Callable[[str], None] | None = None
 
     async def __aenter__(self):
         log.info("looking for device...")
@@ -76,7 +78,8 @@ class Lovense:
                 print(f"  characteristic {c.uuid} {c.description} {c.handle} ({len(c.descriptors)} descriptors)")
 
     async def send_command(self, cmd: str):
-        print(f"send_command {cmd}")
+        if self.notify_command:
+            self.notify_command(cmd)
         command = LovenseCommand(cmd)
         self.command_queue.append(command)
         await self.client.write_gatt_char(self.write_uuid, cmd.encode())
