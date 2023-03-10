@@ -128,9 +128,9 @@ class AudibleDrums(App):
                 self.player.drum(DRUM_LOW_TOM, 0, 1/4)
                 self.player.drum(DRUM_CLOSED_HIHAT, 1/2, 1/4)
             case "coast":
-                self.player.drum(DRUM_SIDE_STICK, 0, 1/4, velocity=64)
-            case "fall":
                 self.player.drum(DRUM_LOW_TOM, 0, 1/4)
+            case "fall":
+                self.player.drum(DRUM_SIDE_STICK, 0, 1/4, velocity=64)
             case _:
                 raise ValueError(f"unknown state {self.heart.state}")
 
