@@ -3,7 +3,7 @@
 import argparse
 import asyncio
 import sys
-from typing import NamedTuple
+from typing import NamedTuple, Type
 
 import pyeep.app
 from pyeep.jackmidi import MidiPlayer
@@ -29,30 +29,51 @@ class HeartSample(NamedTuple):
     rr: tuple[float] = ()
 
 
-class Player(MidiPlayer):
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.bpm = 0
+class GenerativeScore:
+    def __init__(self, *, player: MidiPlayer, bpm: int = 60, **kw):
+        self.player = player
+        self.bpm = bpm
+        self.beat_number: int = 0
+        self.channel: int = 0
+
+    def start(self):
+        pass
+
+    def pause(self):
+        pass
+
+    def stop(self) -> bool:
+        return False
+
+    def beat(self):
+        self.beat_number += 1
 
     def drum(self, note: int, position: float, duration: float, velocity: int = 127):
         beat = 60 / self.bpm
         delay = beat * position
-        self.play("note_on", velocity=velocity, note=note, channel=DRUM_CHANNEL, delay_sec=delay)
-        self.play("note_off", note=note, channel=DRUM_CHANNEL, delay_sec=delay + beat * duration)
+        self.player.play("note_on", velocity=velocity, note=note, channel=DRUM_CHANNEL, delay_sec=delay)
+        self.player.play("note_off", note=note, channel=DRUM_CHANNEL, delay_sec=delay + beat * duration)
 
     def note(self, note: int, position: float, duration: float, velocity: int = 127):
         beat = 60 / self.bpm
         delay = beat * position
-        self.play("note_on", velocity=velocity, note=note, channel=0, delay_sec=delay)
-        self.play("note_off", note=note, channel=0, delay_sec=delay + beat * duration)
+        self.player.play("note_on", velocity=velocity, note=note, channel=self.channel, delay_sec=delay)
+        self.player.play("note_off", note=note, channel=self.channel, delay_sec=delay + beat * duration)
 
-    def bank_program_select(self, channel: int, bank: int, program: int, position: int = 0):
+    def bank_program_select(self, bank: int, program: int, position: int = 0):
         # https://www.sweetwater.com/sweetcare/articles/6-what-msb-lsb-refer-for-changing-banks-andprograms/
+        # FIXME: I cannot seem to be able to make this work with fluidsynth
         beat = 60 / self.bpm
         delay = beat * position
-        self.play("control_change", channel=channel, control=0, value=bank >> 8, delay_sec=delay)
-        self.play("control_change", channel=channel, control=32, value=bank & 0xff, delay_sec=delay)
-        self.play("program_change", channel=channel, program=program, delay_sec=delay)
+        self.player.play("control_change", channel=self.channel, control=0, value=bank >> 8, delay_sec=delay)
+        self.player.play("control_change", channel=self.channel, control=32, value=bank & 0xff, delay_sec=delay)
+        self.player.play("program_change", channel=self.channel, program=program, delay_sec=delay)
+
+
+class HeartGenerativeScore(GenerativeScore):
+    def __init__(self, *, player: MidiPlayer, heart: Excitement, bpm: int = 60, **kw):
+        super().__init__(player=player, bpm=bpm)
+        self.heart = heart
 
 
 class App(pyeep.app.App):
@@ -61,34 +82,29 @@ class App(pyeep.app.App):
         self.player: MidiPlayer
         # self.heart = Heart(self.args.socket)
         self.heart = Excitement(quiet=False)
-        self.beat_number: int = 0
+        self.score: GenerativeScore | None = None
 
     def shutdown(self):
         super().shutdown()
         self.heart.shutting_down = True
 
+    def set_score(self, score_cls: Type[GenerativeScore]):
+        if self.score is not None:
+            self.score.stop()
+        self.score = score_cls(player=self.player, heart=self.heart)
+
     async def composer(self):
         while not self.shutting_down:
-            if self.heart.last_sample is None:
+            if self.score is None or self.heart.last_sample is None:
                 await asyncio.sleep(0.2)
                 continue
-            self.beat_number += 1
 
-            self.beat()
+            self.score.beat()
 
             await asyncio.sleep(60 / self.player.bpm)
 
-        if self.stop_notes():
+        if self.score.stop():
             await asyncio.sleep(60 / self.player.bpm)
-
-    def beat(self):
-        """
-        Generate a beat and send it to the player
-        """
-        raise NotImplementedError()
-
-    def stop_notes(self) -> bool:
-        return False
 
     async def aio_main(self):
         # await asyncio.gather(self.heart.read_socket(), self.composer())
@@ -103,61 +119,68 @@ class App(pyeep.app.App):
         except EOFError:
             pass
 
-    def main(self):
-        with Player("MIDIStim") as player:
+    def main(self, score_cls: Type[GenerativeScore]):
+        with MidiPlayer("MIDIStim") as player:
             self.player = player
+            self.set_score(score_cls)
+            super().main()
 
 
-class AudibleDrums(App):
+class AudibleDrums(HeartGenerativeScore):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.channel = DRUM_CHANNEL
+
     def beat(self):
         self.player.bpm = self.heart.last_sample.rate
         # print(self.heart.state)
         match self.heart.state:
             case "excite":
-                self.player.drum(DRUM_LOW_TOM, 0, 1/4)
-                self.player.drum(DRUM_CRASH1, 1/2, 1/4)
+                self.drum(DRUM_LOW_TOM, 0, 1/4)
+                self.drum(DRUM_CRASH1, 1/2, 1/4)
             case "climb":
-                self.player.drum(DRUM_LOW_TOM, 0, 1/4)
-                self.player.drum(DRUM_CLOSED_HIHAT, 1/2, 1/4)
+                self.drum(DRUM_LOW_TOM, 0, 1/4)
+                self.drum(DRUM_CLOSED_HIHAT, 1/2, 1/4)
             case "coast":
-                self.player.drum(DRUM_LOW_TOM, 0, 1/4)
+                self.drum(DRUM_LOW_TOM, 0, 1/4)
             case "fall":
-                self.player.drum(DRUM_SIDE_STICK, 0, 1/4, velocity=64)
+                self.drum(DRUM_SIDE_STICK, 0, 1/4, velocity=64)
             case _:
                 raise ValueError(f"unknown state {self.heart.state}")
 
 
-class OnOff(App):
+class OnOff(HeartGenerativeScore):
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self.silence_until_beat: int = 0
+        self.channel = 10
 
     def beat(self):
         self.player.bpm = 60
         # self.player.bpm = self.heart.last_sample.rate
-        print(self.heart.state)
+        # print(self.heart.state)
         if self.silence_until_beat > self.beat_number:
             print("silenced")
             return
         match self.heart.state:
             case "excite":
-                self.player.play("note_off", note=64, channel=0)
+                self.player.play("note_off", note=64, channel=self.channel)
                 self.silence_until_beat = self.beat_number + 4
             case "climb":
                 # self.player.play("note_on", note=64, channel=0, velocity=127)
-                self.player.note(64, 0, 7/8)
+                self.note(64, 0, 7/8)
             case "coast":
-                self.player.note(64, 0, 1/8)
-                self.player.note(64, 2/8, 1/8)
-                self.player.note(64, 4/8, 1/8)
-                self.player.note(64, 6/8, 1/8)
+                self.note(64, 0, 1/8)
+                self.note(64, 2/8, 1/8)
+                self.note(64, 4/8, 1/8)
+                self.note(64, 6/8, 1/8)
             case "fall":
-                self.player.note(64, 0, 1/4)
+                self.note(64, 0, 1/4)
 
-        # self.player.bank_program_select(0, 8, 80)
+        self.bank_program_select(8, 80)
 
-    def stop_notes(self) -> bool:
-        self.player.play("note_off", note=64, channel=0)  # , delay_sec=60 / self.player.bpm / 2)
+    def stop(self) -> bool:
+        self.player.play("note_off", note=64, channel=self.channel)  # , delay_sec=60 / self.player.bpm / 2)
         return True
 
 
@@ -169,11 +192,12 @@ def main():
     args = parser.parse_args()
 
     if args.drums:
-        app = AudibleDrums(args)
+        score_cls = AudibleDrums
     else:
-        app = OnOff(args)
-    with app:
-        app.main()
+        score_cls = OnOff
+
+    with App(args) as app:
+        app.main(score_cls)
 
 
 if __name__ == "__main__":
