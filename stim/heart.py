@@ -142,6 +142,9 @@ class Excitement:
         self.last_sample: HeartSample | None = None
         self.shutting_down = False
 
+    def shutdown(self):
+        self.shutting_down = True
+
     @property
     def last_rate(self) -> float:
         if self.history:

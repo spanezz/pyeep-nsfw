@@ -86,7 +86,7 @@ class App(pyeep.app.App):
 
     def shutdown(self):
         super().shutdown()
-        self.heart.shutting_down = True
+        self.heart.shutdown()
 
     def set_score(self, score_cls: Type[GenerativeScore]):
         if self.score is not None:
@@ -132,6 +132,7 @@ class AudibleDrums(HeartGenerativeScore):
         self.channel = DRUM_CHANNEL
 
     def beat(self):
+        super().beat()
         self.player.bpm = self.heart.last_sample.rate
         # print(self.heart.state)
         match self.heart.state:
@@ -156,6 +157,7 @@ class OnOff(HeartGenerativeScore):
         self.channel = 10
 
     def beat(self):
+        super().beat()
         self.player.bpm = 60
         # self.player.bpm = self.heart.last_sample.rate
         # print(self.heart.state)
@@ -188,7 +190,7 @@ def main():
     parser = pyeep.app.App.argparser("Generate a drum pattern based on heart beat")
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
     parser.add_argument("--name", action="store", default="MIDIStim",
-                        help_text="JACK name to use")
+                        help="JACK name to use")
     parser.add_argument("--drums", action="store_true",
                         help="play a drum loop")
     args = parser.parse_args()

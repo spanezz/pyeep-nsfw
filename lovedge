@@ -35,7 +35,7 @@ class App(pyeep.app.App):
 
     def shutdown(self):
         self.shutting_down = True
-        self.heart.shutting_down = True
+        self.heart.shutdown()
         self.lovense.shutting_down = True
 
     def on_heart_sample(self):

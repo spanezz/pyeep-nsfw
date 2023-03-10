@@ -23,8 +23,8 @@ MAC = "D9:7E:F0:C7:A9:A5"
 
 
 class LovenseSynth(midisynth.MidiSynth):
-    def __init__(self, loop, lovense: Lovense):
-        super().__init__("Lovense")
+    def __init__(self, loop, lovense: Lovense, name: str):
+        super().__init__(name)
         self.loop = loop
         self.lovense = lovense
 
@@ -105,7 +105,7 @@ class MidiSynthLogView(pyeep.gtk.LogView):
 
 class App(pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
-        super().__init__(args, "Lovense MIDI")
+        super().__init__(args, args.name)
         self.lovense: Lovense | None = None
 
         self.log_midi = MidiSynthLogView()
@@ -132,7 +132,7 @@ class App(pyeep.gtk.GtkApp):
             self.lovense = lovense
             await self.lovense.send_command("Vibrate:0;")
 
-            with LovenseSynth(asyncio.get_event_loop(), self.lovense) as synth:
+            with LovenseSynth(asyncio.get_event_loop(), self.lovense, name=self.args.name) as synth:
                 # await asyncio.gather(
                 #     # command_loop(dev, receiver),
                 #     dev.play_pattern(),
@@ -140,24 +140,11 @@ class App(pyeep.gtk.GtkApp):
                 self.log_midi.attach(synth)
                 await self.lovense.play_pattern()
 
-    def curses_main(self, stdscr):
-        import curses
-        super().curses_main(stdscr)
-        try:
-            while True:
-                curses.echo()
-                self.command_window.addstr("> ")
-                self.stdscr.refresh()
-                line = self.command_window.getstr().decode()
-                log.info("NEW LINE %s", line)
-                if line.startswith("q"):
-                    break
-        except EOFError:
-            pass
-
 
 def main():
     parser = App.argparser("Drive a Lovense toy as a MIDI instrument")
+    parser.add_argument("--name", action="store", default="Lovense MIDI",
+                        help="JACK name to use")
     args = parser.parse_args()
 
     with App(args) as app:
