@@ -24,42 +24,28 @@ MAC = "D9:7E:F0:C7:A9:A5"
 
 class LovenseSynth(midisynth.MidiSynth):
     def __init__(self, loop, lovense: Lovense, name: str):
-        super().__init__(name)
+        super().__init__(name, synth_samplerate=lovense.sample_rate)
         self.loop = loop
         self.lovense = lovense
 
         self.src_frame = self.client.frame_time
         self.dst_frame = 0
-
-        self.min_frame_bundle: int = 2048
-        self.current_frame_bundle_time: int | None = None
-        self.current_frame_bundle: int = 0
-
-        # Duration of each pattern queue element in nanoseconds
-        # (this needs to be proportional to the capacity of the device to handle commands)
-        # self.frame_nsecs: int = 50_000_000
-        # for i in range(20):
-        #     self.pattern_queue.append(i)
-        # for i in range(5):
-        #     self.pattern_queue.append(20)
-        # for i in range(20, 0, -1):
-        #     self.pattern_queue.append(i)
-        # self.pattern_queue.append(0)
+        self.last_output_frame_time: int | None = None
 
     def on_process(self, frames: int):
         super().on_process(frames)
+        if self.last_output_frame_time is None:
+            self.last_output_frame_time = self.synth_last_frame_time - 1
 
-        if self.current_frame_bundle_time is None:
-            self.current_frame_bundle_time = self.client.last_frame_time
-        self.current_frame_bundle += frames
-
-        if self.current_frame_bundle > self.min_frame_bundle:
-            self.loop.call_soon_threadsafe(self.on_midi_data, self.current_frame_bundle_time, self.current_frame_bundle)
-            self.current_frame_bundle = 0
-            self.current_frame_bundle_time = self.client.last_frame_time
+        if self.last_output_frame_time < self.synth_last_frame_time:
+            self.loop.call_soon_threadsafe(
+                    self.on_midi_data,
+                    self.last_output_frame_time,
+                    self.synth_last_frame_time - self.last_output_frame_time)
+            self.last_output_frame_time = self.synth_last_frame_time
 
     def on_midi_data(self, frame_time: int, frames: int):
-        data = self.generate_resampled(frame_time, frames, self.lovense.sample_rate)
+        data = self.generate(frame_time, frames)
         for val in data:
             self.lovense.pattern_queue.append(int(round(val * 20)))
 
