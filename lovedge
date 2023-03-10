@@ -118,8 +118,8 @@ def main():
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
     args = parser.parse_args()
 
-    app = App(args)
-    app.main()
+    with App(args) as app:
+        app.main()
 
 
 if __name__ == "__main__":

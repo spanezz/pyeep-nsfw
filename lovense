@@ -10,15 +10,9 @@ import logging
 # import signal
 import sys
 
+import pyeep.app
 from pyeep import midisynth
 from stim.lovense import Lovense
-
-try:
-    import coloredlogs
-    HAVE_COLOREDLOGS = True
-except ModuleNotFoundError:
-    HAVE_COLOREDLOGS = False
-
 
 log = logging.getLogger(__name__)
 
@@ -67,84 +61,53 @@ class LovenseSynth(midisynth.MidiSynth):
         for val in data:
             self.lovense.pattern_queue.append(int(round(val * 20)))
 
-# async def ugly_read_stdin() -> str:
-#     loop = asyncio.get_event_loop()
-#     return await loop.run_in_executor(None, lambda: input("command> "))
-#
-#
-# async def command_loop(dev, receiver):
-#     while True:
-#         events, frames = receiver.get_events(receiver.samplerate * 0.1)
-#         for evt in events:
-#             match evt.msg.type:
-#                 case "note_on":
-#                     speed = int(round(evt.msg.velocity / 127 * 20))
-#                     await dev.send_command(f"Vibrate:{speed};")
-#                 case "note_off":
-#                     await dev.send_command("Vibrate:0;")
-#             print(repr(evt))
-#         asyncio.sleep(0.1 - frames / receiver.samplerate)
 
-    # for i in range(0, 20):
-    #     await dev.send_command(f"Vibrate:{i};")
-    #     await asyncio.sleep(0.05)
-    # await dev.send_command("Vibrate:0;")
-    # while True:
-    #     cmd = (await ugly_read_stdin()).strip()
-    #     await dev.client.write_gatt_char(dev.write_uuid, cmd.encode())
+class App(pyeep.app.App):
+    def __init__(self, args: argparse.Namespace):
+        super().__init__(args)
+        self.lovense: Lovense | None = None
 
+    def shutdown(self):
+        super().shutdown()
+        if self.lovense:
+            self.lovense.shutting_down = True
 
-async def aio_main(address: str):
-    log.info("starting scan...")
+    async def aio_main(self):
+        # async with HeartRateMonitor(addr=MAC) as monitor:
+        # characteristic 45440002-0023-4bd4-bbd5-a6920e4c5653 Unknown 12 (0 descriptors)
+        # characteristic 45440003-0023-4bd4-bbd5-a6920e4c5653 Unknown 14 (1 descriptors)
+        async with Lovense(
+                addr=MAC,
+                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
+                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as lovense:
+            # print(f"Battery level: {await dev.read_battery_level()}%")
+            await lovense.start()
+            self.lovense = lovense
+            await self.lovense.send_command("Vibrate:0;")
 
-    # signals = (signal.SIGTERM, signal.SIGINT)
+            with LovenseSynth(asyncio.get_event_loop(), self.lovense):
+                # await asyncio.gather(
+                #     # command_loop(dev, receiver),
+                #     dev.play_pattern(),
+                # )
+                await self.lovense.play_pattern()
 
-    # async with HeartRateMonitor(addr=MAC) as monitor:
-    # characteristic 45440002-0023-4bd4-bbd5-a6920e4c5653 Unknown 12 (0 descriptors)
-    # characteristic 45440003-0023-4bd4-bbd5-a6920e4c5653 Unknown 14 (1 descriptors)
-    async with Lovense(
-            addr=address,
-            read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
-            write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as dev:
-        # print(f"Battery level: {await dev.read_battery_level()}%")
-        await dev.start()
-        # for s in signals:
-        #     asyncio.get_event_loop().add_signal_handler(s, lambda s=s: asyncio.create_task(dev.stop()))
-        await dev.send_command("Vibrate:0;")
-
-        with LovenseSynth(asyncio.get_event_loop(), dev):
-            # await asyncio.gather(
-            #     # command_loop(dev, receiver),
-            #     dev.play_pattern(),
-            # )
-            await dev.play_pattern()
+    def ui_main(self):
+        try:
+            while True:
+                cmd = input("> ")
+                if cmd.startswith("q"):
+                    break
+        except EOFError:
+            pass
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Drive a Lovense toy")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="verbose output")
-    parser.add_argument("--debug", action="store_true",
-                        help="verbose output")
-    # parser.add_argument("address", help="device address")
-
+    parser = App.argparser("Drive a Lovense toy as a MIDI instrument")
     args = parser.parse_args()
 
-    FORMAT = "%(asctime)-15s %(levelname)s %(name)s %(message)s"
-    if args.debug:
-        log_level = logging.DEBUG
-    elif args.verbose:
-        log_level = logging.INFO
-    else:
-        log_level = logging.WARN
-
-    if coloredlogs is not None:
-        coloredlogs.install(level=log_level, fmt=FORMAT)
-    else:
-        logging.basicConfig(level=log_level, stream=sys.stderr, format=FORMAT)
-
-    # return asyncio.run(aio_main(args.address))
-    return asyncio.run(aio_main(MAC))
+    with App(args) as app:
+        app.main()
 
 
 if __name__ == "__main__":

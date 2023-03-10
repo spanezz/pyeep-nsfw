@@ -172,7 +172,8 @@ def main():
         app = AudibleDrums(args)
     else:
         app = OnOff(args)
-    app.main()
+    with app:
+        app.main()
 
 
 if __name__ == "__main__":
