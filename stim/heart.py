@@ -139,6 +139,8 @@ class Excitement:
         self.current_hspan: Optional[HSpan] = None
         self.interesting = False
         self.on_sample: Optional[Callable[[], None]] = None
+        self.last_sample: HeartSample | None = None
+        self.shutting_down = False
 
     @property
     def last_rate(self) -> float:
@@ -194,13 +196,25 @@ class Excitement:
 
         return res
 
+    @property
+    def state(self):
+        if self.interesting:
+            return "excite"
+        elif (state := self.current_slope) == "none":
+            return "coast"
+        else:
+            return state
+
     def check_history(self):
         samples = list(self.history)
+        if len(samples) < 2:
+            return
         desc = ""
         self.window.sample(samples)
         desc += self.window.summary
 
         # long_samples = data[:, data[0, :] > -15]
+        prev_rate = samples[-2].rate
         cur_rate = samples[-1].rate
 
         last_fall: Optional[Slope] = self.window.falls.slopes[-1] if self.window.falls.slopes else None
@@ -208,14 +222,14 @@ class Excitement:
         self.interesting = False
         if self.window.slope_climbing and (last_fall or last_coast):
             if last_fall is None:
-                threshold = last_coast.mid_rate
+                threshold = last_coast.mid_rate + 1
             elif last_coast is None:
                 threshold = last_fall.min_rate
             elif last_coast.samples[-1].time < last_fall.samples[-1].time:
                 threshold = last_fall.min_rate
             else:
                 threshold = last_coast.mid_rate
-            if cur_rate >= threshold and self.window.falls.current is None:
+            if cur_rate > prev_rate and cur_rate >= threshold and self.window.falls.current is None:
                 self.interesting = True
 
         if self.interesting:
@@ -237,7 +251,7 @@ class Excitement:
     def print_status(self, desc: str):
         print("History", [f"{s.rate:3.0f}" for s in self.history], end=" ")
         w = self.window
-        print(f"{w.name}: {w.last_slope:+.04f}: {desc}")
+        print(f"{w.name}: {w.last_slope:+.04f}: {desc} {self.state}")
         sys.stdout.flush()
 
     async def read_socket(self, socket_name: str):
@@ -247,8 +261,9 @@ class Excitement:
             self.history.append(sample)
         self.check_history()
 
-        while (line := await reader.readline()):
+        while not self.shutting_down and (line := await reader.readline()):
             sample = HeartSample(*json.loads(line))
+            self.last_sample = sample
             self.history.append(sample)
             self.check_history()
             if self.on_sample:
@@ -313,3 +328,96 @@ class Excitement:
             self.ax.axvspan(graph_x(hspan.min_sample), graph_x(hspan.max_sample), color="crimson", alpha=0.3)
 
         plt.show()
+
+
+# Alternative implementation that doesn't seem as accurate
+#
+# class Heart:
+#     def __init__(self, socket: str):
+#         self.socket = socket
+#         self.last_sample: HeartSample | None = None
+#         self.last_window: deque[HeartSample] = deque(maxlen=10)
+#         self.improvised_delta: float = 0
+#         self.shutting_down: bool = False
+#         self.state: str = "coast"
+#
+#     async def read_socket(self):
+#         # Read heart beats from https://www.enricozini.org/blog/2023/debian/monitoring-a-heart-rate-monitor/
+#         reader, writer = await asyncio.open_unix_connection(self.socket)
+#
+#         # Skip the initial line with recent heartbeat history
+#         initial = json.loads(await reader.readline())
+#         for sample in (HeartSample(*s) for s in initial["last"]):
+#             self.last_window.append(sample)
+#
+#         while not self.shutting_down and (line := await reader.readline()):
+#             self.last_sample = HeartSample(*json.loads(line))
+#             self.on_sample()
+#             self.last_window.append(self.last_sample)
+#
+#     def on_sample0(self):
+#         # Use mean and variance to detect when the next sample is an outlier
+#         # print("SAMPLE", self.last_sample)
+#         if len(self.last_window) > 3:
+#             samples = [x.rate for x in self.last_window]
+#             mean = statistics.mean(samples)
+#             variance = statistics.variance(samples)
+#             if self.last_sample.rate > mean + variance:
+#                 self.improvised_delta = self.last_sample.rate - mean - variance
+#             elif self.last_sample.rate < mean - variance:
+#                 self.improvised_delta = -(mean - variance - self.last_sample.rate)
+#             else:
+#                 self.improvised_delta = 0.0
+#             # print("Improvised delta:", self.improvised_delta)
+#
+#         if self.improvised_delta > 2:
+#             self.state = "excite"
+#         elif self.improvised_delta > 0.5:
+#             self.state = "climb"
+#         elif self.improvised_delta < -0.5:
+#             self.state = "fall"
+#         else:
+#             self.state = "coast"
+#
+#     def on_sample(self):
+#         # print("SAMPLE", self.last_sample)
+#         if len(self.last_window) > 3:
+#             first_sample = self.last_window[0]
+#             samples_x = [(x.time - first_sample.time) / 1_000_000_000 for x in self.last_window]
+#             samples_y = [x.rate for x in self.last_window]
+#             slope, intercept = statistics.linear_regression(samples_x, samples_y)
+#             predicted = slope * (self.last_sample.time - first_sample.time) / 1_000_000_000 + intercept
+#             difference = self.last_sample.rate - predicted
+#             # mean = statistics.mean(self.last_window)
+#             # variance = statistics.variance(self.last_window)
+#             # if self.last_sample.rate > mean + variance:
+#             #     self.improvised_delta = self.last_sample.rate - mean - variance
+#             # elif self.last_sample.rate < mean - variance:
+#             #     self.improvised_delta = -(mean - variance - self.last_sample.rate)
+#             # else:
+#             #     self.improvised_delta = 0.0
+#             # # print("Improvised delta:", self.improvised_delta)
+#
+#             if difference > 2:
+#                 self.state = "excite"
+#             elif difference >= 1:
+#                 self.state = "climb"
+#             elif difference <= -1:
+#                 self.state = "fall"
+#             else:
+#                 self.state = "coast"
+#
+#             print(f"{self.last_sample.rate} {predicted=:.1f} {slope=:.1f}"
+#                   f" {intercept=:.1f} {difference=:.1f} {self.state}")
+#
+#             # if self.improvised_delta > 2:
+#             #     self.state = "excite"
+#             # elif self.improvised_delta > 0.5:
+#             #     self.state = "climb"
+#             # elif self.improvised_delta < -0.5:
+#             #     self.state = "fall"
+#             # else:
+#             #     self.state = "coast"
+#
+#         else:
+#             self.state = "coast"

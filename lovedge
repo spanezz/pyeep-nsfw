@@ -1,0 +1,143 @@
+#!/usr/bin/python3
+
+# From https://github.com/hbldh/bleak/tree/develop/examples: enable_notifications.py
+# Useful links:
+# https://wiki.st.com/stm32mcu/wiki/Connectivity:STM32WB_HeartRate
+
+import argparse
+import asyncio
+import logging
+import sys
+import threading
+import time
+
+from stim.lovense import Lovense
+from stim.heart import Excitement
+
+try:
+    import coloredlogs
+    HAVE_COLOREDLOGS = True
+except ModuleNotFoundError:
+    HAVE_COLOREDLOGS = False
+
+
+log = logging.getLogger(__name__)
+
+BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+MAC = "D9:7E:F0:C7:A9:A5"
+
+
+class App:
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        # self.heart = Heart(self.args.socket)
+        self.heart = Excitement(quiet=False)
+        self.heart.on_sample = self.on_heart_sample
+        self.shutting_down: bool = False
+        self.beat_number: int = 0
+        self.lovense: Lovense
+        self.silence_until: float = 0.0
+
+    def shutdown(self):
+        self.shutting_down = True
+        self.heart.shutting_down = True
+        self.lovense.shutting_down = True
+
+    def on_heart_sample(self):
+        now = time.time()
+        if now < self.silence_until:
+            self.lovense.pattern_queue.append(0)
+            print(self.heart.state, "silenced")
+            return
+
+        print(self.heart.state)
+        match self.heart.state:
+            case "excite":
+                for i in range(int(self.lovense.sample_rate)):
+                    self.lovense.pattern_queue.append(20)
+                self.lovense.pattern_queue.append(0)
+                self.silence_until = now + 4
+            case "climb":
+                self.lovense.pattern_queue.append(18)
+            case "coast":
+                self.lovense.pattern_queue.append(15)
+            case "fall":
+                self.lovense.pattern_queue.append(10)
+            case _:
+                raise ValueError(f"unknown state {self.heart.state}")
+
+    def beat(self):
+        """
+        Generate a beat and send it to the player
+        """
+        raise NotImplementedError()
+
+    def stop_notes(self) -> bool:
+        return False
+
+    async def amain(self):
+        # async with HeartRateMonitor(addr=MAC) as monitor:
+        # characteristic 45440002-0023-4bd4-bbd5-a6920e4c5653 Unknown 12 (0 descriptors)
+        # characteristic 45440003-0023-4bd4-bbd5-a6920e4c5653 Unknown 14 (1 descriptors)
+        async with Lovense(
+                addr=MAC,
+                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
+                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as dev:
+            # print(f"Battery level: {await dev.read_battery_level()}%")
+            await dev.start()
+            await dev.send_command("Vibrate:0;")
+            self.lovense = dev
+
+            await asyncio.gather(
+                self.heart.read_socket(self.args.socket),
+                dev.play_pattern(),
+            )
+
+    def aio_thread(self):
+        asyncio.run(self.amain())
+
+    def main(self):
+        aio_thread = threading.Thread(target=self.aio_thread, name="aio")
+        aio_thread.start()
+        try:
+            while True:
+                cmd = input("> ")
+                if cmd.startswith("q"):
+                    break
+        except (EOFError, KeyboardInterrupt):
+            pass
+        finally:
+            print("Shutting down...")
+            self.shutdown()
+            aio_thread.join()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Drive a Lovense toy")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="verbose output")
+    parser.add_argument("--debug", action="store_true",
+                        help="verbose output")
+    parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
+
+    args = parser.parse_args()
+
+    FORMAT = "%(asctime)-15s %(levelname)s %(name)s %(message)s"
+    if args.debug:
+        log_level = logging.DEBUG
+    elif args.verbose:
+        log_level = logging.INFO
+    else:
+        log_level = logging.WARN
+
+    if coloredlogs is not None:
+        coloredlogs.install(level=log_level, fmt=FORMAT)
+    else:
+        logging.basicConfig(level=log_level, stream=sys.stderr, format=FORMAT)
+
+    app = App(args)
+    app.main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
