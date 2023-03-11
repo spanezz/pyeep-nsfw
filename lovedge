@@ -8,7 +8,6 @@ import argparse
 import asyncio
 import logging
 import sys
-import threading
 import time
 
 from stim.lovense import Lovense
@@ -28,13 +27,12 @@ class App(pyeep.app.App):
         # self.heart = Heart(self.args.socket)
         self.heart = Excitement(quiet=False)
         self.heart.on_sample = self.on_heart_sample
-        self.shutting_down: bool = False
         self.beat_number: int = 0
         self.lovense: Lovense
         self.silence_until: float = 0.0
 
     def shutdown(self):
-        self.shutting_down = True
+        super().shutdown()
         self.heart.shutdown()
         self.lovense.shutting_down = True
 
@@ -53,11 +51,11 @@ class App(pyeep.app.App):
                 self.lovense.pattern_queue.append(0)
                 self.silence_until = now + 4
             case "climb":
-                self.lovense.pattern_queue.append(18)
-            case "coast":
                 self.lovense.pattern_queue.append(15)
+            case "coast":
+                self.lovense.pattern_queue.append(12)
             case "fall":
-                self.lovense.pattern_queue.append(10)
+                self.lovense.pattern_queue.append(8)
             case _:
                 raise ValueError(f"unknown state {self.heart.state}")
 
@@ -90,27 +88,12 @@ class App(pyeep.app.App):
 
     def ui_main(self):
         try:
-            while True:
+            while not self.shutting_down:
                 cmd = input("> ")
                 if cmd.startswith("q"):
                     break
         except EOFError:
             pass
-
-    def main(self):
-        aio_thread = threading.Thread(target=self.aio_thread, name="aio")
-        aio_thread.start()
-        try:
-            while True:
-                cmd = input("> ")
-                if cmd.startswith("q"):
-                    break
-        except (EOFError, KeyboardInterrupt):
-            pass
-        finally:
-            print("Shutting down...")
-            self.shutdown()
-            aio_thread.join()
 
 
 def main():
