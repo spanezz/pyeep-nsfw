@@ -62,7 +62,9 @@ class LovenseSynth(midisynth.MidiSynth):
     def on_midi_data(self, frame_time: int, frames: int):
         data = self.instruments.generate(frame_time, frames)
         for val in data:
-            self.lovense.pattern_queue.append(int(round(abs(val) * 20)))
+            value = int(round(abs(val) * 20))
+            if not self.lovense.pattern_queue or self.lovense.pattern_queue[-1] != value:
+                self.lovense.pattern_queue.append(value)
 
 
 class LovenseCommandLogView(pyeep.gtk.LogView):

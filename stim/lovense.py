@@ -67,6 +67,7 @@ class Lovense:
 
     async def start(self):
         await self.client.start_notify(self.read_uuid, self.on_reply)
+        self.pattern_queue.clear()
 
     async def stop(self):
         self.shutting_down = True
