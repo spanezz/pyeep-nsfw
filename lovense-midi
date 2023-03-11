@@ -32,6 +32,8 @@ class LovenseSynth(midisynth.MidiSynth):
         self.dst_frame = 0
         self.last_output_frame_time: int | None = None
 
+        self.set_instrument(0, midisynth.OnOff)
+
     def on_process(self, frames: int):
         super().on_process(frames)
         if self.last_output_frame_time is None:
