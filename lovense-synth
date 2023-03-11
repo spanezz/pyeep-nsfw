@@ -140,7 +140,7 @@ class App(pyeep.gtk.GtkApp):
 
 def main():
     parser = App.argparser("Drive a Lovense toy as a MIDI instrument")
-    parser.add_argument("--name", action="store", default="Lovense MIDI",
+    parser.add_argument("--name", action="store", default="Lovense MIDI Synth",
                         help="JACK name to use")
     args = parser.parse_args()
 
