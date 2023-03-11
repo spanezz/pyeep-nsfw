@@ -10,6 +10,7 @@ import logging
 import queue
 import sys
 
+import jack
 import mido
 import numpy
 
@@ -31,32 +32,35 @@ class SlowSine(midisynth.Sine):
 
 
 class LovenseSynth(midisynth.MidiSynth):
-    def __init__(self, loop, lovense: Lovense, name: str):
-        super().__init__(name, synth_samplerate=lovense.sample_rate)
-        self.loop = loop
+    def __init__(self, client: jack.Client, *, lovense: Lovense):
+        super().__init__(client, out_samplerate=lovense.sample_rate)
+        self.loop: asyncio.AbstractEventLoop | None = None
         self.lovense = lovense
 
         self.src_frame = self.client.frame_time
         self.dst_frame = 0
         self.last_output_frame_time: int | None = None
 
-        self.set_instrument(0, midisynth.OnOff)
-        self.set_instrument(1, SlowSine)
+        self.instruments.set(0, midisynth.OnOff)
+        self.instruments.set(1, SlowSine)
 
     def on_process(self, frames: int):
         super().on_process(frames)
-        if self.last_output_frame_time is None:
-            self.last_output_frame_time = self.synth_last_frame_time - 1
 
-        if self.last_output_frame_time < self.synth_last_frame_time:
-            self.loop.call_soon_threadsafe(
-                    self.on_midi_data,
-                    self.last_output_frame_time,
-                    self.synth_last_frame_time - self.last_output_frame_time)
-            self.last_output_frame_time = self.synth_last_frame_time
+        out_last_frame_time = self.instruments.out_last_frame_time
+        if self.last_output_frame_time is None or out_last_frame_time < self.last_output_frame_time:
+            self.last_output_frame_time = out_last_frame_time - 1
+
+        if self.last_output_frame_time < out_last_frame_time:
+            if self.loop is not None:
+                self.loop.call_soon_threadsafe(
+                        self.on_midi_data,
+                        self.last_output_frame_time,
+                        out_last_frame_time - self.last_output_frame_time)
+            self.last_output_frame_time = out_last_frame_time
 
     def on_midi_data(self, frame_time: int, frames: int):
-        data = self.generate(frame_time, frames)
+        data = self.instruments.generate(frame_time, frames)
         for val in data:
             self.lovense.pattern_queue.append(int(round(abs(val) * 20)))
 
@@ -100,10 +104,14 @@ class MidiSynthLogView(pyeep.gtk.LogView):
         return False
 
 
-class App(pyeep.gtk.GtkApp):
+class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
-        super().__init__(args, args.name)
-        self.lovense: Lovense | None = None
+        super().__init__(args, title=args.name)
+        self.lovense = Lovense(
+                addr=MAC,
+                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
+                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653")
+        self.synth = self.add_jack_component(LovenseSynth, lovense=self.lovense)
 
         self.log_midi = MidiSynthLogView()
         self.vbox.pack_start(self.log_midi, True, True, 0)
@@ -116,32 +124,19 @@ class App(pyeep.gtk.GtkApp):
             self.lovense.shutting_down = True
 
     async def aio_main(self):
-        # async with HeartRateMonitor(addr=MAC) as monitor:
-        # characteristic 45440002-0023-4bd4-bbd5-a6920e4c5653 Unknown 12 (0 descriptors)
-        # characteristic 45440003-0023-4bd4-bbd5-a6920e4c5653 Unknown 14 (1 descriptors)
-        async with Lovense(
-                addr=MAC,
-                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
-                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as lovense:
+        self.synth.loop = asyncio.get_event_loop()
+        async with self.lovense:
             # print(f"Battery level: {await dev.read_battery_level()}%")
-            self.log_lovense.attach(lovense)
-            await lovense.start()
-            self.lovense = lovense
+            self.log_lovense.attach(self.lovense)
+            await self.lovense.start()
             await self.lovense.send_command("Vibrate:0;")
 
-            with LovenseSynth(asyncio.get_event_loop(), self.lovense, name=self.args.name) as synth:
-                # await asyncio.gather(
-                #     # command_loop(dev, receiver),
-                #     dev.play_pattern(),
-                # )
-                self.log_midi.attach(synth)
-                await self.lovense.play_pattern()
+            self.log_midi.attach(self.synth)
+            await self.lovense.play_pattern()
 
 
 def main():
-    parser = App.argparser("Drive a Lovense toy as a MIDI instrument")
-    parser.add_argument("--name", action="store", default="Lovense MIDI Synth",
-                        help="JACK name to use")
+    parser = App.argparser("Lovense MIDI Synth", "Drive a Lovense toy as a MIDI instrument")
     args = parser.parse_args()
 
     with App(args) as app:

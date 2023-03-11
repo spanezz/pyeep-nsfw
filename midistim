@@ -6,20 +6,14 @@ import sys
 from typing import NamedTuple, Type
 
 import pyeep.app
+from pyeep.generative import (DRUM_CHANNEL, DRUM_CLOSED_HIHAT, DRUM_CRASH1,
+                              DRUM_LOW_TOM, DRUM_SIDE_STICK, GenerativeScore)
 from pyeep.jackmidi import MidiPlayer
 from stim.heart import Excitement
 
 # See:
 # https://soundprogramming.net/file-formats/general-midi-instrument-list/
 # https://www.pgmusic.com/tutorial_gm.htm
-
-DRUM_CHANNEL = 9
-DRUM_BASS = 36
-DRUM_HIGH_TOM = 50
-DRUM_LOW_TOM = 45
-DRUM_CLOSED_HIHAT = 42
-DRUM_CRASH1 = 49
-DRUM_SIDE_STICK = 37
 
 
 class HeartSample(NamedTuple):
@@ -29,58 +23,16 @@ class HeartSample(NamedTuple):
     rr: tuple[float] = ()
 
 
-class GenerativeScore:
-    def __init__(self, *, player: MidiPlayer, bpm: int = 60, **kw):
-        self.player = player
-        self.bpm = bpm
-        self.beat_number: int = 0
-        self.channel: int = 0
-
-    def start(self):
-        pass
-
-    def pause(self):
-        pass
-
-    def stop(self) -> bool:
-        return False
-
-    def beat(self):
-        self.beat_number += 1
-
-    def drum(self, note: int, position: float, duration: float, velocity: int = 127):
-        beat = 60 / self.bpm
-        delay = beat * position
-        self.player.play("note_on", velocity=velocity, note=note, channel=DRUM_CHANNEL, delay_sec=delay)
-        self.player.play("note_off", note=note, channel=DRUM_CHANNEL, delay_sec=delay + beat * duration)
-
-    def note(self, note: int, position: float, duration: float, velocity: int = 127):
-        beat = 60 / self.bpm
-        delay = beat * position
-        self.player.play("note_on", velocity=velocity, note=note, channel=self.channel, delay_sec=delay)
-        self.player.play("note_off", note=note, channel=self.channel, delay_sec=delay + beat * duration)
-
-    def bank_program_select(self, bank: int, program: int, position: int = 0):
-        # https://www.sweetwater.com/sweetcare/articles/6-what-msb-lsb-refer-for-changing-banks-andprograms/
-        # FIXME: I cannot seem to be able to make this work with fluidsynth
-        beat = 60 / self.bpm
-        delay = beat * position
-        self.player.play("control_change", channel=self.channel, control=0, value=bank >> 8, delay_sec=delay)
-        self.player.play("control_change", channel=self.channel, control=32, value=bank & 0xff, delay_sec=delay)
-        self.player.play("program_change", channel=self.channel, program=program, delay_sec=delay)
-
-
 class HeartGenerativeScore(GenerativeScore):
     def __init__(self, *, player: MidiPlayer, heart: Excitement, bpm: int = 60, **kw):
         super().__init__(player=player, bpm=bpm)
         self.heart = heart
 
 
-class App(pyeep.app.App):
+class App(pyeep.app.JackApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
-        self.player: MidiPlayer
-        # self.heart = Heart(self.args.socket)
+        self.player = self.add_jack_component(MidiPlayer)
         self.heart = Excitement(quiet=False)
         self.score: GenerativeScore | None = None
 
@@ -101,10 +53,10 @@ class App(pyeep.app.App):
 
             self.score.beat()
 
-            await asyncio.sleep(60 / self.player.bpm)
+            await asyncio.sleep(60 / self.score.bpm)
 
         if self.score.stop():
-            await asyncio.sleep(60 / self.player.bpm)
+            await asyncio.sleep(60 / self.score.bpm)
 
     async def aio_main(self):
         # await asyncio.gather(self.heart.read_socket(), self.composer())
@@ -112,7 +64,7 @@ class App(pyeep.app.App):
 
     def ui_main(self):
         try:
-            while True:
+            while not self.shutting_down:
                 cmd = input("> ")
                 if cmd.startswith("q"):
                     break
@@ -120,10 +72,8 @@ class App(pyeep.app.App):
             pass
 
     def main(self, score_cls: Type[GenerativeScore]):
-        with MidiPlayer(self.args.name) as player:
-            self.player = player
-            self.set_score(score_cls)
-            super().main()
+        self.set_score(score_cls)
+        super().main()
 
 
 class AudibleDrums(HeartGenerativeScore):
@@ -187,10 +137,8 @@ class OnOff(HeartGenerativeScore):
 
 
 def main():
-    parser = pyeep.app.App.argparser("Generate a drum pattern based on heart beat")
+    parser = App.argparser("MIDIStim", "Generate a drum pattern based on heart beat")
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
-    parser.add_argument("--name", action="store", default="MIDIStim",
-                        help="JACK name to use")
     parser.add_argument("--drums", action="store_true",
                         help="play a drum loop")
     args = parser.parse_args()
