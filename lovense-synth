@@ -31,6 +31,13 @@ class SlowSine(midisynth.Sine):
         self.factor = self.freq * 2.0 * numpy.pi / self.samplerate
 
 
+class SlowSaw(midisynth.Sine):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.freq = self.note / 69 * 0.7
+        self.factor = self.freq / self.samplerate
+
+
 class LovenseSynth(midisynth.MidiSynth):
     def __init__(self, client: jack.Client, *, lovense: Lovense):
         super().__init__(client, out_samplerate=lovense.sample_rate)
@@ -43,6 +50,7 @@ class LovenseSynth(midisynth.MidiSynth):
 
         self.instruments.set(0, midisynth.OnOff)
         self.instruments.set(1, SlowSine)
+        self.instruments.set(2, SlowSaw)
 
     def on_process(self, frames: int):
         super().on_process(frames)
