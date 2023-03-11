@@ -11,6 +11,7 @@ import queue
 import sys
 
 import mido
+import numpy
 
 import pyeep.gtk
 from pyeep import midisynth
@@ -20,6 +21,13 @@ log = logging.getLogger(__name__)
 
 BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
 MAC = "D9:7E:F0:C7:A9:A5"
+
+
+class SlowSine(midisynth.Sine):
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.freq = self.note / 69 * 0.7
+        self.factor = self.freq * 2.0 * numpy.pi / self.samplerate
 
 
 class LovenseSynth(midisynth.MidiSynth):
@@ -33,6 +41,7 @@ class LovenseSynth(midisynth.MidiSynth):
         self.last_output_frame_time: int | None = None
 
         self.set_instrument(0, midisynth.OnOff)
+        self.set_instrument(1, SlowSine)
 
     def on_process(self, frames: int):
         super().on_process(frames)
@@ -49,7 +58,7 @@ class LovenseSynth(midisynth.MidiSynth):
     def on_midi_data(self, frame_time: int, frames: int):
         data = self.generate(frame_time, frames)
         for val in data:
-            self.lovense.pattern_queue.append(int(round(val * 20)))
+            self.lovense.pattern_queue.append(int(round(abs(val) * 20)))
 
 
 class LovenseCommandLogView(pyeep.gtk.LogView):
