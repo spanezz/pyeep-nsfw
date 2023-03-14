@@ -40,7 +40,7 @@ class Pulses(Pattern):
         for i in range(self.count):
             if i > 0:
                 yield self.silence(duration=self.gap)
-            yield self.wave(volume=self.volume, duration=self.duration, freq=self.freq)
+            yield self.wave(volume=self.volume, duration=self.duration, shape=self.freq)
 
 
 class ChaosPulses(Pattern):
@@ -119,7 +119,19 @@ class TeaseAndDenialMixin(PatternSequence):
                 self.player.set_override(self.channel_name, pattern)
 
 
-class PulseWaveEscalate(TeaseAndDenialMixin, PulseWaveEscalateBase):
+class ContinuousHeartMonitorMixin:
+    """
+    Mixin for patterns that continuously take decisions based on heart rate
+    """
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.excitement: Optional[Excitement] = None
+
+    def on_heartbeat_sample(self, excitement: Excitement):
+        self.excitement = excitement
+
+
+class PulseWaveEscalate(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PulseWaveEscalateBase):
     """
     Pulse wave escalate
     """
@@ -249,18 +261,6 @@ class RandomPauseWave(PatternSequence):
         while True:
             yield Wave(volume=1.0, duration=random.randrange(1, 10), freq=self.FREQ)
             yield Silence(duration=random.uniform(3.0/10.0, 1))
-
-
-class ContinuousHeartMonitorMixin:
-    """
-    Mixin for patterns that continuously take decisions based on heart rate
-    """
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
-        self.excitement: Optional[Excitement] = None
-
-    def on_heartbeat_sample(self, excitement: Excitement):
-        self.excitement = excitement
 
 
 class HeartBeat(ContinuousHeartMonitorMixin, PatternSequence):
@@ -597,13 +597,13 @@ class App(pyeep.app.App):
             await self.calibrate()
         else:
             # self.player.start_mono(TestVolumeSlide())
-            self.player.start_mono(HeartBeatMonitor())
+            # self.player.start_mono(HeartBeatMonitor())
             # self.player.start_mono(HeartBeat())
             # self.player.start_mono(HeartBeatStimulation())
             # self.player.start_mono(HeartBeatFrustration())
             # self.player.start_mono(HeartBeatProportional())
             # self.player.start_mono(HeartBeatMonitor())
-            # self.player.start_mono(PulseWaveEscalate())
+            self.player.start_mono(PulseWaveEscalate())
             # player.start_mono(PulseWaveEscalateChaotic())
             # player.start_stereo(
             #         left=PulseWaveEscalate(),
