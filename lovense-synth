@@ -9,6 +9,7 @@ import asyncio
 import logging
 import queue
 import sys
+from pathlib import Path
 
 import jack
 import mido
@@ -117,10 +118,7 @@ class MidiSynthLogView(pyeep.gtk.LogView):
 class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args, title=args.name)
-        self.lovense = Lovense(
-                addr=MAC,
-                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
-                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653")
+        self.lovense = Lovense(conf=Path(self.args.toy))
         self.synth = self.add_jack_component(LovenseSynth, lovense=self.lovense)
 
         self.log_midi = MidiSynthLogView()
@@ -147,6 +145,7 @@ class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
 
 def main():
     parser = App.argparser("Lovense MIDI Synth", "Drive a Lovense toy as a MIDI instrument")
+    parser.add_argument("toy", metavar="file.json", action="store", help="toy description to use to connect")
     args = parser.parse_args()
 
     with App(args) as app:
