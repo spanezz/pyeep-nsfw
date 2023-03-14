@@ -29,6 +29,9 @@ class App(pyeep.app.App):
         self.beat_number: int = 0
         self.lovense: Lovense
         self.silence_until: float = 0.0
+        self.edging_level: int = 0
+        self.edge_count: int = 0
+        self.coast_count: int = 0
 
     def shutdown(self):
         super().shutdown()
@@ -38,22 +41,27 @@ class App(pyeep.app.App):
     def on_heart_sample(self):
         now = time.time()
         if now < self.silence_until:
-            self.lovense.pattern_queue.append(0)
+            self.lovense.pattern_queue.append(self.edging_level)
+            self.edge_count += 1
             print(self.heart.state, "silenced")
             return
 
         print(self.heart.state)
         match self.heart.state:
             case "excite":
-                for i in range(int(self.lovense.sample_rate)):
+                self.coast_count = 0
+                for i in range(int(self.lovense.sample_rate) + self.edge_count):
                     self.lovense.pattern_queue.append(20)
-                self.lovense.pattern_queue.append(0)
+                self.lovense.pattern_queue.append(self.edging_level)
                 self.silence_until = now + 4
             case "climb":
+                self.coast_count = 0
                 self.lovense.pattern_queue.append(15)
             case "coast":
-                self.lovense.pattern_queue.append(12)
+                self.lovense.pattern_queue.append(min(20, int(round(12 + self.coast_count / 15))))
+                self.coast_count += 1
             case "fall":
+                self.coast_count = 0
                 self.lovense.pattern_queue.append(8)
             case _:
                 raise ValueError(f"unknown state {self.heart.state}")
