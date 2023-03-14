@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import asyncio
-import json
 import sys
 from collections import deque
 from typing import Callable, NamedTuple, Optional
 
 import numpy
 import scipy.stats
+
+from .receiver import HeartReceiver
 
 
 class HeartSample(NamedTuple):
@@ -129,34 +129,7 @@ class HSpan:
         self.max_sample = sample
 
 
-class HeartAnalysis:
-    def __init__(self):
-        self.samples: list[HeartSample] = []
-
-    async def process_sample(self, sample: HeartSample):
-        pass
-
-    async def read_socket(self, socket_name: str):
-        reader, writer = await asyncio.open_unix_connection(socket_name)
-        initial = json.loads(await reader.readline())
-        for sample in (HeartSample(*s) for s in initial["last"]):
-            self.samples.append(sample)
-            await self.process_sample(sample)
-
-        while not self.shutting_down and (line := await reader.readline()):
-            sample = HeartSample(*json.loads(line))
-            self.samples.append(sample)
-            await self.process_sample(sample)
-
-    async def read_file(self, pathname: str):
-        with open(pathname, "rt") as fd:
-            for line in fd:
-                sample = HeartSample(*json.loads(line))
-                self.samples.append(sample)
-                await self.process_sample(sample)
-
-
-class Excitement(HeartAnalysis):
+class Excitement(HeartReceiver):
     def __init__(self, quiet: bool) -> None:
         super().__init__()
         self.quiet = quiet

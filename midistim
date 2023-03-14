@@ -9,7 +9,7 @@ import pyeep.app
 from pyeep.generative import (DRUM_CHANNEL, DRUM_CLOSED_HIHAT, DRUM_CRASH1,
                               DRUM_LOW_TOM, DRUM_SIDE_STICK, GenerativeScore)
 from pyeep.jackmidi import MidiPlayer
-from stim.heart import Excitement
+from stim.heart.improvised import Excitement
 
 # See:
 # https://soundprogramming.net/file-formats/general-midi-instrument-list/

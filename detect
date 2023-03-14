@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import sys
 
-from stim.heart import Excitement
+from stim.heart.improvised import Excitement
 
 
 async def amain(detector: Excitement, input: str):

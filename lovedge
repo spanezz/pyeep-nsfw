@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 import pyeep.app
-from stim.heart import Excitement
+from stim.heart.improvised import Excitement
 from stim.lovense import Lovense
 
 log = logging.getLogger(__name__)
