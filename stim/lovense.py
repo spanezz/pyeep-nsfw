@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections import deque
+from pathlib import Path
 from typing import Callable
 
 from bleak import BleakClient, BleakScanner
@@ -25,12 +27,13 @@ class Lovense:
     """
     def __init__(
             self,
-            addr: str,
-            read_uuid: str,
-            write_uuid: str):
-        self.addr = addr
-        self.read_uuid = read_uuid
-        self.write_uuid = write_uuid
+            conf: Path):
+        with open(conf, "rt") as fd:
+            data = json.load(fd)
+
+        self.addr = data["mac"]
+        self.read_uuid = data["read_uuid"]
+        self.write_uuid = data["write_uuid"]
         self.device: BLEDevice
         self.client: BleakClient
         # Queue of commands sent to the device and awaiting a reply

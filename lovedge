@@ -3,17 +3,16 @@
 # From https://github.com/hbldh/bleak/tree/develop/examples: enable_notifications.py
 # Useful links:
 # https://wiki.st.com/stm32mcu/wiki/Connectivity:STM32WB_HeartRate
-
 import argparse
 import asyncio
 import logging
 import sys
 import time
-
-from stim.lovense import Lovense
-from stim.heart import Excitement
+from pathlib import Path
 
 import pyeep.app
+from stim.heart import Excitement
+from stim.lovense import Lovense
 
 log = logging.getLogger(__name__)
 
@@ -72,10 +71,7 @@ class App(pyeep.app.App):
         # async with HeartRateMonitor(addr=MAC) as monitor:
         # characteristic 45440002-0023-4bd4-bbd5-a6920e4c5653 Unknown 12 (0 descriptors)
         # characteristic 45440003-0023-4bd4-bbd5-a6920e4c5653 Unknown 14 (1 descriptors)
-        async with Lovense(
-                addr=MAC,
-                read_uuid="45440003-0023-4bd4-bbd5-a6920e4c5653",
-                write_uuid="45440002-0023-4bd4-bbd5-a6920e4c5653") as dev:
+        async with Lovense(conf=Path(self.args.toy)) as dev:
             # print(f"Battery level: {await dev.read_battery_level()}%")
             await dev.start()
             await dev.send_command("Vibrate:0;")
@@ -98,6 +94,7 @@ class App(pyeep.app.App):
 
 def main():
     parser = App.argparser("Edging using a Lovense toy and a heart frequency monitor")
+    parser.add_argument("toy", metavar="file.json", action="store", help="toy description to use to connect")
     parser.add_argument("socket", action="store", help="path to the socket to use to read heart beats")
     args = parser.parse_args()
 
