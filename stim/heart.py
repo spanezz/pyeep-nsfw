@@ -129,7 +129,34 @@ class HSpan:
         self.max_sample = sample
 
 
-class Excitement:
+class HeartAnalysis:
+    def __init__(self):
+        self.samples: list[HeartSample] = []
+
+    async def process_sample(self, sample: HeartSample):
+        pass
+
+    async def read_socket(self, socket_name: str):
+        reader, writer = await asyncio.open_unix_connection(socket_name)
+        initial = json.loads(await reader.readline())
+        for sample in (HeartSample(*s) for s in initial["last"]):
+            self.samples.append(sample)
+            await self.process_sample(sample)
+
+        while not self.shutting_down and (line := await reader.readline()):
+            sample = HeartSample(*json.loads(line))
+            self.samples.append(sample)
+            await self.process_sample(sample)
+
+    async def read_file(self, pathname: str):
+        with open(pathname, "rt") as fd:
+            for line in fd:
+                sample = HeartSample(*json.loads(line))
+                self.samples.append(sample)
+                await self.process_sample(sample)
+
+
+class Excitement(HeartAnalysis):
     def __init__(self, quiet: bool) -> None:
         super().__init__()
         self.quiet = quiet
@@ -257,29 +284,16 @@ class Excitement:
         print(f"{w.name}: {w.last_slope:+.04f}: {desc} {self.state}")
         sys.stdout.flush()
 
-    async def read_socket(self, socket_name: str):
-        reader, writer = await asyncio.open_unix_connection(socket_name)
-        initial = json.loads(await reader.readline())
-        for sample in (HeartSample(*s) for s in initial["last"]):
-            self.history.append(sample)
+    async def process_sample(self, sample: HeartSample):
+        self.last_sample = sample
+        self.history.append(sample)
         self.check_history()
-
-        while not self.shutting_down and (line := await reader.readline()):
-            sample = HeartSample(*json.loads(line))
-            self.last_sample = sample
-            self.history.append(sample)
-            self.check_history()
-            if self.on_sample:
-                self.on_sample()
+        if self.on_sample:
+            self.on_sample()
 
     async def read_file(self, pathname: str):
-        all_samples: list[HeartSample] = []
-        with open(pathname, "rt") as fd:
-            for line in fd:
-                sample = HeartSample(*json.loads(line))
-                all_samples.append(sample)
-                self.history.append(sample)
-                self.check_history()
+        await super().read_file(pathname)
+        all_samples = self.samples
 
         import matplotlib.pyplot as plt
         self.figure, self.ax = plt.subplots(figsize=(8, 6))
