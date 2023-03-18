@@ -2,19 +2,12 @@ from __future__ import annotations
 
 import sys
 from collections import deque
-from typing import Callable, NamedTuple, Optional
+from typing import Callable, Optional
 
 import numpy
 import scipy.stats
 
-from .receiver import HeartReceiver
-
-
-class HeartSample(NamedTuple):
-    # UNIX timestamp in nanoseconds
-    time: int
-    rate: float
-    rr: tuple[float] = ()
+from .receiver import HeartReceiver, HeartSample
 
 
 class Slope:
@@ -140,7 +133,6 @@ class Excitement(HeartReceiver):
         self.interesting = False
         self.on_sample: Optional[Callable[[], None]] = None
         self.last_sample: HeartSample | None = None
-        self.shutting_down = False
 
     def shutdown(self):
         self.shutting_down = True

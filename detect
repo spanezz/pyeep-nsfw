@@ -1,38 +1,53 @@
 #!/usr/bin/python3
 
 import argparse
-import asyncio
 import sys
+from pathlib import Path
 
-from stim.heart.improvised import Excitement
+# from stim.heart.improvised import Excitement
+from stim.heart.rmssd import Study
+
+import pyeep.gtk
+from pyeep.gtk import Gtk
 
 
-async def amain(detector: Excitement, input: str):
-    if input.endswith(".socket"):
-        await detector.read_socket(input)
-    else:
-        await detector.read_file(input)
+class App(pyeep.gtk.GtkApp):
+    def __init__(self, args: argparse.Namespace):
+        super().__init__(args, title="Visualize heart rate")
+        # self.detector = Excitement(quiet=args.quiet)
+        self.detector = Study(Path(self.args.input), quiet=args.quiet)
+        if self.detector.realtime:
+            self.mark = Gtk.Button("Mark")
+            self.mark.connect("clicked", self.on_mark)
+            self.vbox.pack_start(self.mark, False, False, 0)
+
+        hbox = Gtk.Box()
+        hbox.pack_start(self.detector.win_60s.widget, True, True, 0)
+        hbox.pack_start(self.detector.win_30s.widget, True, True, 0)
+        hbox.pack_start(self.detector.win_10s.widget, True, True, 0)
+        self.vbox.pack_start(hbox, True, True, 0)
+
+    def shutdown(self):
+        super().shutdown()
+        self.detector.shutdown()
+
+    def on_mark(self, button):
+        self.detector.add_mark()
+
+    async def aio_main(self):
+        await self.detector.run()
 
 
 def main():
-    # TODO: allow to use a function for intensity
-    # TODO: implement a slow start
-
-    parser = argparse.ArgumentParser(description="Tone pattern generator")
+    parser = App.argparser("Visualize heart rate")
     parser.add_argument("input", metavar="file.{socket,json}", action="store",
                         help="UNIX socket or JSONl history file to use to read heartbeat data")
     parser.add_argument("--quiet", "-q", action="store_true",
                         help="do not print values as they are processed")
     args = parser.parse_args()
 
-    detector = Excitement(quiet=args.quiet)
-
-    try:
-        asyncio.run(amain(detector, args.input))
-    except KeyboardInterrupt:
-        print("Shutting down...")
-    finally:
-        print("Cleanup...")
+    with App(args) as app:
+        app.main()
 
 
 if __name__ == "__main__":
