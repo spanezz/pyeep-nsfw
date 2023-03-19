@@ -23,17 +23,23 @@ class LovenseCommand:
 
 class Lovense:
     """
-    Send commands to a Lovense device
+    Abstract interface to a Lovense toy
     """
-    def __init__(
-            self,
-            conf: Path):
+    def __init__(self, conf: Path):
         with open(conf, "rt") as fd:
             data = json.load(fd)
 
         self.addr = data["mac"]
         self.read_uuid = data["read_uuid"]
         self.write_uuid = data["write_uuid"]
+
+
+class LovenseReal(Lovense):
+    """
+    Send commands to a Lovense device
+    """
+    def __init__(self, conf: Path):
+        super().__init__(conf)
         self.device: BLEDevice
         self.client: BleakClient
         # Queue of commands sent to the device and awaiting a reply
