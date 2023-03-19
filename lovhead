@@ -66,7 +66,7 @@ class Headpos(threading.Thread):
             x = numpy.mean(data[:, 0])
             y = numpy.mean(data[:, 1])
             z = numpy.mean(data[:, 2])
-            a = math.atan(x / math.sqrt(y**2 + z**2)) / (2 * math.pi) * 360
+            a = math.atan(x / math.sqrt(y**2 + z**2)) / math.pi * 180
             # a2 = math.atan(y / math.sqrt(x**2 + z**2)) / (2 * math.pi) * 360
             # a3 = 90 - math.atan(z / math.sqrt(x**2 + y**2)) / (2 * math.pi) * 360
             if initial is None:
