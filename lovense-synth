@@ -129,7 +129,7 @@ class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     def shutdown(self):
         super().shutdown()
         if self.toy:
-            self.toy.shutting_down = True
+            self.toy.shutdown()
 
     async def aio_main(self):
         self.synth.loop = asyncio.get_event_loop()

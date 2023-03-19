@@ -33,66 +33,24 @@ class Lovense:
         self.read_uuid = data["read_uuid"]
         self.write_uuid = data["write_uuid"]
 
-
-class LovenseReal(Lovense):
-    """
-    Send commands to a Lovense device
-    """
-    def __init__(self, conf: Path):
-        super().__init__(conf)
-        self.device: BLEDevice
-        self.client: BleakClient
         # Queue of commands sent to the device and awaiting a reply
         self.command_queue: deque[LovenseCommand] = deque()
+
         # Queue of intensities to be played
         self.pattern_queue: deque[int] = deque()
+
         # Sample rate of pattern_queue
         self.sample_rate: int = 20
+
         self.frame_nsecs: int = int(round(1_000_000_000 / self.sample_rate))
+
         self.shutting_down = False
+
+        # Callable notified of every command sent to the toy
         self.notify_command: Callable[[str], None] | None = None
 
-    async def __aenter__(self):
-        log.info("looking for device...")
-        device = await BleakScanner.find_device_by_address(self.addr)
-        if device is None:
-            raise RuntimeError(f"could not find device with address {self.addr}")
-        self.device = device
-
-        log.info("connecting to device...")
-        self.client = BleakClient(
-            self.device,
-            disconnected_callback=self.on_disconnect,
-        )
-        await self.client.__aenter__()
-        log.info("Connected")
-
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        log.info("shutting down...")
-        await self.stop()
-        await self.client.__aexit__(exc_type, exc, tb)
-
-    async def start(self):
-        await self.client.start_notify(self.read_uuid, self.on_reply)
-        self.pattern_queue.clear()
-
-    async def stop(self):
+    def shutdown(self):
         self.shutting_down = True
-
-    def print_device_info(self):
-        for service in self.client.services:
-            print(f"service {service.uuid}")
-            for c in service.characteristics:
-                print(f"  characteristic {c.uuid} {c.description} {c.handle} ({len(c.descriptors)} descriptors)")
-
-    async def send_command(self, cmd: str):
-        if self.notify_command:
-            self.notify_command(cmd)
-        command = LovenseCommand(cmd)
-        self.command_queue.append(command)
-        await self.client.write_gatt_char(self.write_uuid, cmd.encode())
 
     async def play_pattern(self):
         last_frame = time.time_ns() / self.frame_nsecs
@@ -118,6 +76,58 @@ class LovenseReal(Lovense):
             if target_time > cur_time:
                 await asyncio.sleep((target_time - cur_time) / 1_000_000_000)
 
+
+class LovenseReal(Lovense):
+    """
+    Send commands to a Lovense device
+    """
+    def __init__(self, conf: Path):
+        super().__init__(conf)
+        self.device: BLEDevice
+        self.client: BleakClient
+
+    async def __aenter__(self):
+        log.info("looking for device...")
+        device = await BleakScanner.find_device_by_address(self.addr)
+        if device is None:
+            raise RuntimeError(f"could not find device with address {self.addr}")
+        self.device = device
+
+        log.info("connecting to device...")
+        self.client = BleakClient(
+            self.device,
+            disconnected_callback=self.on_disconnect,
+        )
+        await self.client.__aenter__()
+        log.info("Connected")
+
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        log.info("shutting down...")
+        self.shutdown()
+        await self.client.__aexit__(exc_type, exc, tb)
+
+    async def start(self):
+        await self.client.start_notify(self.read_uuid, self.on_reply)
+        self.pattern_queue.clear()
+
+    async def stop(self):
+        self.shutting_down = True
+
+    def print_device_info(self):
+        for service in self.client.services:
+            print(f"service {service.uuid}")
+            for c in service.characteristics:
+                print(f"  characteristic {c.uuid} {c.description} {c.handle} ({len(c.descriptors)} descriptors)")
+
+    async def send_command(self, cmd: str):
+        if self.notify_command:
+            self.notify_command(cmd)
+        command = LovenseCommand(cmd)
+        self.command_queue.append(command)
+        await self.client.write_gatt_char(self.write_uuid, cmd.encode())
+
     def on_reply(self, characteristic: BleakGATTCharacteristic, data: bytearray):
         if self.command_queue:
             cmd = self.command_queue.popleft()
@@ -130,4 +140,4 @@ class LovenseReal(Lovense):
         """
         Called when client disconnects
         """
-        self.shutting_down = True
+        self.shutdown()
