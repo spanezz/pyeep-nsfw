@@ -18,6 +18,7 @@ import numpy
 import pyeep.gtk
 from pyeep import midisynth
 from stim import lovense
+from stim.lovense_gtk import LovenseCommandLogView
 
 log = logging.getLogger(__name__)
 
@@ -94,25 +95,6 @@ class LovenseSynth(midisynth.MidiSynth):
                 self.toy.pattern_queue.append(value)
 
 
-class LovenseCommandLogView(pyeep.gtk.LogView):
-    def __init__(self, max_lines: int = 10):
-        super().__init__(max_lines)
-        self.queue: queue.Queue[str] = queue.Queue()
-
-    def attach(self, toy: lovense.Lovense):
-        toy.notify_command = self.on_command
-
-    def on_command(self, cmd):
-        # Executed in the aio thread
-        self.queue.put(cmd)
-        pyeep.gtk.GLib.idle_add(self.process_queues)
-
-    def process_queues(self):
-        while not self.queue.empty():
-            self.append(self.queue.get())
-        return False
-
-
 class MidiSynthLogView(pyeep.gtk.LogView):
     def __init__(self, max_lines: int = 10):
         super().__init__(max_lines)
@@ -154,7 +136,6 @@ class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     async def aio_main(self):
         self.synth.loop = asyncio.get_event_loop()
         async with self.toy:
-            # print(f"Battery level: {await dev.read_battery_level()}%")
             self.log_toy.attach(self.toy)
             await self.toy.start()
             await self.toy.send_command("Vibrate:0;")
