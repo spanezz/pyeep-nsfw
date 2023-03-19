@@ -77,7 +77,7 @@ class Lovense:
                 await asyncio.sleep((target_time - cur_time) / 1_000_000_000)
 
 
-class LovenseReal(Lovense):
+class RealLovense(Lovense):
     """
     Send commands to a Lovense device
     """
@@ -106,14 +106,11 @@ class LovenseReal(Lovense):
     async def __aexit__(self, exc_type, exc, tb):
         log.info("shutting down...")
         self.shutdown()
-        await self.client.__aexit__(exc_type, exc, tb)
+        return await self.client.__aexit__(exc_type, exc, tb)
 
     async def start(self):
         await self.client.start_notify(self.read_uuid, self.on_reply)
         self.pattern_queue.clear()
-
-    async def stop(self):
-        self.shutting_down = True
 
     def print_device_info(self):
         for service in self.client.services:
@@ -141,3 +138,27 @@ class LovenseReal(Lovense):
         Called when client disconnects
         """
         self.shutdown()
+
+
+class MockLovense(Lovense):
+    """
+    Send commands to a Lovense device
+    """
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        log.info("shutting down...")
+        self.shutdown()
+
+    async def start(self):
+        self.pattern_queue.clear()
+
+    def print_device_info(self):
+        print("mock lovense device")
+
+    async def send_command(self, cmd: str):
+        if self.notify_command:
+            self.notify_command(cmd)
+        else:
+            print(f"mock lovense send command {cmd!r}")

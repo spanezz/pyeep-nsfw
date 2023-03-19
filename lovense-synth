@@ -118,7 +118,10 @@ class MidiSynthLogView(pyeep.gtk.LogView):
 class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args, title=args.name)
-        self.toy = lovense.LovenseReal(conf=Path(self.args.toy))
+        if self.args.mock_toy:
+            self.toy = lovense.MockLovense(conf=Path(self.args.toy))
+        else:
+            self.toy = lovense.RealLovense(conf=Path(self.args.toy))
         self.synth = self.add_jack_component(LovenseSynth, toy=self.toy)
 
         self.log_midi = MidiSynthLogView()
@@ -145,7 +148,10 @@ class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
 
 def main():
     parser = App.argparser("Lovense MIDI Synth", "Drive a Lovense toy as a MIDI instrument")
-    parser.add_argument("toy", metavar="file.json", action="store", help="toy description to use to connect")
+    parser.add_argument("toy", metavar="file.json", action="store",
+                        help="toy description to use to connect")
+    parser.add_argument("--mock-toy", action="store_true",
+                        help="do not really connect to a toy")
     args = parser.parse_args()
 
     with App(args) as app:
