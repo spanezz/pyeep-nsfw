@@ -26,17 +26,13 @@ MAC = "D9:7E:F0:C7:A9:A5"
 
 
 class SlowSine(midisynth.Sine):
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
-        self.freq = self.note / 69 * 0.7
-        self.factor = self.freq * 2.0 * numpy.pi / self.samplerate
+    def get_freq(self):
+        return self.note / 69 * 0.7
 
 
 class SlowSaw(midisynth.Sine):
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
-        self.freq = self.note / 69 * 0.7
-        self.factor = self.freq / self.samplerate
+    def get_freq(self):
+        return self.note / 69 * 0.7
 
 
 class LovenseSynth(midisynth.MidiSynth):
