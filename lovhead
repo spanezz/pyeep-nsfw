@@ -10,12 +10,12 @@ import sys
 import threading
 import math
 from pathlib import Path
-from queue import Queue
 
 import numpy
 import pylsl
 
 import pyeep.app
+from pyeep.gtk import Gtk
 from stim import lovense
 from stim.lovense_gtk import LovenseCommandLogView
 
@@ -33,10 +33,28 @@ class Head(threading.Thread):
         self.toy = toy
         self.loop: asyncio.AbstractEventLoop | None = None
         self.shutting_down = False
+        self.mode = "center_zero"
+        self.param_lock = threading.Lock()
+        self.reference_roll: float | None = None
+        self.reference_pitch: float | None = None
+        self.control_angle = 45
 
     def shutdown(self):
         self.loop = None
         self.shutting_down = True
+
+    def set_mode(self, mode: str):
+        with self.param_lock:
+            self.mode = mode
+
+    def set_center(self):
+        with self.param_lock:
+            self.reference_roll = None
+            self.reference_pitch = None
+
+    def set_control_angle(self, value: int):
+        with self.param_lock:
+            self.control_angle = value
 
     def run(self):
         log.info("ACC: connecting to stream inlet")
@@ -44,24 +62,42 @@ class Head(threading.Thread):
         self.inlet = pylsl.StreamInlet(self.info)
         log.info("ACC: connected to stream inlet")
 
-        initial: float | None = None
-
         while not self.shutting_down:
             samples, timestamps = self.inlet.pull_chunk(timeout=1, max_samples=8)
             data = numpy.array(samples, dtype=float)
             x = numpy.mean(data[:, 0])
             y = numpy.mean(data[:, 1])
             z = numpy.mean(data[:, 2])
-            a = math.atan(x / math.sqrt(y**2 + z**2)) / math.pi * 180
-            # a2 = math.atan(y / math.sqrt(x**2 + z**2)) / (2 * math.pi) * 360
-            # a3 = 90 - math.atan(z / math.sqrt(x**2 + y**2)) / (2 * math.pi) * 360
-            if initial is None:
-                initial = a
-            else:
-                power = max(0, int(round(20 - abs(initial - a) / 2)))
-                if self.loop is not None:
-                    self.loop.call_soon_threadsafe(
-                            self.on_command, power)
+
+            roll = math.atan2(y, z) / math.pi * 180
+            pitch = math.atan2(-x, math.sqrt(y*y + z*z)) / math.pi * 180
+
+            with self.param_lock:
+                if self.reference_roll is None:
+                    self.reference_roll = roll
+
+                if self.reference_pitch is None:
+                    self.reference_pitch = pitch
+
+                # roll_angle = self.reference_roll - roll
+                pitch_angle = self.reference_pitch - pitch
+                match self.mode:
+                    case "center_zero":
+                        power = numpy.clip(abs(pitch_angle) * 2 / self.control_angle, 0, 1)
+                    case "center_middle_increase_up":
+                        power = numpy.clip(0.5 - pitch_angle * 2 / self.control_angle, 0, 1)
+                    case "center_middle_increase_down":
+                        power = numpy.clip(0.5 + pitch_angle * 2 / self.control_angle, 0, 1)
+                    case "center_max":
+                        power = numpy.clip(1 - abs(pitch_angle) * 2 / self.control_angle, 0, 1)
+                    case _:
+                        log.warning("Unknown mode %r", self.mode)
+                        power = 0
+
+                # print(f"POS {self.mode} {roll=:.1f} {roll_angle=:.1f} {pitch=:.1f} {pitch_angle=:.1f} {power=:.2f}")
+
+            if self.loop is not None:
+                self.loop.call_soon_threadsafe(self.on_command, int(round(power * 20)))
 
     def on_command(self, power: int):
         if not self.toy.pattern_queue or self.toy.pattern_queue[-1] != power:
@@ -71,14 +107,52 @@ class Head(threading.Thread):
 class App(pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args, title="Lovhead")
-        self.head_queue = Queue()
         if self.args.mock_toy:
             self.toy = lovense.MockLovense(conf=Path(self.args.toy))
         else:
             self.toy = lovense.RealLovense(conf=Path(self.args.toy))
         self.head = Head(self.toy)
+
+        zero_center = Gtk.RadioButton.new_with_label_from_widget(None, "Zero on center")
+        zero_center.connect("toggled", self.set_mode, "center_zero")
+        self.vbox.pack_start(zero_center, False, False, 0)
+
+        mid_center_increase_up = Gtk.RadioButton.new_with_label_from_widget(
+                zero_center, "Middle on center, up increases")
+        mid_center_increase_up.connect("toggled", self.set_mode, "center_middle_increase_up")
+        self.vbox.pack_start(mid_center_increase_up, False, False, 0)
+
+        mid_center_increase_down = Gtk.RadioButton.new_with_label_from_widget(
+                zero_center, "Middle on center, down increases")
+        mid_center_increase_down.connect("toggled", self.set_mode, "center_middle_increase_down")
+        self.vbox.pack_start(mid_center_increase_down, False, False, 0)
+
+        max_center = Gtk.RadioButton.new_with_label_from_widget(zero_center, "Max on center")
+        max_center.connect("toggled", self.set_mode, "center_max")
+        self.vbox.pack_start(max_center, False, False, 0)
+
+        self.control_angle = Gtk.Adjustment(
+                value=self.head.control_angle, upper=180, step_increment=5, page_increment=10)
+        self.control_angle_button = Gtk.SpinButton()
+        self.control_angle_button.set_adjustment(self.control_angle)
+        self.control_angle_button.connect("value-changed", self.on_control_angle_changed)
+        self.vbox.pack_start(self.control_angle_button, False, False, 0)
+
+        center = Gtk.Button.new_with_label("Recenter")
+        center.connect("clicked", self.set_center)
+        self.vbox.pack_start(center, True, True, 0)
+
         self.log_toy = LovenseCommandLogView()
         self.vbox.pack_start(self.log_toy, True, True, 0)
+
+    def set_mode(self, button, mode: str):
+        self.head.set_mode(mode)
+
+    def set_center(self, button):
+        self.head.set_center()
+
+    def on_control_angle_changed(self, scroll):
+        self.head.set_control_angle(self.control_angle.get_value())
 
     def shutdown(self):
         super().shutdown()
