@@ -25,14 +25,36 @@ BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
 MAC = "D9:7E:F0:C7:A9:A5"
 
 
-class SlowSine(midisynth.Sine):
+class VibeMixin:
     def get_freq(self):
         return self.note / 69 * 0.7
 
+    def get_attenuation(self, frame_time: int, frames: int) -> numpy.ndarray:
+        res = super().get_attenuation(frame_time, frames)
+        if (t := self.instrument.transpose):
+            return numpy.clip(res + (t / 8192), 0, 1)
+        else:
+            return res
 
-class SlowSaw(midisynth.Sine):
-    def get_freq(self):
-        return self.note / 69 * 0.7
+
+class OnOff(midisynth.Note):
+    def synth(self, frame_time: int, frames: int) -> numpy.ndarray:
+        if self.last_note is None:
+            return numpy.zeros(frames, dtype=self.dtype)
+        value = self.last_note.velocity / 127 + self.instrument.transpose / 8192
+        if value > 1:
+            value = 1
+        elif value < 0:
+            value = 0
+        return numpy.full(frames, value, dtype=self.dtype)
+
+
+class SlowSine(VibeMixin, midisynth.Sine):
+    pass
+
+
+class SlowSaw(VibeMixin, midisynth.Sine):
+    pass
 
 
 class LovenseSynth(midisynth.MidiSynth):
@@ -45,7 +67,7 @@ class LovenseSynth(midisynth.MidiSynth):
         self.dst_frame = 0
         self.last_output_frame_time: int | None = None
 
-        self.instruments.set(0, midisynth.OnOff)
+        self.instruments.set(0, OnOff)
         self.instruments.set(1, SlowSine)
         self.instruments.set(2, SlowSaw)
 
