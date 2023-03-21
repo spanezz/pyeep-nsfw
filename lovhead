@@ -106,11 +106,12 @@ class Head(threading.Thread):
 
 class App(pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
-        super().__init__(args, title="Lovhead")
+        path = Path(args.toy)
+        super().__init__(args, title="Lovhead {path.stem}")
         if self.args.mock_toy:
-            self.toy = lovense.MockLovense(conf=Path(self.args.toy))
+            self.toy = lovense.MockLovense(conf=path)
         else:
-            self.toy = lovense.RealLovense(conf=Path(self.args.toy))
+            self.toy = lovense.RealLovense(conf=path)
         self.head = Head(self.toy)
 
         zero_center = Gtk.RadioButton.new_with_label_from_widget(None, "Zero on center")
