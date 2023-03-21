@@ -6,6 +6,7 @@
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import queue
 import sys
@@ -16,6 +17,7 @@ import mido
 import numpy
 
 import pyeep.gtk
+from pyeep.gtk import Gtk
 from pyeep import midisynth
 from stim import lovense
 from stim.lovense_gtk import LovenseCommandLogView
@@ -59,8 +61,8 @@ class SlowSaw(VibeMixin, midisynth.Sine):
 
 
 class LovenseSynth(midisynth.MidiSynth):
-    def __init__(self, client: jack.Client, *, toy: lovense.Lovense):
-        super().__init__(client, out_samplerate=toy.sample_rate)
+    def __init__(self, client: jack.Client, *, toy: lovense.Lovense, first_channel: int = 0, **kwargs):
+        super().__init__(client, out_samplerate=toy.sample_rate, **kwargs)
         self.loop: asyncio.AbstractEventLoop | None = None
         self.toy = toy
 
@@ -68,9 +70,9 @@ class LovenseSynth(midisynth.MidiSynth):
         self.dst_frame = 0
         self.last_output_frame_time: int | None = None
 
-        self.instruments.set(0, OnOff)
-        self.instruments.set(1, SlowSine)
-        self.instruments.set(2, SlowSaw)
+        self.instruments.set(first_channel + 0, OnOff)
+        self.instruments.set(first_channel + 1, SlowSine)
+        self.instruments.set(first_channel + 2, SlowSaw)
 
     def on_process(self, frames: int):
         super().on_process(frames)
@@ -118,36 +120,64 @@ class MidiSynthLogView(pyeep.gtk.LogView):
 class App(pyeep.app.JackApp, pyeep.gtk.GtkApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args, title=args.name)
-        if self.args.mock_toy:
-            self.toy = lovense.MockLovense(conf=Path(self.args.toy))
-        else:
-            self.toy = lovense.RealLovense(conf=Path(self.args.toy))
-        self.synth = self.add_jack_component(LovenseSynth, toy=self.toy)
+        self.toys: list[lovense.Lovense] = []
+        self.synths: list[LovenseSynth] = []
 
-        self.log_midi = MidiSynthLogView()
-        self.vbox.pack_start(self.log_midi, True, True, 0)
-        self.log_toy = LovenseCommandLogView()
-        self.vbox.pack_start(self.log_toy, True, True, 0)
+        hbox = Gtk.Box()
+        self.vbox.pack_start(hbox, True, True, 0)
+
+        first_channel = 0
+        midi_inport: jack.OwnMidiPort | None = None
+        for path in (Path(p) for p in self.args.toys):
+            if self.args.mock_toy:
+                toy = lovense.MockLovense(conf=path)
+            else:
+                toy = lovense.RealLovense(conf=path)
+            self.toys.append(toy)
+            synth = self.add_jack_component(LovenseSynth, toy=toy, first_channel=first_channel, inport=midi_inport)
+            midi_inport = synth.inport
+            self.synths.append(synth)
+
+            title = f"{path.stem} ch{first_channel}…{first_channel + 3}"
+            frame = Gtk.Frame.new(title)
+            hbox.pack_start(frame, True, True, 0)
+
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+            frame.add(vbox)
+
+            log_midi = MidiSynthLogView()
+            log_midi.attach(synth)
+
+            vbox.pack_start(log_midi, True, True, 0)
+            log_toy = LovenseCommandLogView()
+            log_toy.attach(toy)
+            vbox.pack_start(log_toy, True, True, 0)
+
+            first_channel += 3
 
     def shutdown(self):
         super().shutdown()
-        self.toy.shutdown()
+        for toy in self.toys:
+            toy.shutdown()
 
     async def aio_main(self):
-        self.synth.loop = asyncio.get_event_loop()
-        async with self.toy:
-            self.log_toy.attach(self.toy)
-            await self.toy.start()
-            await self.toy.send_command("Vibrate:0;")
+        for synth in self.synths:
+            synth.loop = asyncio.get_event_loop()
 
-            self.log_midi.attach(self.synth)
-            await self.toy.play_pattern()
+        stack = contextlib.AsyncExitStack()
+        async with stack:
+            for toy in self.toys:
+                await stack.enter_async_context(toy)
+            await toy.start()
+            await toy.send_command("Vibrate:0;")
+
+            await asyncio.gather(*(toy.play_pattern() for toy in self.toys))
 
 
 def main():
     parser = App.argparser("Lovense MIDI Synth", "Drive a Lovense toy as a MIDI instrument")
-    parser.add_argument("toy", metavar="file.json", action="store",
-                        help="toy description to use to connect")
+    parser.add_argument("toys", metavar="file.json", nargs="+", action="store",
+                        help="toy description(s) to use to connect")
     parser.add_argument("--mock-toy", action="store_true",
                         help="do not really connect to a toy")
     args = parser.parse_args()
