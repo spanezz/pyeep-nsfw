@@ -80,7 +80,7 @@ class App(pyeep.aio.AIOApp):
             self.add_component(Dump)
 
     def main_loop(self):
-        while not self.shutting_down:
+        while self.hubs and not self.shutting_down:
             time.sleep(0.2)
 
 
