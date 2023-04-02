@@ -80,8 +80,9 @@ class ToyPlayer:
     """
     Keep a timed command queue for toy actuators
     """
-    def __init__(self, actuator: buttplug.client.client.Actuator):
+    def __init__(self, actuator: buttplug.client.client.Actuator, sender: Callable):
         self.actuator = actuator
+        self.sender = sender
 
         # Queue of intensities (from 0 to 1) to be played
         self.pattern_queue: deque[float] = deque()
@@ -109,6 +110,7 @@ class ToyPlayer:
                 if new != old:
                     # print(new)
                     await self.actuator.command(new)
+                    self.sender(SetPower(actuator=self.actuator, power=new))
                     old = new
                 else:
                     # print("same")
