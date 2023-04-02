@@ -47,7 +47,7 @@ class Buttplug:
 class App(pyeep.app.App):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
-        self.bp = Buttplug("bp-tool", args.addr)
+        self.bp = Buttplug("bp-tool", args.iface)
 
     def shutdown(self):
         super().shutdown()
@@ -108,7 +108,7 @@ class App(pyeep.app.App):
 
 def main():
     parser = App.argparser("Basic buttplug device management")
-    parser.add_argument("--addr", action="store", default="ws://127.0.0.1:12345",
+    parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
                         help="Intiface Engine address to connect to")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--scan", action="store_true",
