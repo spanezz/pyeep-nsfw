@@ -1,47 +1,68 @@
 #!/usr/bin/python3
 
-# From https://github.com/hbldh/bleak/tree/develop/examples: enable_notifications.py
-# Useful links:
-# https://wiki.st.com/stm32mcu/wiki/Connectivity:STM32WB_HeartRate
 import argparse
-import asyncio
 import logging
+import math
 import sys
 import threading
-import math
-from pathlib import Path
+from typing import Type
 
 import numpy
 import pylsl
 
+import buttplug
 import pyeep.app
+from pyeep.app import Component, Hub, Message
 from pyeep.gtk import Gtk
-from stim import lovense
-from stim.lovense_gtk import LovenseCommandLogView
+from stim import toy
+
+# from stim.lovense_gtk import LovenseCommandLogView
 
 
 log = logging.getLogger(__name__)
 
-BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
-MAC = "D9:7E:F0:C7:A9:A5"
+
+class SubthreadComponent(Component):
+    pass
 
 
-class Head(threading.Thread):
+class SubthreadHub(Hub):
+    def __init__(self):
+        super().__init__(name="subthread")
+
+    def add_component(self, component_cls: Type[Component], **kwargs) -> Component:
+        if issubclass(component_cls, SubthreadComponent):
+            kwargs["hub"] = self
+            component = component_cls(**kwargs)
+            self.components[component.name] = component
+            return component
+
+        return super().add_component(component_cls, **kwargs)
+
+
+class Head(SubthreadComponent):
     # Sample rate = 52
-    def __init__(self, toy: lovense.Lovense):
-        super().__init__()
-        self.toy = toy
-        self.loop: asyncio.AbstractEventLoop | None = None
-        self.shutting_down = False
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.thread = threading.Thread(name=self.name, target=self.run)
         self.mode = "center_zero"
         self.param_lock = threading.Lock()
         self.reference_roll: float | None = None
         self.reference_pitch: float | None = None
         self.control_angle = 45
+        self.actuator: buttplug.client.client.Actuator | None = None
+        self.thread.start()
 
     def shutdown(self):
-        self.loop = None
-        self.shutting_down = True
+        super().shutdown()
+        self.thread.join()
+
+    def receive(self, msg: Message):
+        match msg:
+            case toy.NewDevice():
+                for a in msg.dev.actuators:
+                    # TODO: pick better than random
+                    self.actuator = a
 
     def set_mode(self, mode: str):
         with self.param_lock:
@@ -96,23 +117,16 @@ class Head(threading.Thread):
 
                 # print(f"POS {self.mode} {roll=:.1f} {roll_angle=:.1f} {pitch=:.1f} {pitch_angle=:.1f} {power=:.2f}")
 
-            if self.loop is not None:
-                self.loop.call_soon_threadsafe(self.on_command, int(round(power * 20)))
-
-    def on_command(self, power: int):
-        if not self.toy.pattern_queue or self.toy.pattern_queue[-1] != power:
-            self.toy.pattern_queue.append(power)
+            if self.actuator is not None:
+                self.send(toy.SetPower(actuator=self.actuator, power=power))
 
 
-class App(pyeep.gtk.GtkApp):
-    def __init__(self, args: argparse.Namespace):
-        path = Path(args.toy)
-        super().__init__(args, title="Lovhead {path.stem}")
-        if self.args.mock_toy:
-            self.toy = lovense.MockLovense(conf=path)
-        else:
-            self.toy = lovense.RealLovense(conf=path)
-        self.head = Head(self.toy)
+class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
+    def __init__(self, args: argparse.Namespace, title="Lovhead"):
+        super().__init__(args, title=title)
+        self.add_hub(SubthreadHub())
+        self.add_component(toy.Toys, client_name=title, iface=args.iface)
+        self.head = self.add_component(Head)
 
         zero_center = Gtk.RadioButton.new_with_label_from_widget(None, "Zero on center")
         zero_center.connect("toggled", self.set_mode, "center_zero")
@@ -143,8 +157,8 @@ class App(pyeep.gtk.GtkApp):
         center.connect("clicked", self.set_center)
         self.vbox.pack_start(center, True, True, 0)
 
-        self.log_toy = LovenseCommandLogView()
-        self.vbox.pack_start(self.log_toy, True, True, 0)
+        # self.log_toy = LovenseCommandLogView()
+        # self.vbox.pack_start(self.log_toy, True, True, 0)
 
     def set_mode(self, button, mode: str):
         self.head.set_mode(mode)
@@ -155,31 +169,11 @@ class App(pyeep.gtk.GtkApp):
     def on_control_angle_changed(self, scroll):
         self.head.set_control_angle(self.control_angle.get_value())
 
-    def shutdown(self):
-        super().shutdown()
-        self.head.shutdown()
-        self.toy.shutdown()
-
-    async def aio_main(self):
-        self.head.loop = asyncio.get_event_loop()
-        async with self.toy:
-            self.log_toy.attach(self.toy)
-            await self.toy.start()
-            await self.toy.send_command("Vibrate:0;")
-            await asyncio.gather(
-                self.toy.play_pattern(),
-            )
-
-    def ui_main(self):
-        self.head.start()
-        super().ui_main()
-
 
 def main():
-    parser = App.argparser("Control lovense toys with head movements")
-    parser.add_argument("toy", metavar="file.json", action="store", help="toy description to use to connect")
-    parser.add_argument("--mock-toy", action="store_true",
-                        help="do not really connect to a toy")
+    parser = App.argparser("Control toys with head movements")
+    parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
+                        help="Intiface Engine address to connect to")
     args = parser.parse_args()
 
     with App(args) as app:
