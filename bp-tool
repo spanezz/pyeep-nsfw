@@ -67,16 +67,17 @@ class Dump(pyeep.aio.AIOComponent):
                     await dump_device(msg.dev)
                 case None:
                     self.send(Shutdown())
+                    break
 
 
 class App(pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
-        self.add_component(toy.Toys("bp-tool", args.iface))
+        self.add_component(toy.Toys, client_name="bp-tool", iface=args.iface)
         if self.args.scan:
-            self.add_component(Scan())
+            self.add_component(Scan)
         elif self.args.dump:
-            self.add_component(Dump())
+            self.add_component(Dump)
 
     def main_loop(self):
         while not self.shutting_down:
