@@ -28,6 +28,13 @@ class ScanRequest(Message):
         return "scan request"
 
 
+class SetPower(Message):
+    def __init__(self, *, actuator: buttplug.client.client.Actuator, power: float, **kwargs):
+        super().__init__(**kwargs)
+        self.actuator = actuator
+        self.power = power
+
+
 class Toys(pyeep.aio.AIOComponent):
     def __init__(self, client_name: str, iface: str):
         super().__init__(name="toys")
@@ -53,6 +60,8 @@ class Toys(pyeep.aio.AIOComponent):
                     case ScanRequest():
                         await self.client.start_scanning()
                         scanning = True
+                    case SetPower():
+                        await msg.actuator.command(msg.power)
                     case None:
                         pass
 

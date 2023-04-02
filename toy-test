@@ -1,0 +1,103 @@
+#!/usr/bin/python3
+
+import argparse
+import asyncio
+import logging
+import sys
+
+import buttplug
+import pyeep.aio
+import pyeep.app
+from pyeep.gtk import Gtk, GtkComponent
+from stim import toy
+
+log = logging.getLogger(__name__)
+
+
+class ToyView(Gtk.Box):
+    def __init__(self, dev: buttplug.client.client.Device, toys_view: "ToysView"):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+        self.dev = dev
+        self.toys_view = toys_view
+        self.label_name = Gtk.Label(label=dev.name)
+        self.pack_start(self.label_name, False, False, 0)
+
+        for actuator in dev.actuators:
+            self.power = Gtk.Scale.new_with_range(
+                    orientation=Gtk.Orientation.HORIZONTAL,
+                    min=0,
+                    max=100,
+                    step=5)
+            self.power.set_digits(2)
+            self.power.set_draw_value(False)
+            for mark in (25, 50, 75):
+                self.power.add_mark(
+                    value=mark,
+                    position=Gtk.PositionType.BOTTOM,
+                    markup=None
+                )
+            self.pack_start(self.power, False, False, 0)
+
+            self.power.connect("value_changed", self.on_power, actuator)
+
+    def on_power(self, adj, actuator):
+        val = round(adj.get_value())
+        self.toys_view.send(toy.SetPower(actuator=actuator, dst="toys", power=val / 100.0))
+
+
+class ToysView(GtkComponent, Gtk.Box):
+    def __init__(self):
+        GtkComponent.__init__(self)
+        Gtk.Box.__init__(self)
+
+    def receive(self, msg: toy.Message):
+        match msg:
+            case toy.NewDevice():
+                tv = ToyView(msg.dev, self)
+                self.pack_start(tv, True, True, 0)
+                self.show_all()
+
+
+class InterfaceConnector(pyeep.aio.AIOComponent):
+    def __init__(self, toys_view: ToysView):
+        super().__init__(self, name="interface_connector")
+        self.toys_view = toys_view
+
+
+class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
+    def __init__(self, args: argparse.Namespace, title: str):
+        super().__init__(args, title=title)
+
+        self.add_component(toy.Toys(title, args.iface))
+
+        toys_view = ToysView()
+        self.add_component(toys_view)
+        self.vbox.pack_start(toys_view, True, True, 0)
+
+    async def aio_main(self):
+        self.head.loop = asyncio.get_event_loop()
+        async with self.toy:
+            self.log_toy.attach(self.toy)
+            await self.toy.start()
+            self.toy.pattern_queue.append(0)
+            await asyncio.gather(
+                self.toy.play_pattern(),
+            )
+
+    def ui_main(self):
+        self.head.start()
+        super().ui_main()
+
+
+def main():
+    parser = App.argparser("Low-level manual fiddling with toys")
+    parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
+                        help="Intiface Engine address to connect to")
+    args = parser.parse_args()
+
+    with App(args, title="Toy test") as app:
+        app.main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
