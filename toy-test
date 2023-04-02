@@ -46,8 +46,8 @@ class ToyView(Gtk.Box):
 
 
 class ToysView(GtkComponent, Gtk.Box):
-    def __init__(self):
-        GtkComponent.__init__(self)
+    def __init__(self, **kwargs):
+        GtkComponent.__init__(self, **kwargs)
         Gtk.Box.__init__(self)
 
     def receive(self, msg: toy.Message):
@@ -58,20 +58,13 @@ class ToysView(GtkComponent, Gtk.Box):
                 self.show_all()
 
 
-class InterfaceConnector(pyeep.aio.AIOComponent):
-    def __init__(self, toys_view: ToysView):
-        super().__init__(self, name="interface_connector")
-        self.toys_view = toys_view
-
-
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, title: str):
         super().__init__(args, title=title)
 
-        self.add_component(toy.Toys(title, args.iface))
+        self.add_component(toy.Toys, client_name=title, iface=args.iface)
+        toys_view = self.add_component(ToysView)
 
-        toys_view = ToysView()
-        self.add_component(toys_view)
         self.vbox.pack_start(toys_view, True, True, 0)
 
     async def aio_main(self):

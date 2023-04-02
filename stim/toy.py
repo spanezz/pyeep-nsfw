@@ -36,8 +36,9 @@ class SetPower(Message):
 
 
 class Toys(pyeep.aio.AIOComponent):
-    def __init__(self, client_name: str, iface: str):
-        super().__init__(name="toys")
+    def __init__(self, client_name: str, iface: str, **kwargs):
+        kwargs.setdefault("name", "toys")
+        super().__init__(**kwargs)
         self.client = buttplug.Client(client_name, buttplug.ProtocolSpec.v3)
         self.connector = buttplug.WebsocketConnector(iface, logger=self.logger)
         self.devices_seen: set[buttplug.client.client.Device] = set()
@@ -73,6 +74,54 @@ class Toys(pyeep.aio.AIOComponent):
             if scanning:
                 await self.client.stop_scanning()
             await self.client.disconnect()
+
+
+class ToyPlayer:
+    """
+    Keep a timed command queue for toy actuators
+    """
+    def __init__(self, actuator: buttplug.client.client.Actuator):
+        self.actuator = actuator
+
+        # Queue of intensities (from 0 to 1) to be played
+        self.pattern_queue: deque[float] = deque()
+
+        # Sample rate of pattern_queue
+        self.sample_rate: int = 20
+
+        self.frame_nsecs: int = int(round(1_000_000_000 / self.sample_rate))
+
+        # Callable notified of every command sent to the toy
+        self.notify_command: Callable[[str], None] | None = None
+
+        self.shutting_down = False
+
+    def shutdown(self):
+        self.shutting_down = True
+
+    async def play_pattern(self):
+        last_frame = time.time_ns() / self.frame_nsecs
+        old: float = 0.0
+        while not self.shutting_down:
+            # print(f"tick cq={len(self.command_queue)}", end=" ")
+            if self.pattern_queue:
+                new = self.pattern_queue.popleft()
+                if new != old:
+                    # print(new)
+                    await self.actuator.command(new)
+                    old = new
+                else:
+                    # print("same")
+                    pass
+            else:
+                # print("empty")
+                pass
+
+            last_frame += 1
+            target_time = last_frame * self.frame_nsecs
+            cur_time = time.time_ns()
+            if target_time > cur_time:
+                await asyncio.sleep((target_time - cur_time) / 1_000_000_000)
 
 
 class Toy:
