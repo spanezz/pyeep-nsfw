@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+
+# buttplug-py example code
+#
+# This is a program that connects to a server, scans for devices, and lists
+# the found devices. It'll be copiously commented, so you have some idea
+# of what's going on and can maybe make something yourself.
+#
+# NOTE: We'll be talking about this in terms of execution flow, so you'll want
+# to start at the bottom and work your way up.
+
+import argparse
+import asyncio
+import logging
+import sys
+import time
+
+import pyeep.app
+
+# These are really the only things you actually need out of the library.
+# The Client and the *Connector are used to establish a connection to the server.
+# ProtocolSpec can be used to specify the protocol version that the client may use.
+import buttplug
+
+
+log = logging.getLogger(__name__)
+
+
+class Buttplug:
+    def __init__(self, client_name: str, address: str):
+        self.client_name = client_name
+        self.address = address
+        self.client = buttplug.Client(client_name, buttplug.ProtocolSpec.v3)
+        self.connector = buttplug.WebsocketConnector("ws://127.0.0.1:12345", logger=log)
+        self.shutting_down = False
+
+    def shutdown(self):
+        self.shutting_down = True
+
+    async def __aenter__(self):
+        await self.client.connect(self.connector)
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.client.disconnect()
+
+
+class App(pyeep.app.App):
+    def __init__(self, args: argparse.Namespace):
+        super().__init__(args)
+        self.bp = Buttplug("bp-tool", args.addr)
+
+    def shutdown(self):
+        super().shutdown()
+        self.bp.shutdown()
+
+    async def do_scan(self):
+        devices_seen: set[buttplug.client.client.Device] = set()
+        for dev in self.bp.client.devices.values():
+            await self.dump_device(dev)
+            devices_seen.add(dev)
+
+        await self.bp.client.start_scanning()
+        while not self.shutting_down:
+            await asyncio.sleep(0.5)
+
+            for dev in self.bp.client.devices.values():
+                if dev not in devices_seen:
+                    devices_seen.add(dev)
+                    await self.dump_device(dev)
+
+        await self.bp.client.stop_scanning()
+
+    async def dump_device(self, dev: buttplug.client.client.Device):
+        print(f"# {dev.index} {dev.name}")
+
+        for a in dev.actuators:
+            print(f"* Actuator: {a.description} {a.__class__.__name__}")
+
+        for a in dev.linear_actuators:
+            print(f"* Linear actuator {a.description} {a.__class__.__name__}")
+
+        for a in dev.rotatory_actuators:
+            print(f"* Rotatory actuator: {a.description} {a.__class__.__name__}")
+
+        for s in dev.sensors:
+            value = await s.read()
+            print(f"* Sensor: {s.description} {s.__class__.__name__}: {value}")
+
+    async def do_dump(self):
+        for dev in self.bp.client.devices.values():
+            await self.dump_device(dev)
+
+    async def aio_main(self):
+        async with self.bp:
+            if self.args.scan:
+                await self.do_scan()
+            elif self.args.dump:
+                await self.do_dump()
+            self.shutdown()
+
+    def ui_main(self):
+        try:
+            while not self.shutting_down:
+                time.sleep(0.2)
+        except EOFError:
+            pass
+
+
+def main():
+    parser = App.argparser("Basic buttplug device management")
+    parser.add_argument("--addr", action="store", default="ws://127.0.0.1:12345",
+                        help="Intiface Engine address to connect to")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--scan", action="store_true",
+                       help="Scan for devices")
+    group.add_argument("--dump", action="store_true",
+                       help="Dump information about connected devices")
+    args = parser.parse_args()
+
+    with App(args) as app:
+        app.main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
