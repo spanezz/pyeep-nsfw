@@ -1,18 +1,8 @@
 #!/usr/bin/python3
 
-# buttplug-py example code
-#
-# This is a program that connects to a server, scans for devices, and lists
-# the found devices. It'll be copiously commented, so you have some idea
-# of what's going on and can maybe make something yourself.
-#
-# NOTE: We'll be talking about this in terms of execution flow, so you'll want
-# to start at the bottom and work your way up.
-
 import argparse
 import logging
 import sys
-import time
 
 from pyeep.app import Shutdown
 import pyeep.aio
@@ -78,10 +68,6 @@ class App(pyeep.aio.AIOApp):
             self.add_component(Scan)
         elif self.args.dump:
             self.add_component(Dump)
-
-    def main_loop(self):
-        while self.hubs and not self.shutting_down:
-            time.sleep(0.2)
 
 
 def main():
