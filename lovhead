@@ -12,7 +12,7 @@ import pylsl
 
 import buttplug
 import pyeep.app
-from pyeep.app import Component, Hub, Message
+from pyeep.app import Component, Hub, Message, Shutdown
 from pyeep.gtk import Gtk
 from stim import toy
 
@@ -23,21 +23,15 @@ log = logging.getLogger(__name__)
 
 
 class SubthreadComponent(Component):
-    pass
+    HUB = "subthread"
 
 
 class SubthreadHub(Hub):
-    def __init__(self):
-        super().__init__(name="subthread")
+    def __init__(self, **kwargs):
+        kwargs.setdefault("name", "subthread")
+        super().__init__(**kwargs)
 
-    def add_component(self, component_cls: Type[Component], **kwargs) -> Component:
-        if issubclass(component_cls, SubthreadComponent):
-            kwargs["hub"] = self
-            component = component_cls(**kwargs)
-            self.components[component.name] = component
-            return component
-
-        return super().add_component(component_cls, **kwargs)
+    # TODO: shut down when Head is done
 
 
 class Head(SubthreadComponent):
@@ -51,6 +45,7 @@ class Head(SubthreadComponent):
         self.reference_pitch: float | None = None
         self.control_angle = 45
         self.actuator: buttplug.client.client.Actuator | None = None
+        self.shutting_down = False
         self.thread.start()
 
     def shutdown(self):
@@ -60,9 +55,11 @@ class Head(SubthreadComponent):
     def receive(self, msg: Message):
         match msg:
             case toy.NewDevice():
-                for a in msg.dev.actuators:
-                    # TODO: pick better than random
-                    self.actuator = a
+                # for a in msg.dev.actuators:
+                # TODO: pick better than random
+                self.actuator = msg.actuator.actuator
+            case Shutdown():
+                self.shutting_down = True
 
     def set_mode(self, mode: str):
         with self.param_lock:
@@ -124,7 +121,7 @@ class Head(SubthreadComponent):
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, title="Lovhead"):
         super().__init__(args, title=title)
-        self.add_hub(SubthreadHub())
+        self.add_hub(SubthreadHub)
         self.add_component(toy.Toys, client_name=title, iface=args.iface)
         self.head = self.add_component(Head)
 
