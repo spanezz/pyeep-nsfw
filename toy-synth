@@ -121,11 +121,11 @@ class ToySynth(midisynth.MidiSynth):
         match msg:
             case toy.NewDevice():
                 with self.toy_banks_lock:
-                    for a in msg.dev.actuators:
-                        new_bank = ToyBank(self, self.first_free_channel, actuator=a)
-                        self.first_free_channel += new_bank.nchannels
-                        self.toy_banks.add(new_bank)
-                        self.add_instrument_bank(new_bank.instruments)
+                    # for a in msg.dev.actuators:
+                    new_bank = ToyBank(self, self.first_free_channel, actuator=msg.actuator.actuator)
+                    self.first_free_channel += new_bank.nchannels
+                    self.toy_banks.add(new_bank)
+                    self.add_instrument_bank(new_bank.instruments)
 
     def on_process(self, frames: int):
         super().on_process(frames)
@@ -206,10 +206,10 @@ class ToysView(pyeep.gtk.GtkComponent, Gtk.Box):
     def receive(self, msg: toy.Message):
         match msg:
             case toy.NewDevice():
-                tv = ToyView(msg.dev)
+                tv = ToyView(msg.actuator.actuator._device)
                 self.pack_start(tv, True, True, 0)
                 self.show_all()
-                self.views[msg.dev] = tv
+                self.views[msg.actuator.actuator._device] = tv
             case toy.SetPower():
                 if (tv := self.views.get(msg.actuator._device)) is not None:
                     scale = tv.by_actuator[msg.actuator]
