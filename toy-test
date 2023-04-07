@@ -5,18 +5,18 @@ import asyncio
 import logging
 import sys
 
-import buttplug
 import pyeep.aio
 import pyeep.app
 from pyeep.gtk import Gtk, GtkComponent
-from stim import toy
+from stim import toy, cnc
 
 log = logging.getLogger(__name__)
 
 
-class ToyView(Gtk.Box):
-    def __init__(self, actuator: toy.Actuator, toys_view: "ToysView"):
-        super().__init__(orientation=Gtk.Orientation.VERTICAL)
+class ToyView(GtkComponent, Gtk.Box):
+    def __init__(self, *, actuator: toy.Actuator, toys_view: "ToysView", **kwargs):
+        GtkComponent.__init__(self, **kwargs)
+        Gtk.Box.__init__(self, orientation=Gtk.Orientation.VERTICAL)
         self.actuator = actuator
         self.toys_view = toys_view
         self.label_name = Gtk.Label(label=actuator.actuator._device.name + "\n" + actuator.name)
@@ -39,6 +39,15 @@ class ToyView(Gtk.Box):
 
         self.power.connect("value_changed", self.on_power)
 
+    def receive(self, msg: toy.Message):
+        match msg:
+            case cnc.CncCommand():
+                match msg.command:
+                    case "EMERGENCY":
+                        self.power.set_value(0)
+                    case "STOP":
+                        self.power.set_value(0)
+
     def on_power(self, adj):
         val = round(adj.get_value())
         self.toys_view.send(toy.SetPower(actuator=self.actuator.actuator, power=val / 100.0))
@@ -52,7 +61,7 @@ class ToysView(GtkComponent, Gtk.Box):
     def receive(self, msg: toy.Message):
         match msg:
             case toy.NewDevice():
-                tv = ToyView(msg.actuator, self)
+                tv = self.hub.app.add_component(ToyView, actuator=msg.actuator, toys_view=self)
                 self.pack_start(tv, True, True, 0)
                 self.show_all()
 
@@ -62,6 +71,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().__init__(args, title=title)
 
         self.add_component(toy.Toys, client_name=title, iface=args.iface)
+        self.add_component(cnc.CncReceiver)
         toys_view = self.add_component(ToysView)
 
         self.vbox.pack_start(toys_view, True, True, 0)
