@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import queue
+# import queue
 
-import pyeep.gtk
+# import pyeep.gtk
 from pyeep.gtk import Gtk, GtkComponent
 # from . import lovense, toy, cnc
 from . import toy, cnc
@@ -20,7 +20,7 @@ from . import toy, cnc
 #         # Executed in the aio thread
 #         self.queue.put(cmd)
 #         pyeep.gtk.GLib.idle_add(self.process_queues)
- 
+#
 #     def process_queues(self):
 #         while not self.queue.empty():
 #             self.append(self.queue.get())
@@ -62,12 +62,16 @@ class ToyView(GtkComponent, Gtk.Box):
 
         self.power.connect("value_changed", self.on_power)
         self.last_value: float = 0.0
+        self.value_override: float | None = None
 
     def is_active(self) -> bool:
         return self.active.get_active()
 
     def set_value(self, value: float):
-        self.adjustment.set_value(value)
+        if self.value_override is not None:
+            self.adjustment.set_value(self.value_override)
+        else:
+            self.adjustment.set_value(value)
         self.last_value = value
 
     def add_value(self, value: float):
@@ -93,10 +97,12 @@ class ToyView(GtkComponent, Gtk.Box):
                                 -self.adjustment.get_minimum_increment())
                     case "+Z":
                         if self.is_active():
-                            self.adjustment.set_value(100)
+                            self.value_override = 100
+                            self.set_value(self.last_value)
                     case "-Z":
                         if self.is_active():
-                            self.adjustment.set_value(self.last_value)
+                            self.value_override = None
+                            self.set_value(self.last_value)
                     case "F+":
                         if self.is_active():
                             self.add_value(1)
