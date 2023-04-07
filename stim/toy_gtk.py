@@ -137,6 +137,8 @@ class ToysView(GtkComponent, Gtk.Box):
         match msg:
             case toy.NewDevice():
                 tv = self.hub.app.add_component(ToyView, actuator=msg.actuator, toys_view=self)
+                if not self.toy_views:
+                    self.active = tv
                 self.toy_views.append(tv)
                 self.pack_start(tv, True, True, 0)
                 self.show_all()
