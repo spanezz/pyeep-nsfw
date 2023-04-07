@@ -1,20 +1,22 @@
 #!/usr/bin/python3
 
 import argparse
-import asyncio
 import math
 import random
 import sys
+from pathlib import Path
 from typing import Generator, Optional
 
 import numpy
 
+import pyeep.aio
 import pyeep.app
+from pyeep.app import Shutdown
 from pyeep import shape, volume
 from pyeep.audio import PyAudioPlayer
 from pyeep.pattern import Pattern, PatternSequence, Silence, Wave
 from pyeep.wav import WaveWriter
-from stim.heart import Excitement
+from stim.heart.improvised import Excitement
 
 
 class Pulses(Pattern):
@@ -131,7 +133,8 @@ class ContinuousHeartMonitorMixin:
         self.excitement = excitement
 
 
-class PulseWaveEscalate(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PulseWaveEscalateBase):
+# class PulseWaveEscalate(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PulseWaveEscalateBase):
+class PulseWaveEscalate(PulseWaveEscalateBase):
     """
     Pulse wave escalate
     """
@@ -145,7 +148,8 @@ class PulseWaveEscalate(TeaseAndDenialMixin, ContinuousHeartMonitorMixin, PulseW
         # With a callback from the heart rate monitor, enqueue override
         # patterns in case things get interesting
         for i, f in zip(self.duration_pattern(), self.freq_pattern()):
-            yield Pulses(count=i * 2, duration=0.1, freq=f, volume=self.PULSE_VOLUME, gap=5.0/100.0)
+            f = 500
+            yield Pulses(count=i * 2, duration=0.1, freq=f, volume=self.PULSE_VOLUME, gap=10.0/100.0)
             yield Wave(
                     volume=volume.Sine(vmin=self.WAVE_VOLUME * 0.93, vmax=self.WAVE_VOLUME, freq=3),
                     duration=self.MIN_DURATION + i / 2, freq=f)
@@ -556,54 +560,54 @@ class TestVolumeSlide(PatternSequence):
         yield Wave(volume=volume.RampDown(0.0, 1.0), duration=1, freq=1000)
 
 
-class App(pyeep.app.App):
-    def __init__(self, args: argparse.Namespace):
-        super().__init__(args)
-        self.args = args
-        if self.args.output:
-            self.player = WaveWriter(args.output)
-        else:
-            self.player = PyAudioPlayer()
-        self.excitement: Optional[Excitement] = None
+class MonitorHeartbeat(pyeep.aio.AIOComponent):
+    def __init__(self, *, path: Path | None, **kwargs):
+        super().__init__(**kwargs)
+        self.path = path
 
-    def shutdown(self):
-        if self.shutting_down:
+    def receive(self, msg):
+        match msg:
+            case Shutdown():
+                self.excitement.shutdown()
+
+    async def run(self):
+        if self.path is None:
             return
-        super().shutdown()
-        self.player.shutdown()
-        if self.excitement is not None:
-            self.excitement.shutdown()
+
+        self.excitement = Excitement(path=self.path, quiet=False)
+        self.excitement.on_sample = self.on_heartbeat_sample
+        await self.excitement.read_socket()
 
     def on_heartbeat_sample(self):
-        for pattern in self.player.channels:
+        app = self.hub.app
+        for pattern in app.player.channels:
             if (cb := getattr(pattern, "on_heartbeat_sample", None)) is None:
                 continue
             cb(self.excitement)
 
-    async def monitor_heartbeat(self):
-        if self.args.heart is None:
-            return
 
-        self.excitement = Excitement(quiet=False)
-        self.excitement.on_sample = self.on_heartbeat_sample
-        await self.excitement.read_socket(self.args.heart)
+class App(pyeep.aio.AIOApp, pyeep.app.App):
+    def __init__(self, args: argparse.Namespace):
+        super().__init__(args)
+        self.args = args
+        if self.args.output:
+            self.player = self.add_component(WaveWriter, args.output)
+        else:
+            self.player = self.add_component(PyAudioPlayer)
+        self.excitement: Optional[Excitement] = None
+        self.add_component(MonitorHeartbeat, path=Path(self.args.heart))
 
-    async def calibrate(self):
-        self.player.start_mono(Calibrate())
-        await self.player.loop()
-
-    async def aio_main(self):
         if self.args.calibrate:
-            await self.calibrate()
+            self.player.start_mono(Calibrate())
         else:
             # self.player.start_mono(TestVolumeSlide())
-            # self.player.start_mono(HeartBeatMonitor())
+            self.player.start_mono(HeartBeatMonitor())
             # self.player.start_mono(HeartBeat())
             # self.player.start_mono(HeartBeatStimulation())
             # self.player.start_mono(HeartBeatFrustration())
             # self.player.start_mono(HeartBeatProportional())
             # self.player.start_mono(HeartBeatMonitor())
-            self.player.start_mono(PulseWaveEscalate())
+            # self.player.start_mono(PulseWaveEscalate())
             # player.start_mono(PulseWaveEscalateChaotic())
             # player.start_stereo(
             #         left=PulseWaveEscalate(),
@@ -624,17 +628,12 @@ class App(pyeep.app.App):
             #         left=PulseWaveEscalate(),
             #         right=VolumeSwing(),
             # )
-            await asyncio.gather(self.monitor_heartbeat(), self.player.loop())
-        self.shutdown()
 
-    def ui_main(self):
-        try:
-            while True:
-                cmd = input("> ")
-                if cmd.startswith("q"):
-                    break
-        except EOFError:
-            pass
+    def send(self, msg):
+        # FIXME: hack to stop player until it turns into a proper component
+        if isinstance(msg, Shutdown):
+            self.player.shutdown()
+        return super().send(msg)
 
 
 def main():

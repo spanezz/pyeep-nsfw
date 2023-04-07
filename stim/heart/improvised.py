@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections import deque
+from pathlib import Path
 from typing import Callable, Optional
 
 import numpy
@@ -123,8 +124,8 @@ class HSpan:
 
 
 class Excitement(HeartReceiver):
-    def __init__(self, quiet: bool) -> None:
-        super().__init__()
+    def __init__(self, *, path: Path, quiet: bool) -> None:
+        super().__init__(path=path)
         self.quiet = quiet
         self.history: deque[HeartSample] = deque(maxlen=20)
         self.window = Window("10s", 10)
