@@ -47,29 +47,48 @@ class ToyView(GtkComponent, Gtk.Box):
         self.adjustment = self.power.get_adjustment()
 
         self.power.connect("value_changed", self.on_power)
+        self.last_value: float = 0.0
 
     def is_active(self) -> bool:
         return self.active.get_active()
+
+    def set_value(self, value: float):
+        self.adjustment.set_value(value)
+        self.last_value = value
+
+    def add_value(self, value: float):
+        self.set_value(
+            self.adjustment.get_value() + value)
 
     def receive(self, msg: toy.Message):
         match msg:
             case cnc.CncCommand():
                 match msg.command:
                     case "EMERGENCY":
-                        self.adjustment.set_value(0)
+                        self.set_value(0)
                     case "STOP":
                         if self.is_active():
-                            self.adjustment.set_value(0)
+                            self.set_value(0)
                     case "SPEED UP":
                         if self.is_active():
-                            inc = self.adjustment.get_minimum_increment()
-                            self.adjustment.set_value(
-                                self.adjustment.get_value() + inc)
+                            self.add_value(
+                                self.adjustment.get_minimum_increment())
                     case "SLOW DOWN":
                         if self.is_active():
-                            inc = self.adjustment.get_minimum_increment()
-                            self.adjustment.set_value(
-                                self.adjustment.get_value() - inc)
+                            self.add_value(
+                                -self.adjustment.get_minimum_increment())
+                    case "+Z":
+                        if self.is_active():
+                            self.adjustment.set_value(100)
+                    case "-Z":
+                        if self.is_active():
+                            self.adjustment.set_value(self.last_value)
+                    case "F+":
+                        if self.is_active():
+                            self.add_value(1)
+                    case "F-":
+                        if self.is_active():
+                            self.add_value(-1)
 
     def on_power(self, adj):
         val = round(adj.get_value())
