@@ -42,7 +42,7 @@ class Scan(pyeep.aio.AIOComponent):
                 case Shutdown():
                     break
                 case toy.NewDevice():
-                    await dump_device(msg.dev)
+                    await dump_device(msg.actuator.actuator._device)
 
 
 class Dump(pyeep.aio.AIOComponent):
