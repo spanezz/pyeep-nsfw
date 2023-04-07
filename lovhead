@@ -9,11 +9,11 @@ import threading
 import numpy
 import pylsl
 
-import buttplug
 import pyeep.app
 from pyeep.app import Component, Hub, Message, Shutdown
 from pyeep.gtk import Gtk
 from stim import toy
+from stim.toy_gtk import ToysView
 
 # from stim.lovense_gtk import LovenseCommandLogView
 
@@ -35,15 +35,15 @@ class SubthreadHub(Hub):
 
 class Head(SubthreadComponent):
     # Sample rate = 52
-    def __init__(self, **kwargs):
+    def __init__(self, toys_view: ToysView, **kwargs):
         super().__init__(**kwargs)
         self.thread = threading.Thread(name=self.name, target=self.run)
+        self.toys_view = toys_view
         self.mode = "center_zero"
         self.param_lock = threading.Lock()
         self.reference_roll: float | None = None
         self.reference_pitch: float | None = None
         self.control_angle = 45
-        self.actuator: buttplug.client.client.Actuator | None = None
         self.shutting_down = False
         self.thread.start()
 
@@ -53,10 +53,6 @@ class Head(SubthreadComponent):
 
     def receive(self, msg: Message):
         match msg:
-            case toy.NewDevice():
-                # for a in msg.dev.actuators:
-                # TODO: pick better than random
-                self.actuator = msg.actuator.actuator
             case Shutdown():
                 self.shutting_down = True
 
@@ -113,8 +109,8 @@ class Head(SubthreadComponent):
 
                 # print(f"POS {self.mode} {roll=:.1f} {roll_angle=:.1f} {pitch=:.1f} {pitch_angle=:.1f} {power=:.2f}")
 
-            if self.actuator is not None:
-                self.send(toy.SetPower(actuator=self.actuator, power=power))
+            if self.toys_view.active is not None:
+                self.send(toy.SetPower(actuator=self.toys_view.active.actuator.actuator, power=power))
 
 
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
@@ -122,7 +118,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().__init__(args, title=title)
         self.add_hub(SubthreadHub)
         self.add_component(toy.Toys, client_name=title, iface=args.iface)
-        self.head = self.add_component(Head)
+
+        toys_view = self.add_component(ToysView)
+        self.vbox.pack_start(toys_view, True, True, 0)
+
+        self.head = self.add_component(Head, toys_view=toys_view)
 
         zero_center = Gtk.RadioButton.new_with_label_from_widget(None, "Zero on center")
         zero_center.connect("toggled", self.set_mode, "center_zero")

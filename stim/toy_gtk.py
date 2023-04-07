@@ -42,6 +42,7 @@ class ToyView(GtkComponent, Gtk.Box):
         else:
             active_radio_group = None
         self.active = Gtk.RadioButton.new_with_label_from_widget(active_radio_group, "Active")
+        self.active.connect("toggled", self.on_active)
         self.pack_start(self.active, False, False, 0)
 
         self.power = Gtk.Scale.new_with_range(
@@ -63,6 +64,10 @@ class ToyView(GtkComponent, Gtk.Box):
         self.power.connect("value_changed", self.on_power)
         self.last_value: float = 0.0
         self.value_override: float | None = None
+
+    def on_active(self, button):
+        if button.get_active():
+            self.toys_view.active = self
 
     def is_active(self) -> bool:
         return self.active.get_active()
@@ -120,6 +125,7 @@ class ToysView(GtkComponent, Gtk.Box):
         GtkComponent.__init__(self, **kwargs)
         Gtk.Box.__init__(self)
         self.toy_views: list[ToyView] = []
+        self.active: ToyView | None = None
 
     def get_active_index(self) -> int:
         for idx, tv in enumerate(self.toy_views):
