@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import argparse
-import asyncio
 import logging
 import sys
 
@@ -14,27 +13,19 @@ log = logging.getLogger(__name__)
 
 
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
-    def __init__(self, args: argparse.Namespace, title: str):
-        super().__init__(args, title=title)
+    def __init__(self, args: argparse.Namespace, **kwargs):
+        super().__init__(args, **kwargs)
 
-        scan = self.add_component(ToysScan)
-        self.vbox.pack_start(scan, False, False, 0)
+        self.scan_button = self.add_component(ToysScan)
+        self.toys_view = self.add_component(ToysView)
 
-        self.add_component(toy.Toys, client_name=title, iface=args.iface)
+        self.add_component(toy.Toys, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
-        toys_view = self.add_component(ToysView)
 
-        self.vbox.pack_start(toys_view, True, True, 0)
-
-    async def aio_main(self):
-        self.head.loop = asyncio.get_event_loop()
-        async with self.toy:
-            self.log_toy.attach(self.toy)
-            await self.toy.start()
-            self.toy.pattern_queue.append(0)
-            await asyncio.gather(
-                self.toy.play_pattern(),
-            )
+    def on_activate(self, app):
+        super().on_activate(app)
+        self.vbox.append(self.scan_button)
+        self.vbox.append(self.toys_view)
 
     def ui_main(self):
         self.head.start()
@@ -47,7 +38,7 @@ def main():
                         help="Intiface Engine address to connect to")
     args = parser.parse_args()
 
-    with App(args, title="Toy test") as app:
+    with App(args, title="Toy test", application_id="org.enricozini.toy_test") as app:
         app.main()
 
 

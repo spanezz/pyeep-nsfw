@@ -3,7 +3,7 @@ from __future__ import annotations
 # import queue
 
 # import pyeep.gtk
-from pyeep.gtk import Gtk, GtkComponent
+from pyeep.gtk import Gtk, GtkComponentBox
 # from . import lovense, toy, cnc
 from . import toy, cnc
 
@@ -27,23 +27,28 @@ from . import toy, cnc
 #         return False
 
 
-class ToyView(GtkComponent, Gtk.Box):
+class ToyView(GtkComponentBox):
     def __init__(self, *, actuator: toy.Actuator, toys_view: "ToysView", **kwargs):
         kwargs.setdefault("name", "tv_" + actuator.name)
-        GtkComponent.__init__(self, **kwargs)
-        Gtk.Box.__init__(self, orientation=Gtk.Orientation.VERTICAL)
+        super().__init__(**kwargs)
+
         self.actuator = actuator
         self.toys_view = toys_view
+
+        self.set_hexpand(True)
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.box.set_hexpand(True)
+        self.append(self.box)
+
         self.label_name = Gtk.Label(label=actuator.actuator._device.name + "\n" + actuator.name)
-        self.pack_start(self.label_name, False, False, 0)
+        self.box.append(self.label_name)
+
+        self.active = Gtk.CheckButton(label="Active")
+        self.active.connect("toggled", self.on_active)
+        self.box.append(self.active)
 
         if self.toys_view.toy_views:
-            active_radio_group = self.toys_view.toy_views[0].active
-        else:
-            active_radio_group = None
-        self.active = Gtk.RadioButton.new_with_label_from_widget(active_radio_group, "Active")
-        self.active.connect("toggled", self.on_active)
-        self.pack_start(self.active, False, False, 0)
+            self.active.set_group(self.toys_view.toy_views[0].active)
 
         self.power = Gtk.Scale.new_with_range(
                 orientation=Gtk.Orientation.HORIZONTAL,
@@ -58,7 +63,7 @@ class ToyView(GtkComponent, Gtk.Box):
                 position=Gtk.PositionType.BOTTOM,
                 markup=None
             )
-        self.pack_start(self.power, False, False, 0)
+        self.box.append(self.power)
         self.adjustment = self.power.get_adjustment()
 
         self.power.connect("value_changed", self.on_power)
@@ -121,12 +126,12 @@ class ToyView(GtkComponent, Gtk.Box):
         self.toys_view.send(toy.SetPower(actuator=self.actuator.actuator, power=val / 100.0))
 
 
-class ToysView(GtkComponent, Gtk.Box):
+class ToysView(GtkComponentBox):
     def __init__(self, **kwargs):
-        GtkComponent.__init__(self, **kwargs)
-        Gtk.Box.__init__(self)
+        super().__init__(**kwargs)
         self.toy_views: list[ToyView] = []
         self.active: ToyView | None = None
+        self.set_hexpand(True)
 
     def get_active_index(self) -> int:
         for idx, tv in enumerate(self.toy_views):
@@ -139,10 +144,10 @@ class ToysView(GtkComponent, Gtk.Box):
             case toy.NewDevice():
                 tv = self.hub.app.add_component(ToyView, actuator=msg.actuator, toys_view=self)
                 if not self.toy_views:
+                    tv.active.set_active(True)
                     self.active = tv
                 self.toy_views.append(tv)
-                self.pack_start(tv, True, True, 0)
-                self.show_all()
+                self.append(tv)
             case cnc.CncCommand():
                 match msg.command:
                     case "+A":
@@ -157,13 +162,12 @@ class ToysView(GtkComponent, Gtk.Box):
                         self.toy_views[new_active].active.set_active(True)
 
 
-class ToysScan(GtkComponent, Gtk.Box):
+class ToysScan(GtkComponentBox):
     def __init__(self, **kwargs):
-        GtkComponent.__init__(self, **kwargs)
-        Gtk.Box.__init__(self)
+        super().__init__(**kwargs)
         self.scan = Gtk.ToggleButton.new_with_label("Device scan")
         self.scan.connect("toggled", self.on_toggle)
-        self.pack_start(self.scan, False, False, 0)
+        self.append(self.scan)
 
     def on_toggle(self, toggle):
         if self.scan.get_active():
