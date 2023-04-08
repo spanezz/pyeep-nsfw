@@ -128,16 +128,30 @@ class ToyView(GtkComponentBox):
 
 class ToysView(GtkComponentBox):
     def __init__(self, **kwargs):
+        kwargs["orientation"] = Gtk.Orientation.VERTICAL
         super().__init__(**kwargs)
         self.toy_views: list[ToyView] = []
         self.active: ToyView | None = None
         self.set_hexpand(True)
+
+        self.scan = Gtk.ToggleButton.new_with_label("Device scan")
+        self.scan.connect("toggled", self.on_scan_toggled)
+        self.append(self.scan)
+
+        self.toybox = Gtk.Box()
+        self.append(self.toybox)
 
     def get_active_index(self) -> int:
         for idx, tv in enumerate(self.toy_views):
             if tv.is_active():
                 return idx
         return 0
+
+    def on_scan_toggled(self, toggle):
+        if self.scan.get_active():
+            self.send(toy.ScanRequest(dst="toys", scan=True))
+        else:
+            self.send(toy.ScanRequest(dst="toys", scan=False))
 
     def receive(self, msg: toy.Message):
         match msg:
@@ -147,7 +161,7 @@ class ToysView(GtkComponentBox):
                     tv.active.set_active(True)
                     self.active = tv
                 self.toy_views.append(tv)
-                self.append(tv)
+                self.toybox.append(tv)
             case cnc.CncCommand():
                 match msg.command:
                     case "+A":
@@ -160,17 +174,3 @@ class ToysView(GtkComponentBox):
                         if new_active < 0:
                             new_active = len(self.toy_views) - 1
                         self.toy_views[new_active].active.set_active(True)
-
-
-class ToysScan(GtkComponentBox):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.scan = Gtk.ToggleButton.new_with_label("Device scan")
-        self.scan.connect("toggled", self.on_toggle)
-        self.append(self.scan)
-
-    def on_toggle(self, toggle):
-        if self.scan.get_active():
-            self.send(toy.ScanRequest(dst="toys", scan=True))
-        else:
-            self.send(toy.ScanRequest(dst="toys", scan=False))
