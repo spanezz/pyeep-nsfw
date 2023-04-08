@@ -155,3 +155,18 @@ class ToysView(GtkComponent, Gtk.Box):
                         if new_active < 0:
                             new_active = len(self.toy_views) - 1
                         self.toy_views[new_active].active.set_active(True)
+
+
+class ToysScan(GtkComponent, Gtk.Box):
+    def __init__(self, **kwargs):
+        GtkComponent.__init__(self, **kwargs)
+        Gtk.Box.__init__(self)
+        self.scan = Gtk.ToggleButton.new_with_label("Device scan")
+        self.scan.connect("toggled", self.on_toggle)
+        self.pack_start(self.scan, False, False, 0)
+
+    def on_toggle(self, toggle):
+        if self.scan.get_active():
+            self.send(toy.ScanRequest(dst="toys", scan=True))
+        else:
+            self.send(toy.ScanRequest(dst="toys", scan=False))

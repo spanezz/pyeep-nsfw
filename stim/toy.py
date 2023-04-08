@@ -24,6 +24,10 @@ class NewDevice(Message):
 
 
 class ScanRequest(Message):
+    def __init__(self, *, scan: bool = True, **kwargs):
+        super().__init__(**kwargs)
+        self.scan = scan
+
     def __str__(self):
         return "scan request"
 
@@ -133,8 +137,11 @@ class Toys(pyeep.aio.AIOComponent):
                     case Shutdown():
                         break
                     case ScanRequest():
-                        await self.client.start_scanning()
-                        scanning = True
+                        if msg.scan:
+                            await self.client.start_scanning()
+                        else:
+                            await self.client.stop_scanning()
+                        scanning = msg.scan
                     # case SetPower():
                     #     await msg.actuator.command(msg.power)
                     case None:

@@ -8,7 +8,7 @@ import sys
 import pyeep.aio
 import pyeep.app
 from stim import toy, cnc
-from stim.toy_gtk import ToysView
+from stim.toy_gtk import ToysView, ToysScan
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +16,9 @@ log = logging.getLogger(__name__)
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, title: str):
         super().__init__(args, title=title)
+
+        scan = self.add_component(ToysScan)
+        self.vbox.pack_start(scan, False, False, 0)
 
         self.add_component(toy.Toys, client_name=title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
