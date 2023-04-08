@@ -26,8 +26,12 @@ class CncReceiver(pyeep.aio.AIOComponent):
     async def run(self):
         # Poll socket to connect
         while True:
-            reader, writer = await asyncio.open_unix_connection(self.path)
-            break
+            try:
+                reader, writer = await asyncio.open_unix_connection(self.path)
+            except ConnectionRefusedError:
+                task_msg = await self.next_message(timeout=0.5)
+                if isinstance(task_msg, Shutdown):
+                    return
 
         # Read socket
         task_msg = asyncio.create_task(self.next_message())
