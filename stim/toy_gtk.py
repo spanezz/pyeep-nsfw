@@ -88,6 +88,7 @@ class ToyView(GtkComponent, Gtk.Box):
             case cnc.CncCommand():
                 match msg.command:
                     case "EMERGENCY":
+                        self.value_override = None
                         self.set_value(0)
                     case "STOP":
                         if self.is_active():
