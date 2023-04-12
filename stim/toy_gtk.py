@@ -5,7 +5,7 @@ from __future__ import annotations
 # import pyeep.gtk
 from pyeep.gtk import Gtk, GtkComponentBox
 # from . import lovense, toy, cnc
-from . import toy, cnc
+from . import toy, cnc, beat
 
 
 # class LovenseCommandLogView(pyeep.gtk.LogView):
@@ -120,6 +120,8 @@ class ToyView(GtkComponentBox):
                     case "F-":
                         if self.is_active():
                             self.add_value(-1)
+            case beat.Beat():
+                self.add_value(1)
 
     def on_power(self, adj):
         val = round(adj.get_value())
