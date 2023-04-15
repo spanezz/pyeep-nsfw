@@ -4,11 +4,11 @@ import argparse
 import logging
 import sys
 
+import pyeep.gtk
 import pyeep.aio
 import pyeep.app
-from stim import toy, cnc
+from stim import toy, cnc, scenes
 from stim.toy_gtk import ToysView
-from stim.beat import BpmView
 
 log = logging.getLogger(__name__)
 
@@ -18,15 +18,32 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().__init__(args, **kwargs)
 
         self.toys_view = self.add_component(ToysView)
-        self.bpm_view = self.add_component(BpmView)
 
         self.add_component(toy.Toys, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
 
+    def build_main_window(self):
+        super().build_main_window()
+
+        action = pyeep.gtk.Gio.SimpleAction.new("eagerness", None)
+        action.connect("activate", self.start_scene, scenes.Eagerness)
+        self.gtk_app.add_action(action)
+
+        scenes_menu = pyeep.gtk.Gio.Menu()
+        scenes_menu.append("Eagerness", "app.eagerness")
+
+        menu = pyeep.gtk.Gio.Menu()
+        menu.append_submenu("Scenes", scenes_menu)
+        self.gtk_app.set_menubar(menu)
+        self.window.set_show_menubar(True)
+
+    def start_scene(self, action, param, scene):
+        self.add_component(scene)
+
     def on_activate(self, app):
         super().on_activate(app)
-        self.vbox.append(self.bpm_view)
         self.vbox.append(self.toys_view)
+        self.toys_view.set_vexpand(True)
 
     def ui_main(self):
         self.head.start()

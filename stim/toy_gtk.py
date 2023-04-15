@@ -1,30 +1,20 @@
 from __future__ import annotations
 
-# import queue
-
-# import pyeep.gtk
+from pyeep.app import Message
 from pyeep.gtk import Gtk, GtkComponentBox
-# from . import lovense, toy, cnc
-from . import toy, cnc, beat
+from . import toy, cnc
 
 
-# class LovenseCommandLogView(pyeep.gtk.LogView):
-#     def __init__(self, max_lines: int = 10):
-#         super().__init__(max_lines)
-#         self.queue: queue.Queue[str] = queue.Queue()
-#
-#     def attach(self, toy: lovense.Lovense):
-#         toy.notify_command = self.on_command
-#
-#     def on_command(self, cmd):
-#         # Executed in the aio thread
-#         self.queue.put(cmd)
-#         pyeep.gtk.GLib.idle_add(self.process_queues)
-#
-#     def process_queues(self):
-#         while not self.queue.empty():
-#             self.append(self.queue.get())
-#         return False
+class SetActivePower(Message):
+    def __init__(self, *, power: float, **kwargs):
+        super().__init__(**kwargs)
+        self.power = power
+
+
+class IncreaseActivePower(Message):
+    def __init__(self, *, amount: float, **kwargs):
+        super().__init__(**kwargs)
+        self.amount = amount
 
 
 class ToyView(GtkComponentBox):
@@ -120,8 +110,12 @@ class ToyView(GtkComponentBox):
                     case "F-":
                         if self.is_active():
                             self.add_value(-1)
-            case beat.Beat():
-                self.add_value(1)
+            case SetActivePower():
+                if self.is_active():
+                    self.set_value(msg.power)
+            case IncreaseActivePower():
+                if self.is_active():
+                    self.add_value(msg.amount)
 
     def on_power(self, adj):
         val = round(adj.get_value())
@@ -138,6 +132,7 @@ class ToysView(GtkComponentBox):
 
         self.scan = Gtk.ToggleButton.new_with_label("Device scan")
         self.scan.connect("toggled", self.on_scan_toggled)
+        self.scan.set_vexpand(False)
         self.append(self.scan)
 
         self.toybox = Gtk.Box()
