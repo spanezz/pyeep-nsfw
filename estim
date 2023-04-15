@@ -595,19 +595,20 @@ class App(pyeep.aio.AIOApp, pyeep.app.App):
         else:
             self.player = self.add_component(PyAudioPlayer)
         self.excitement: Optional[Excitement] = None
-        self.add_component(MonitorHeartbeat, path=Path(self.args.heart))
+        if self.args.heart:
+            self.add_component(MonitorHeartbeat, path=Path(self.args.heart))
 
         if self.args.calibrate:
             self.player.start_mono(Calibrate())
         else:
             # self.player.start_mono(TestVolumeSlide())
-            self.player.start_mono(HeartBeatMonitor())
+            # self.player.start_mono(HeartBeatMonitor())
             # self.player.start_mono(HeartBeat())
             # self.player.start_mono(HeartBeatStimulation())
             # self.player.start_mono(HeartBeatFrustration())
             # self.player.start_mono(HeartBeatProportional())
             # self.player.start_mono(HeartBeatMonitor())
-            # self.player.start_mono(PulseWaveEscalate())
+            self.player.start_mono(PulseWaveEscalate())
             # player.start_mono(PulseWaveEscalateChaotic())
             # player.start_stereo(
             #         left=PulseWaveEscalate(),

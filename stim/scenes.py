@@ -17,8 +17,8 @@ class Eagerness(GtkComponentWindow):
         self.grid = Gtk.Grid()
         self.set_child(self.grid)
 
-        self.bpm = Gtk.Adjustment(lower=1, upper=150, step_increment=1, page_increment=5, value=1)
-        self.increment = Gtk.Adjustment(lower=0, upper=100, step_increment=1, page_increment=5, value=1)
+        self.bpm = Gtk.Adjustment(lower=1, upper=600, step_increment=1, page_increment=5, value=1)
+        self.increment = Gtk.Adjustment(lower=0, upper=100, step_increment=1, page_increment=5, value=2)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.bpm)
