@@ -125,7 +125,7 @@ class ToyView(GtkComponentBox):
 
     def on_power(self, adj):
         val = round(adj.get_value())
-        self.toys_view.send(toy.SetPower(actuator=self.actuator.actuator, power=val / 100.0))
+        self.toys_view.send(toy.SetPower(actuator=self.actuator, power=val / 100.0))
 
 
 class ToysView(GtkComponentBox):

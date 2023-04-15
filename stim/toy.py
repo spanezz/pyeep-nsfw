@@ -33,7 +33,7 @@ class ScanRequest(Message):
 
 
 class SetPower(Message):
-    def __init__(self, *, actuator: buttplug.client.client.Actuator, power: float, **kwargs):
+    def __init__(self, *, actuator: "Actuator", power: float, **kwargs):
         super().__init__(**kwargs)
         self.actuator = actuator
         self.power = power
@@ -68,8 +68,8 @@ class Actuator(pyeep.aio.AIOComponent):
                 #     await self.client.start_scanning()
                 #     scanning = True
                 case SetPower():
-                    if msg.actuator == self.actuator:
-                        await msg.actuator.command(msg.power)
+                    if msg.actuator == self:
+                        await self.actuator.command(msg.power)
 
     # async def play_pattern(self):
     #     last_frame = time.time_ns() / self.frame_nsecs
@@ -163,7 +163,7 @@ class ToyPlayer:
     """
     Keep a timed command queue for toy actuators
     """
-    def __init__(self, actuator: buttplug.client.client.Actuator, sender: Callable):
+    def __init__(self, actuator: Actuator, sender: Callable):
         self.actuator = actuator
         self.sender = sender
 
