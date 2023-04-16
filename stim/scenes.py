@@ -37,11 +37,11 @@ class Eagerness(GtkComponentWindow):
 
         self.timeout: int | None = None
 
-    def on_close(self, win):
+    def cleanup(self):
         if self.timeout is not None:
             GLib.source_remove(self.timeout)
             self.timeout = None
-        super().on_close(win)
+        super().cleanup()
 
     def on_value_changed(self, button):
         value = self.bpm.get_value()
