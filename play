@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 
 import argparse
+import importlib
 import logging
+import pkgutil
 import sys
 
 import pyeep.aio
@@ -50,7 +52,10 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.grid.attach(self.frame_log, 1, 1, 1, 1)
 
         # Instantiate scenes
-        self.scenes_box.append(self.add_component(scenes.Eagerness))
+        for importer, modname, ispkg in pkgutil.iter_modules(scenes.__path__, "stim.scenes."):
+            importlib.import_module(modname)
+        for scene_cls in scenes.base.SCENES:
+            self.scenes_box.append(self.add_component(scene_cls))
 
         scan_action = self.add_component(ScanAction)
         self.gtk_app.add_action(scan_action.action)
