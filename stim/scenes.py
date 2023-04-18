@@ -1,19 +1,29 @@
 from __future__ import annotations
 
-from pyeep.gtk import GLib, Gtk, GtkComponentWindow
+from pyeep.gtk import GLib, Gtk, GtkComponentFrame
 
 from . import toy_gtk
 
 
-class Eagerness(GtkComponentWindow):
+class Scene(GtkComponentFrame):
+    TITLE: str
+
     def __init__(self, **kwargs):
-        kwargs.setdefault("name", "eagerness")
+        kwargs.setdefault("label", self.TITLE)
         super().__init__(**kwargs)
+        self.build()
 
     def build(self):
-        self.set_title("Eagerness")
-        self.set_default_size(600, 300)
+        # self.set_title(self.TITLE)
+        # self.set_default_size(600, 300)
+        pass
 
+
+class Eagerness(Scene):
+    TITLE = "Eagerness"
+
+    def build(self):
+        super().build()
         self.grid = Gtk.Grid()
         self.set_child(self.grid)
 

@@ -38,6 +38,8 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.frame_outputs = Gtk.Frame(label="Outputs")
         self.frame_scenes = Gtk.Frame(label="Scenes")
+        self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.frame_scenes.set_child(self.scenes_box)
 
         self.frame_log = Gtk.Frame(label="Log")
         self.frame_log.set_child(self.logview)
@@ -62,7 +64,8 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.window.set_show_menubar(True)
 
     def start_scene(self, action, param, scene):
-        self.add_component(scene)
+        component = self.add_component(scene)
+        self.scenes_box.append(component)
 
     def ui_main(self):
         self.head.start()
