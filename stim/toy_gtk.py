@@ -121,11 +121,6 @@ class ToysView(GtkComponentBox):
         self.active: ToyView | None = None
         self.set_hexpand(True)
 
-        self.scan = Gtk.ToggleButton.new_with_label("Device scan")
-        self.scan.connect("toggled", self.on_scan_toggled)
-        self.scan.set_vexpand(False)
-        self.append(self.scan)
-
         self.toybox = Gtk.Box()
         self.append(self.toybox)
 
@@ -134,12 +129,6 @@ class ToysView(GtkComponentBox):
             if tv.is_active():
                 return idx
         return 0
-
-    def on_scan_toggled(self, toggle):
-        if self.scan.get_active():
-            self.send(ScanRequest(dst="toys", scan=True))
-        else:
-            self.send(ScanRequest(dst="toys", scan=False))
 
     def receive(self, msg: Message):
         match msg:

@@ -7,10 +7,10 @@ import sys
 import pyeep.aio
 import pyeep.app
 import pyeep.gtk
-from pyeep.gtk import Gtk
+from pyeep.gtk import Gtk, Gio
 from stim import cnc, scenes
 from stim.output import NullOutput, NewOutput, OutputsView
-from stim.buttplug import ButtplugClient
+from stim.buttplug import ButtplugClient, ScanAction
 
 log = logging.getLogger(__name__)
 
@@ -34,10 +34,6 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.frame_inputs = Gtk.Frame(label="Inputs")
 
-        # self.frame_outputs = Gtk.Frame(label="Outputs")
-        # self.frame_inputs.set_child(self.toys_view)
-        # self.toys_view.set_vexpand(True)
-
         self.frame_scenes = Gtk.Frame(label="Scenes")
         self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_scenes.set_child(self.scenes_box)
@@ -52,14 +48,21 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.grid.attach(self.frame_log, 1, 1, 1, 1)
 
         # Actions for scenes
-        action = pyeep.gtk.Gio.SimpleAction.new("eagerness", None)
+        action = Gio.SimpleAction.new("eagerness", None)
         action.connect("activate", self.start_scene, scenes.Eagerness)
         self.gtk_app.add_action(action)
 
-        scenes_menu = pyeep.gtk.Gio.Menu()
+        scan_action = self.add_component(ScanAction)
+        self.gtk_app.add_action(scan_action.action)
+
+        devices_menu = Gio.Menu()
+        devices_menu.append("Device scan", "app.buttplug_scan")
+
+        scenes_menu = Gio.Menu()
         scenes_menu.append("Eagerness", "app.eagerness")
 
         menu = pyeep.gtk.Gio.Menu()
+        menu.append_submenu("Devices", devices_menu)
         menu.append_submenu("Scenes", scenes_menu)
         self.gtk_app.set_menubar(menu)
         self.window.set_show_menubar(True)

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import logging
 
-from pyeep.app import Message, Shutdown
-import pyeep.aio
-
 import buttplug
+import pyeep.aio
+from pyeep.app import Message, Shutdown, Component
+from pyeep.gtk import Gio, GLib
 
-from .output import Output, NewOutput, SetPower
+from .output import NewOutput, Output, SetPower
 
 log = logging.getLogger(__name__)
 
@@ -104,3 +104,21 @@ class ButtplugClient(pyeep.aio.AIOComponent):
             if scanning:
                 await self.client.stop_scanning()
             await self.client.disconnect()
+
+
+class ScanAction(Component):
+    HUB = "gtk"
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("name", "buttplug_scan")
+        super().__init__(**kwargs)
+        self.action = Gio.SimpleAction.new_stateful(
+                name=kwargs["name"],
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        self.action.connect("activate", self.on_activate)
+
+    def on_activate(self, action, parameter):
+        new_state = not self.action.get_state().get_boolean()
+        self.action.set_state(GLib.Variant.new_boolean(new_state))
+        self.send(ScanRequest(scan=new_state))
