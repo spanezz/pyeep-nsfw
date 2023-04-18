@@ -11,16 +11,9 @@ import pyeep.aio
 
 import buttplug
 
+from .output import Output, NewOutput, SetPower
+
 log = logging.getLogger(__name__)
-
-
-class NewDevice(Message):
-    def __init__(self, *, actuator: "Actuator", **kwargs):
-        super().__init__(**kwargs)
-        self.actuator = actuator
-
-    def __str__(self):
-        return f"new device: {self.actuator.actuator._device.name} {self.actuator.name}"
 
 
 class ScanRequest(Message):
@@ -32,18 +25,12 @@ class ScanRequest(Message):
         return "scan request"
 
 
-class SetPower(Message):
-    def __init__(self, *, actuator: "Actuator", power: float, **kwargs):
-        super().__init__(**kwargs)
-        self.actuator = actuator
-        self.power = power
-
-
-class Actuator(pyeep.aio.AIOComponent):
+class Actuator(Output, pyeep.aio.AIOComponent):
     """
     Component driving an actuator
     """
-    def __init__(self, *, actuator: buttplug.client.client.Actuator, sample_rate: int = 20, **kwargs):
+    def __init__(self, *, actuator: buttplug.client.client.Actuator, **kwargs):
+        kwargs.setdefault("rate", 20)
         super().__init__(**kwargs)
         self.actuator = actuator
 
@@ -54,6 +41,10 @@ class Actuator(pyeep.aio.AIOComponent):
         self.sample_rate: int = 20
 
         self.frame_nsecs: int = int(round(1_000_000_000 / self.sample_rate))
+
+    @property
+    def description(self) -> str:
+        return f"{self.actuator._device.name} {self.name}"
 
     async def run(self):
         await self.process_messages()
@@ -68,7 +59,7 @@ class Actuator(pyeep.aio.AIOComponent):
                 #     await self.client.start_scanning()
                 #     scanning = True
                 case SetPower():
-                    if msg.actuator == self:
+                    if msg.output == self:
                         await self.actuator.command(msg.power)
 
     # async def play_pattern(self):
@@ -109,7 +100,7 @@ class Toys(pyeep.aio.AIOComponent):
 
         for a in dev.actuators:
             actuator = self.hub.app.add_component(Actuator, name=f"{name}_act{a.index}", actuator=a)
-            self.send(NewDevice(actuator=actuator))
+            self.send(NewOutput(actuator=actuator))
 
         # for a in dev.linear_actuators:
         #     print(f"* Linear actuator {a.description} {a.__class__.__name__}")

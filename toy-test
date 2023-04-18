@@ -10,6 +10,7 @@ import pyeep.gtk
 from pyeep.gtk import Gtk
 from stim import cnc, scenes, toy
 from stim.toy_gtk import ToysView
+from stim.output import NullOutput, NewOutput
 
 log = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.add_component(toy.Toys, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
+        null_output = self.add_component(NullOutput, name="null_output")
+        self.send(NewOutput(output=null_output))
 
     def build_main_window(self):
         super().build_main_window()

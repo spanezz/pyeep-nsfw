@@ -6,7 +6,7 @@ import sys
 
 from pyeep.app import Shutdown
 import pyeep.aio
-from stim import toy
+from stim import toy, output
 
 import buttplug
 
@@ -41,7 +41,7 @@ class Scan(pyeep.aio.AIOComponent):
             match msg:
                 case Shutdown():
                     break
-                case toy.NewDevice():
+                case output.NewOutput():
                     await dump_device(msg.actuator.actuator._device)
 
 
@@ -53,7 +53,7 @@ class Dump(pyeep.aio.AIOComponent):
             match msg:
                 case Shutdown():
                     break
-                case toy.NewDevice():
+                case output.NewOutput():
                     await dump_device(msg.dev)
                 case None:
                     self.send(Shutdown())

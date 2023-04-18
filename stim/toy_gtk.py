@@ -3,6 +3,7 @@ from __future__ import annotations
 from pyeep.app import Message
 from pyeep.gtk import Gtk, GtkComponentBox
 from . import toy, cnc
+from .output import Output, NewOutput, SetPower
 
 
 class SetActivePower(Message):
@@ -18,11 +19,11 @@ class IncreaseActivePower(Message):
 
 
 class ToyView(GtkComponentBox):
-    def __init__(self, *, actuator: toy.Actuator, toys_view: "ToysView", **kwargs):
-        kwargs.setdefault("name", "tv_" + actuator.name)
+    def __init__(self, *, output: Output, toys_view: "ToysView", **kwargs):
+        kwargs.setdefault("name", "tv_" + output.name)
         super().__init__(**kwargs)
 
-        self.actuator = actuator
+        self.output = output
         self.toys_view = toys_view
 
         self.set_hexpand(True)
@@ -30,7 +31,8 @@ class ToyView(GtkComponentBox):
         self.box.set_hexpand(True)
         self.append(self.box)
 
-        self.label_name = Gtk.Label(label=actuator.actuator._device.name + "\n" + actuator.name)
+        self.label_name = Gtk.Label(label=output.description)
+        self.label_name.wrap = True
         self.box.append(self.label_name)
 
         self.active = Gtk.CheckButton(label="Active")
@@ -119,7 +121,7 @@ class ToyView(GtkComponentBox):
 
     def on_power(self, adj):
         val = round(adj.get_value())
-        self.toys_view.send(toy.SetPower(actuator=self.actuator, power=val / 100.0))
+        self.toys_view.send(SetPower(output=self.output, power=val / 100.0))
 
 
 class ToysView(GtkComponentBox):
@@ -152,8 +154,8 @@ class ToysView(GtkComponentBox):
 
     def receive(self, msg: toy.Message):
         match msg:
-            case toy.NewDevice():
-                tv = self.hub.app.add_component(ToyView, actuator=msg.actuator, toys_view=self)
+            case NewOutput():
+                tv = self.hub.app.add_component(ToyView, output=msg.output, toys_view=self)
                 if not self.toy_views:
                     tv.active.set_active(True)
                     self.active = tv
