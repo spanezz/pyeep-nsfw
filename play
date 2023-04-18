@@ -73,12 +73,12 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
 
 def main():
-    parser = App.argparser("Low-level manual fiddling with toys")
+    parser = App.argparser("Play with nonconventional inputs and outputs")
     parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
                         help="Intiface Engine address to connect to")
     args = parser.parse_args()
 
-    with App(args, title="Toy test", application_id="org.enricozini.toy_test") as app:
+    with App(args, title="Player", application_id="org.enricozini.play") as app:
         app.main()
 
 
