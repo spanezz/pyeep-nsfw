@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pyeep.gtk import GLib, Gtk, GtkComponentFrame
 
-from . import toy_gtk
+from . import output
 
 
 class Scene(GtkComponentFrame):
@@ -64,10 +64,10 @@ class Eagerness(Scene):
             self.timeout = GLib.timeout_add(round(60 / value * 1000), self.on_tick)
 
     def on_stop(self, button):
-        self.send(toy_gtk.SetActivePower(power=0))
+        self.send(output.SetActivePower(power=0))
         self.bpm.set_value(self.bpm.get_value() * 1.2)
 
     def on_tick(self):
         amount = self.increment.get_value()
-        self.send(toy_gtk.IncreaseActivePower(amount=amount))
+        self.send(output.IncreaseActivePower(amount=amount))
         return True

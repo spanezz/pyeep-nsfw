@@ -9,8 +9,7 @@ import pyeep.app
 import pyeep.gtk
 from pyeep.gtk import Gtk
 from stim import cnc, scenes
-from stim.toy_gtk import ToysView
-from stim.output import NullOutput, NewOutput
+from stim.output import NullOutput, NewOutput, OutputsView
 from stim.buttplug import ButtplugClient
 
 log = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
 
-        self.toys_view = self.add_component(ToysView)
+        self.outputs = self.add_component(OutputsView)
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
@@ -34,10 +33,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.window.set_child(self.grid)
 
         self.frame_inputs = Gtk.Frame(label="Inputs")
-        self.frame_inputs.set_child(self.toys_view)
-        self.toys_view.set_vexpand(True)
 
-        self.frame_outputs = Gtk.Frame(label="Outputs")
+        # self.frame_outputs = Gtk.Frame(label="Outputs")
+        # self.frame_inputs.set_child(self.toys_view)
+        # self.toys_view.set_vexpand(True)
+
         self.frame_scenes = Gtk.Frame(label="Scenes")
         self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_scenes.set_child(self.scenes_box)
@@ -46,10 +46,10 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.frame_log.set_child(self.logview)
         self.logview.set_vexpand(True)
 
-        self.grid.attach(self.frame_inputs, 0, 0, 1, 1)
-        self.grid.attach(self.frame_outputs, 0, 1, 1, 1)
-        self.grid.attach(self.frame_scenes, 1, 0, 1, 2)
-        self.grid.attach(self.frame_log, 0, 2, 2, 1)
+        self.grid.attach(self.frame_inputs, 0, 0, 1, 2)
+        self.grid.attach(self.frame_scenes, 1, 0, 1, 1)
+        self.grid.attach(self.outputs, 2, 0, 1, 2)
+        self.grid.attach(self.frame_log, 1, 1, 1, 1)
 
         # Actions for scenes
         action = pyeep.gtk.Gio.SimpleAction.new("eagerness", None)
