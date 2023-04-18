@@ -148,7 +148,7 @@ class PulseWaveEscalate(PulseWaveEscalateBase):
         # With a callback from the heart rate monitor, enqueue override
         # patterns in case things get interesting
         for i, f in zip(self.duration_pattern(), self.freq_pattern()):
-            f = 500
+            f = 2000
             yield Pulses(count=i * 2, duration=0.1, freq=f, volume=self.PULSE_VOLUME, gap=10.0/100.0)
             yield Wave(
                     volume=volume.Sine(vmin=self.WAVE_VOLUME * 0.93, vmax=self.WAVE_VOLUME, freq=3),
