@@ -30,6 +30,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().build_main_window()
 
         self.grid = Gtk.Grid()
+        self.grid.set_column_homogeneous(True)
         self.window.set_child(self.grid)
 
         self.frame_inputs = Gtk.Frame(label="Inputs")
