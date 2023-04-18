@@ -13,7 +13,7 @@ from pyeep.gtk import Gtk, Gio
 from stim import cnc, scenes
 from stim.output import NullOutput, NewOutput, OutputsView
 from stim.buttplug import ButtplugClient, ScanAction
-from stim.muse2 import HeadMovement
+from stim.muse2 import HeadPosition, HeadMovement
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
+        self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))

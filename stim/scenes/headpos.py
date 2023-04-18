@@ -6,7 +6,7 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import Gtk
 
 from .. import output
-from ..muse2 import HeadMoved
+from ..muse2 import HeadMoved, HeadShaken
 from .base import Scene, register
 
 
@@ -94,3 +94,28 @@ class HeadPosition(Scene):
                             power = 0
 
                     self.send(output.SetActivePower(power=power * 100))
+
+
+@register
+class HeadYesNo(Scene):
+    TITLE = "Head yes/no"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # TODO: optional decay
+
+    def build(self):
+        super().build()
+
+    @check_hub
+    def receive(self, msg: Message):
+        match msg:
+            case HeadShaken():
+                if self.is_active():
+                    match msg.axis:
+                        case "z":
+                            # No
+                            self.send(output.IncreaseActivePower(amount=-msg.freq))
+                        case "y":
+                            # Yes
+                            self.send(output.IncreaseActivePower(amount=msg.freq))
