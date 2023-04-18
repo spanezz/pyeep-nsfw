@@ -14,7 +14,7 @@ class NewOutput(Message):
         self.output = output
 
     def __str__(self):
-        return f"new output: {self.output.description}"
+        return super().__str__() + f"({self.output.description})"
 
 
 class SetPower(Message):
@@ -23,6 +23,9 @@ class SetPower(Message):
         self.output = output
         self.power = power
 
+    def __str__(self) -> str:
+        return super().__str__() + f"(power={self.power})"
+
 
 class Output(pyeep.app.Component):
     """
@@ -30,6 +33,8 @@ class Output(pyeep.app.Component):
     """
     def __init__(self, *, rate: int, **kwargs):
         super().__init__(**kwargs)
+
+        # Rate (changes per second) at which this output can take commands
         self.rate = rate
 
     @property

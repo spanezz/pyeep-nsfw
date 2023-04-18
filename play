@@ -8,9 +8,10 @@ import pyeep.aio
 import pyeep.app
 import pyeep.gtk
 from pyeep.gtk import Gtk
-from stim import cnc, scenes, toy
+from stim import cnc, scenes
 from stim.toy_gtk import ToysView
 from stim.output import NullOutput, NewOutput
+from stim.buttplug import ButtplugClient
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.toys_view = self.add_component(ToysView)
 
-        self.add_component(toy.Toys, client_name=self.title, iface=args.iface)
+        self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))

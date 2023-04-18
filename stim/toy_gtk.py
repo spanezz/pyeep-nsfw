@@ -3,6 +3,7 @@ from __future__ import annotations
 from pyeep.app import Message
 from pyeep.gtk import Gtk, GtkComponentBox
 from . import toy, cnc
+from .buttplug import ScanRequest
 from .output import Output, NewOutput, SetPower
 
 
@@ -80,7 +81,7 @@ class ToyView(GtkComponentBox):
         self.set_value(
             self.adjustment.get_value() + value)
 
-    def receive(self, msg: toy.Message):
+    def receive(self, msg: Message):
         match msg:
             case cnc.CncCommand():
                 match msg.command:
@@ -148,11 +149,11 @@ class ToysView(GtkComponentBox):
 
     def on_scan_toggled(self, toggle):
         if self.scan.get_active():
-            self.send(toy.ScanRequest(dst="toys", scan=True))
+            self.send(ScanRequest(dst="toys", scan=True))
         else:
-            self.send(toy.ScanRequest(dst="toys", scan=False))
+            self.send(ScanRequest(dst="toys", scan=False))
 
-    def receive(self, msg: toy.Message):
+    def receive(self, msg: Message):
         match msg:
             case NewOutput():
                 tv = self.hub.app.add_component(ToyView, output=msg.output, toys_view=self)
