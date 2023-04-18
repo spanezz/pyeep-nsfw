@@ -47,10 +47,8 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.grid.attach(self.outputs, 2, 0, 1, 2)
         self.grid.attach(self.frame_log, 1, 1, 1, 1)
 
-        # Actions for scenes
-        action = Gio.SimpleAction.new("eagerness", None)
-        action.connect("activate", self.start_scene, scenes.Eagerness)
-        self.gtk_app.add_action(action)
+        # Instantiate scenes
+        self.scenes_box.append(self.add_component(scenes.Eagerness))
 
         scan_action = self.add_component(ScanAction)
         self.gtk_app.add_action(scan_action.action)
@@ -58,18 +56,10 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         devices_menu = Gio.Menu()
         devices_menu.append("Device scan", "app.buttplug_scan")
 
-        scenes_menu = Gio.Menu()
-        scenes_menu.append("Eagerness", "app.eagerness")
-
         menu = pyeep.gtk.Gio.Menu()
         menu.append_submenu("Devices", devices_menu)
-        menu.append_submenu("Scenes", scenes_menu)
         self.gtk_app.set_menubar(menu)
         self.window.set_show_menubar(True)
-
-    def start_scene(self, action, param, scene):
-        component = self.add_component(scene)
-        self.scenes_box.append(component)
 
     def ui_main(self):
         self.head.start()
