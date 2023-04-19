@@ -35,7 +35,7 @@ class Joystick(Input, pyeep.pygame.PygameComponent):
             print("JEV", event)
 
 
-class Joysticks(Input, pyeep.pygame.PygameComponent):
+class Joysticks(pyeep.pygame.PygameComponent):
     EVENTS = (
         pygame.JOYDEVICEADDED,
         pygame.JOYDEVICEREMOVED
