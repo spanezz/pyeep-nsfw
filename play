@@ -9,8 +9,9 @@ import sys
 import pyeep.aio
 import pyeep.app
 import pyeep.gtk
+import pyeep.pygame
 from pyeep.gtk import Gtk, Gio
-from stim import cnc, scenes, inputs
+from stim import cnc, scenes, inputs, joystick
 from stim.output import NullOutput, NewOutput, OutputsModel
 from stim.buttplug import ButtplugClient, ScanAction
 from stim.muse2 import HeadPosition, HeadMovement
@@ -21,6 +22,7 @@ log = logging.getLogger(__name__)
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
+        self.add_hub(pyeep.pygame.PygameHub)
         self.outputs = self.add_component(OutputsModel)
         self.inputs: list[input.Input] = []
 
@@ -28,6 +30,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(cnc.CncReceiver)
         self.inputs.append(self.add_component(HeadPosition))
         self.inputs.append(self.add_component(HeadMovement))
+        self.add_component(joystick.Joysticks)
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
 
