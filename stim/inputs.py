@@ -1,7 +1,18 @@
 from __future__ import annotations
 
+from pyeep.app import Message
 import pyeep.aio
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
+
+
+class InputSetActive(Message):
+    def __init__(self, *, input: "Input", value: bool, **kwargs):
+        super().__init__(**kwargs)
+        self.input = input
+        self.value = value
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(input={self.input}, value={self.value})"
 
 
 class Input(pyeep.app.Component):
@@ -15,6 +26,9 @@ class Input(pyeep.app.Component):
     def description(self) -> str:
         return self.name
 
+    def is_active(self) -> bool:
+        raise NotImplementedError(f"{self.__class__.__name__}._is_active not implemented")
+
 
 class InputModel(GtkComponent):
     def __init__(self, *, input: Input, **kwargs):
@@ -25,7 +39,7 @@ class InputModel(GtkComponent):
         self.active = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-"),
                 parameter_type=None,
-                state=GLib.Variant.new_boolean(False))
+                state=GLib.Variant.new_boolean(self.input.active))
         self.active.connect("activate", self.on_activate)
         self.hub.app.gtk_app.add_action(self.active)
 
@@ -35,6 +49,7 @@ class InputModel(GtkComponent):
     def on_activate(self, action, parameter):
         new_state = not self.active.get_state().get_boolean()
         self.active.set_state(GLib.Variant.new_boolean(new_state))
+        self.send(InputSetActive(input=self.input, value=new_state))
 
     def build(self) -> Gtk.Box:
         w = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
