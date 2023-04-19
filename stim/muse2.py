@@ -11,6 +11,8 @@ import scipy
 from pyeep.app import Message, Shutdown
 from pyeep.lsl import LSLComponent, LSLSamples
 
+from .inputs import Input
+
 
 class HeadMoved(Message):
     def __init__(self, *, pitch: float, roll: float, **kwargs):
@@ -33,11 +35,15 @@ class HeadShaken(Message):
         return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
 
 
-class HeadPosition(LSLComponent):
+class HeadPosition(Input, LSLComponent):
     def __init__(self, **kwargs):
         kwargs.setdefault("stream_type", "ACC")
         kwargs.setdefault("max_samples", 8)
         super().__init__(**kwargs)
+
+    @property
+    def description(self) -> str:
+        return "Head position"
 
     async def run(self):
         while True:
@@ -103,7 +109,7 @@ class GyroAxis:
             return 0
 
 
-class HeadMovement(LSLComponent):
+class HeadMovement(Input, LSLComponent):
     def __init__(self, **kwargs):
         kwargs.setdefault("stream_type", "GYRO")
         kwargs.setdefault("max_samples", 8)
@@ -111,6 +117,10 @@ class HeadMovement(LSLComponent):
         self.x_axis = GyroAxis("x")
         self.y_axis = GyroAxis("y")
         self.z_axis = GyroAxis("z")
+
+    @property
+    def description(self) -> str:
+        return "Head movement"
 
     async def run(self):
         while True:

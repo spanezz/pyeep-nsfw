@@ -222,6 +222,7 @@ class OutputsModel(GtkComponent):
             name="current-output",
             parameter_type=GLib.VariantType("s"),
             state=GLib.Variant.new_string(""))
+        self.hub.app.gtk_app.add_action(self.active_action)
 
     def build(self) -> Gtk.Frame:
         w = Gtk.Frame(label="Outputs")

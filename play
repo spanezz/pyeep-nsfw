@@ -10,7 +10,7 @@ import pyeep.aio
 import pyeep.app
 import pyeep.gtk
 from pyeep.gtk import Gtk, Gio
-from stim import cnc, scenes
+from stim import cnc, scenes, inputs
 from stim.output import NullOutput, NewOutput, OutputsModel
 from stim.buttplug import ButtplugClient, ScanAction
 from stim.muse2 import HeadPosition, HeadMovement
@@ -22,12 +22,12 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.outputs = self.add_component(OutputsModel)
-        self.gtk_app.add_action(self.outputs.active_action)
+        self.inputs: list[input.Input] = []
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
-        self.add_component(HeadPosition)
-        self.add_component(HeadMovement)
+        self.inputs.append(self.add_component(HeadPosition))
+        self.inputs.append(self.add_component(HeadMovement))
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
 
@@ -39,6 +39,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.window.set_child(self.grid)
 
         self.frame_inputs = Gtk.Frame(label="Inputs")
+        self.inputs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.frame_inputs.set_child(self.inputs_box)
+        for inp in self.inputs:
+            input_model = self.add_component(inputs.InputModel, input=inp)
+            self.inputs_box.append(input_model.widget)
 
         self.frame_scenes = Gtk.Frame(label="Scenes")
         self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
