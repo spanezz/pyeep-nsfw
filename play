@@ -11,7 +11,7 @@ import pyeep.app
 import pyeep.gtk
 from pyeep.gtk import Gtk, Gio
 from stim import cnc, scenes
-from stim.output import NullOutput, NewOutput, OutputsView
+from stim.output import NullOutput, NewOutput, OutputsModel
 from stim.buttplug import ButtplugClient, ScanAction
 from stim.muse2 import HeadPosition, HeadMovement
 
@@ -21,7 +21,8 @@ log = logging.getLogger(__name__)
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
-        self.outputs = self.add_component(OutputsView)
+        self.outputs = self.add_component(OutputsModel)
+        self.gtk_app.add_action(self.outputs.active_action)
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
@@ -49,14 +50,15 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.grid.attach(self.frame_inputs, 0, 0, 1, 2)
         self.grid.attach(self.frame_scenes, 1, 0, 1, 1)
-        self.grid.attach(self.outputs, 2, 0, 1, 2)
+        self.grid.attach(self.outputs.widget, 2, 0, 1, 2)
         self.grid.attach(self.frame_log, 1, 1, 1, 1)
 
         # Instantiate scenes
         for importer, modname, ispkg in pkgutil.iter_modules(scenes.__path__, "stim.scenes."):
             importlib.import_module(modname)
         for scene_cls in scenes.base.SCENES:
-            self.scenes_box.append(self.add_component(scene_cls))
+            scene = self.add_component(scene_cls)
+            self.scenes_box.append(scene.widget)
 
         scan_action = self.add_component(ScanAction)
         self.gtk_app.add_action(scan_action.action)

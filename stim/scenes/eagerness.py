@@ -11,30 +11,33 @@ from .base import Scene, register
 class Eagerness(Scene):
     TITLE = "Eagerness"
 
-    def build(self):
-        super().build()
-        self.grid = Gtk.Grid()
-        self.set_child(self.grid)
-
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.bpm = Gtk.Adjustment(lower=1, upper=600, step_increment=1, page_increment=5, value=1)
+        self.bpm.connect("value-changed", self.on_value_changed)
         self.increment = Gtk.Adjustment(lower=0, upper=100, step_increment=1, page_increment=5, value=2)
+        self.timeout: int | None = None
+
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = Gtk.Grid()
+        expander.set_child(grid)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.bpm)
-        spinbutton.connect("value-changed", self.on_value_changed)
-        self.grid.attach(spinbutton, 0, 0, 1, 1)
+        grid.attach(spinbutton, 0, 0, 1, 1)
 
-        self.grid.attach(Gtk.Label(label="times per minute, increase by"), 1, 0, 1, 1)
+        grid.attach(Gtk.Label(label="times per minute, increase by"), 1, 0, 1, 1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.increment)
-        self.grid.attach(spinbutton, 2, 0, 1, 1)
+        grid.attach(spinbutton, 2, 0, 1, 1)
 
         stop = Gtk.Button(label="Stop!")
         stop.connect("clicked", self.on_stop)
-        self.grid.attach(stop, 0, 1, 4, 1)
+        grid.attach(stop, 0, 1, 4, 1)
 
-        self.timeout: int | None = None
+        return expander
 
     @check_hub
     def start(self):
@@ -63,7 +66,7 @@ class Eagerness(Scene):
         if value > 0:
             self.timeout = GLib.timeout_add(round(60 / value * 1000), self.on_tick)
 
-    def on_value_changed(self, button):
+    def on_value_changed(self, adjustment):
         if self.is_active():
             self.update_timer()
 

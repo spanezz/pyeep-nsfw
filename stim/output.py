@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
-from pyeep.app import Message, Shutdown, check_hub
 import pyeep.aio
-from pyeep.gtk import Gtk, GtkComponentBox, GtkComponentFrame
+from pyeep.app import Message, Shutdown, check_hub
+from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
 log = logging.getLogger(__name__)
 
@@ -28,13 +28,13 @@ class SetPower(Message):
         return super().__str__() + f"(power={self.power})"
 
 
-class SetActiveOutput(Message):
-    def __init__(self, *, output: "Output", **kwargs):
-        super().__init__(**kwargs)
-        self.output = output
-
-    def __str__(self) -> str:
-        return super().__str__() + f"(output={self.output.description})"
+# class SetActiveOutput(Message):
+#     def __init__(self, *, output: "Output", **kwargs):
+#         super().__init__(**kwargs)
+#         self.output = output
+#
+#     def __str__(self) -> str:
+#         return super().__str__() + f"(output={self.output.description})"
 
 
 class SetActivePower(Message):
@@ -100,72 +100,80 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
                         self.power = msg.power
 
 
-class OutputView(GtkComponentBox):
-    def __init__(self, *, output: Output, previous: OutputView | None = None, **kwargs):
-        kwargs.setdefault("name", "tv_" + output.name)
+class OutputModel(GtkComponent):
+    def __init__(self, *, output: Output, active_action: Gio.Action, **kwargs):
+        kwargs.setdefault("name", "output_model_" + output.name)
         super().__init__(**kwargs)
-
         self.output = output
 
-        self.set_hexpand(True)
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.box.set_hexpand(True)
-        self.append(self.box)
+        self.active_action = active_action
+        if not self.active_action.get_state().get_string():
+            self.active_action.set_state(GLib.Variant.new_string(self.name))
 
-        self.label_name = Gtk.Label(label=output.description)
-        self.label_name.wrap = True
-        self.box.append(self.label_name)
-
-        self.active = Gtk.CheckButton(label="Active")
-        self.active.connect("toggled", self.on_active)
-        self.box.append(self.active)
-        if previous:
-            self.active.set_group(previous.active)
-        else:
-            self.active.set_active(True)
-
-        self.power = Gtk.Scale.new_with_range(
-                orientation=Gtk.Orientation.HORIZONTAL,
-                min=0,
-                max=100,
-                step=5)
-        self.power.set_digits(2)
-        self.power.set_draw_value(False)
-        for mark in (25, 50, 75):
-            self.power.add_mark(
-                value=mark,
-                position=Gtk.PositionType.BOTTOM,
-                markup=None
-            )
-        self.box.append(self.power)
-        self.adjustment = self.power.get_adjustment()
-
+        self.power = Gtk.Adjustment(
+                value=0,
+                lower=0,
+                upper=100,
+                step_increment=5,
+                page_increment=10,
+                page_size=0)
         self.power.connect("value_changed", self.on_power)
+
         self.last_value: float = 0.0
         self.value_override: float | None = None
-
-    def on_active(self, button):
-        if button.get_active():
-            self.send(SetActiveOutput(output=self.output))
 
     def on_power(self, adj):
         val = round(adj.get_value())
         self.send(SetPower(output=self.output, power=val / 100.0))
 
+    def build(self) -> Gtk.Box:
+        w = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        w.set_hexpand(True)
+
+        label_name = Gtk.Label(label=self.output.description)
+        label_name.wrap = True
+        w.append(label_name)
+
+        active = Gtk.CheckButton(label="Active")
+        detailed_name = Gio.Action.print_detailed_name(
+                "app." + self.active_action.get_name(),
+                GLib.Variant.new_string(self.name))
+        active.set_detailed_action_name(detailed_name)
+        active.set_action_target_value(GLib.Variant.new_string(self.name))
+        w.append(active)
+
+        power = Gtk.Scale(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                adjustment=self.power)
+        power.set_digits(2)
+        power.set_draw_value(False)
+        for mark in (25, 50, 75):
+            power.add_mark(
+                value=mark,
+                position=Gtk.PositionType.BOTTOM,
+                markup=None
+            )
+        w.append(power)
+
+        return w
+
     @check_hub
     def is_active(self) -> bool:
-        return self.active.get_active()
+        current = self.active_action.get_state().get_string()
+        return current == self.name
 
+    @check_hub
     def set_value(self, value: float):
         if self.value_override is not None:
-            self.adjustment.set_value(self.value_override)
+            self.power.set_value(self.value_override)
         else:
-            self.adjustment.set_value(value)
+            self.power.set_value(value)
         self.last_value = value
 
+    @check_hub
     def add_value(self, value: float):
         self.set_value(
-            self.adjustment.get_value() + value)
+            self.power.get_value() + value)
 
     def receive(self, msg: Message):
         match msg:
@@ -207,18 +215,23 @@ class OutputView(GtkComponentBox):
                     self.add_value(msg.amount)
 
 
-class OutputsView(GtkComponentFrame):
+class OutputsModel(GtkComponent):
     def __init__(self, **kwargs):
-        kwargs.setdefault("label", "Outputs")
         super().__init__(**kwargs)
-        self.output_views: list[OutputView] = []
-        # self.active: ToyView | None = None
-        # self.set_hexpand(True)
-        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.set_child(self.box)
+        self.active_action = Gio.SimpleAction.new_stateful(
+            name="current-output",
+            parameter_type=GLib.VariantType("s"),
+            state=GLib.Variant.new_string(""))
 
-        # self.toybox = Gtk.Box()
-        # self.append(self.toybox)
+    def build(self) -> Gtk.Frame:
+        w = Gtk.Frame(label="Outputs")
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        w.set_child(box)
+        return w
+
+    # def on_active(self, button):
+    #     if button.get_active():
+    #         self.send(SetActiveOutput(output=self.output))
 
     # def get_active_index(self) -> int:
     #     for idx, tv in enumerate(self.toy_views):
@@ -229,13 +242,8 @@ class OutputsView(GtkComponentFrame):
     def receive(self, msg: Message):
         match msg:
             case NewOutput():
-                previous = self.output_views[-1] if self.output_views else None
-                tv = self.hub.app.add_component(OutputView, output=msg.output, previous=previous)
-                # if not self.toy_views:
-                #     tv.active.set_active(True)
-                #     self.active = tv
-                self.output_views.append(tv)
-                self.box.append(tv)
+                output = self.hub.app.add_component(OutputModel, output=msg.output, active_action=self.active_action)
+                self.widget.get_child().append(output.widget)
             # case cnc.CncCommand():
             #     match msg.command:
             #         case "+A":

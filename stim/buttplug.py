@@ -113,7 +113,7 @@ class ScanAction(Component):
         kwargs.setdefault("name", "buttplug_scan")
         super().__init__(**kwargs)
         self.action = Gio.SimpleAction.new_stateful(
-                name=kwargs["name"],
+                name=self.name.replace("_", "-"),
                 parameter_type=None,
                 state=GLib.Variant.new_boolean(False))
         self.action.connect("activate", self.on_activate)

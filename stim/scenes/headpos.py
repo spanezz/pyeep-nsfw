@@ -18,14 +18,18 @@ class HeadPosition(Scene):
         super().__init__(**kwargs)
         self.reference_roll: float | None = None
         self.reference_pitch: float | None = None
+
+        self.control_angle = Gtk.Adjustment(
+                value=60, upper=180, step_increment=5, page_increment=10)
+
         # TODO: replace with a Gtk backend for mode selection
         self.mode: str = "center_zero"
 
-    def build(self):
-        super().build()
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        self.set_child(box)
+        expander.set_child(box)
 
         zero_center = Gtk.CheckButton(label="Zero on center")
         zero_center.connect("toggled", self.set_mode, "center_zero")
@@ -47,15 +51,15 @@ class HeadPosition(Scene):
         max_center.connect("toggled", self.set_mode, "center_max")
         box.append(max_center)
 
-        self.control_angle = Gtk.Adjustment(
-                value=60, upper=180, step_increment=5, page_increment=10)
-        self.control_angle_button = Gtk.SpinButton()
-        self.control_angle_button.set_adjustment(self.control_angle)
-        box.append(self.control_angle_button)
+        control_angle_button = Gtk.SpinButton()
+        control_angle_button.set_adjustment(self.control_angle)
+        box.append(control_angle_button)
 
         center = Gtk.Button.new_with_label("Recenter")
         center.connect("clicked", self.set_center)
         box.append(center)
+
+        return expander
 
     @check_hub
     def set_mode(self, button, mode: str):
@@ -104,8 +108,8 @@ class HeadYesNo(Scene):
         super().__init__(**kwargs)
         # TODO: optional decay
 
-    def build(self):
-        super().build()
+    def build(self) -> Gtk.Expander:
+        return super().build()
 
     @check_hub
     def receive(self, msg: Message):
