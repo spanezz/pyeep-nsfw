@@ -5,12 +5,13 @@ import importlib
 import logging
 import pkgutil
 import sys
+from typing import Type
 
 import pyeep.aio
 import pyeep.app
 import pyeep.gtk
 import pyeep.pygame
-from pyeep.gtk import Gtk, Gio
+from pyeep.gtk import Gtk, Gio, GLib
 from stim import cnc, scenes, inputs, joystick
 from stim.output import NullOutput, NewOutput, OutputsModel
 from stim.buttplug import ButtplugClient, ScanAction
@@ -28,11 +29,23 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(cnc.CncReceiver)
-        self.inputs.append(self.add_component(HeadPosition))
-        self.inputs.append(self.add_component(HeadMovement))
+        self.add_component(HeadPosition)
+        self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
+
+    def _add_input(self, input: inputs.Input):
+        self.inputs.append(input)
+        if (inputs_box := getattr(self, "inputs_box", None)):
+            input_model = self.add_component(inputs.InputModel, input=input)
+            inputs_box.append(input_model.widget)
+
+    def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
+        component = super().add_component(component_cls, **kwargs)
+        if isinstance(component, inputs.Input):
+            GLib.idle_add(self._add_input, component)
+        return component
 
     def build_main_window(self):
         super().build_main_window()
