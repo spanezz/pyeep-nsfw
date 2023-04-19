@@ -49,14 +49,9 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_scenes.set_child(self.scenes_box)
 
-        self.frame_log = Gtk.Frame(label="Log")
-        self.frame_log.set_child(self.logview)
-        self.logview.set_vexpand(True)
-
-        self.grid.attach(self.frame_inputs, 0, 0, 1, 2)
+        self.grid.attach(self.frame_inputs, 0, 0, 1, 1)
         self.grid.attach(self.frame_scenes, 1, 0, 1, 1)
-        self.grid.attach(self.outputs.widget, 2, 0, 1, 2)
-        self.grid.attach(self.frame_log, 1, 1, 1, 1)
+        self.grid.attach(self.outputs.widget, 2, 0, 1, 1)
 
         # Instantiate scenes
         for importer, modname, ispkg in pkgutil.iter_modules(scenes.__path__, "stim.scenes."):
