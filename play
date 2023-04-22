@@ -80,7 +80,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.gtk_app.add_action(scan_action.action)
 
         devices_menu = Gio.Menu()
-        devices_menu.append("Device scan", "app.buttplug_scan")
+        devices_menu.append("Device scan", "app.buttplug-scan")
 
         menu = pyeep.gtk.Gio.Menu()
         menu.append_submenu("Devices", devices_menu)
