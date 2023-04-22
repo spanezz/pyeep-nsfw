@@ -6,6 +6,7 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
+from . import cnc
 from .messages import EmergencyStop
 
 log = logging.getLogger(__name__)
@@ -232,6 +233,7 @@ class OutputModel(GtkComponent):
 class OutputsModel(GtkComponent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.output_models: list[OutputModel] = []
         self.active_action = Gio.SimpleAction.new_stateful(
             name="current-output",
             parameter_type=GLib.VariantType("s"),
@@ -248,26 +250,39 @@ class OutputsModel(GtkComponent):
     #     if button.get_active():
     #         self.send(SetActiveOutput(output=self.output))
 
-    # def get_active_index(self) -> int:
-    #     for idx, tv in enumerate(self.toy_views):
-    #         if tv.is_active():
-    #             return idx
-    #     return 0
+    @check_hub
+    def get_active_index(self) -> int:
+        names = [m.name for m in self.output_models]
+        current = self.active_action.get_state().get_string()
+        try:
+            return names.index(current)
+        except ValueError:
+            self.logger.warning("%s: current output %r not in %r", current, names)
+            return 0
 
+    @check_hub
+    def activate_next(self):
+        current = self.get_active_index()
+        current = (current + 1) % len(self.output_models)
+        self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
+
+    @check_hub
+    def activate_prev(self):
+        current = self.get_active_index()
+        current = (current - 1) % len(self.output_models)
+        self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
+
+    @check_hub
     def receive(self, msg: Message):
         match msg:
             case NewOutput():
-                output = self.hub.app.add_component(OutputModel, output=msg.output, active_action=self.active_action)
-                self.widget.get_child().append(output.widget)
-            # case cnc.CncCommand():
-            #     match msg.command:
-            #         case "+A":
-            #             new_active = self.get_active_index() + 1
-            #             if new_active >= len(self.toy_views):
-            #                 new_active = 0
-            #             self.toy_views[new_active].active.set_active(True)
-            #         case "-A":
-            #             new_active = self.get_active_index() - 1
-            #             if new_active < 0:
-            #                 new_active = len(self.toy_views) - 1
-            #             self.toy_views[new_active].active.set_active(True)
+                output_model = self.hub.app.add_component(
+                        OutputModel, output=msg.output, active_action=self.active_action)
+                self.output_models.append(output_model)
+                self.widget.get_child().append(output_model.widget)
+            case cnc.CncCommand():
+                match msg.command:
+                    case "+A":
+                        self.activate_next()
+                    case "-A":
+                        self.activate_prev()
