@@ -117,6 +117,7 @@ class ScanAction(Component):
                 parameter_type=None,
                 state=GLib.Variant.new_boolean(False))
         self.action.connect("activate", self.on_activate)
+        self.hub.app.gtk_app.add_action(self.action)
 
     def on_activate(self, action, parameter):
         new_state = not self.action.get_state().get_boolean()

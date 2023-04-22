@@ -8,6 +8,7 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown
 
 from .inputs import Input, InputSetActive
+from .messages import EmergencyStop
 
 
 class CncCommand(Message):
@@ -67,5 +68,8 @@ class CncInput(Input, pyeep.aio.AIOComponent):
                 if data["value"] != 0:
                     # print(data)
                     if self.active:
+                        match data["name"]:
+                            case "EMERGENCY":
+                                self.send(EmergencyStop())
                         self.send(CncCommand(command=data["name"]))
                 task_line = asyncio.create_task(reader.readline())

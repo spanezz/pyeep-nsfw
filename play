@@ -77,8 +77,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
             scene = self.add_component(scene_cls)
             self.scenes_box.append(scene.widget)
 
-        scan_action = self.add_component(ScanAction)
-        self.gtk_app.add_action(scan_action.action)
+        self.add_component(ScanAction)
 
         devices_menu = Gio.Menu()
         devices_menu.append("Device scan", "app.buttplug-scan")
