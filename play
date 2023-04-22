@@ -28,7 +28,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.inputs: list[input.Input] = []
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
-        self.add_component(cnc.CncReceiver)
+        self.add_component(cnc.CncInput)
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
@@ -36,6 +36,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.send(NewOutput(output=null_output))
 
     def _add_input(self, input: inputs.Input):
+        # TODO: also remove on remove_component
         self.inputs.append(input)
         if (inputs_box := getattr(self, "inputs_box", None)):
             input_model = self.add_component(inputs.InputModel, input=input)
