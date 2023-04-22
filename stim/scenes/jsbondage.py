@@ -1,13 +1,63 @@
 from __future__ import annotations
 
+import statistics
+import time
+from collections import deque
+from typing import NamedTuple, Iterator
+
 import numpy
 
 from pyeep.app import Message, check_hub
-from pyeep.gtk import Gtk
+from pyeep.gtk import Gtk, GLib
 
 from .. import output
 from ..joystick import JoystickAxisMoved
 from .base import Scene, register
+
+
+class Sample(NamedTuple):
+    time: float
+    value: float
+
+
+class Axis:
+    def __init__(self, window_width: float = 5.0):
+        self.values: deque[Sample] = deque()
+        # Window width in seconds
+        self.window_width: float = window_width
+
+    def add(self, value: float):
+        cur_time = time.time()
+        self.values.append(Sample(cur_time, value))
+
+        threshold = cur_time - self.window_width
+        while self.values and self.values[0].time < threshold:
+            self.values.popleft()
+
+    def deltas(self) -> Iterator[float]:
+        if not self.values:
+            return
+
+        last_time = self.values[-1].time
+        old: float | None = None
+        for sample in self.values:
+            if old is None:
+                old = sample.value
+            else:
+                age = last_time - sample.time
+                yield abs(sample.value - old) / ((1 + age)**1.4)
+                old = sample.value
+
+    def movement(self) -> float:
+        if len(self.values) < 2:
+            return 0.0
+        return statistics.mean(self.deltas())
+
+    def tick(self):
+        if not self.values:
+            pass
+        else:
+            self.add(self.values[-1].value)
 
 
 @register
@@ -16,8 +66,33 @@ class JSBondage(Scene):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.reference_values: dict[int, float] = {}
-        self.last_values: dict[int, float] = {}
+        self.axes: dict[int, Axis] = {}
+        self.timeout: int | None = None
+
+    @check_hub
+    def start(self):
+        super().start()
+        self.timeout = GLib.timeout_add(100, self.on_tick)
+
+    @check_hub
+    def pause(self):
+        if self.timeout is not None:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+        super().pause()
+
+    @check_hub
+    def update_timer(self):
+        if self.timeout is not None:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+
+    @check_hub
+    def on_tick(self):
+        for a in self.axes.values():
+            a.tick()
+        self._check_variance()
+        return True
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
@@ -25,36 +100,58 @@ class JSBondage(Scene):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         expander.set_child(box)
 
-        center = Gtk.Button.new_with_label("Recenter")
-        center.connect("clicked", self.set_center)
-        box.append(center)
+        reset = Gtk.Button.new_with_label("Reset")
+        reset.connect("clicked", self.reset)
+        box.append(reset)
 
         return expander
 
     @check_hub
-    def set_center(self, button):
-        self.reference_values = self.last_values.copy()
+    def reset(self, button):
+        for axis in self.axes.values():
+            axis.values.clear()
         self.send(output.SetActivePower(power=0))
+
+    def _check_variance(self):
+        if self.axes:
+            movement = max(a.movement() for a in self.axes.values())
+        else:
+            movement = 0.0
+
+        threshold = 0.0015
+        cap = 0.005
+        if movement > threshold:
+            power = numpy.clip((movement - threshold) / cap, 0, 1)
+            print(f"EEK! {movement:.5f} {power}")
+            self.send(output.SetActivePower(power=power * 100))
+        else:
+            print(f"OK {movement:.5f}")
+            self.send(output.SetActivePower(power=0))
+
+        # if msg.axis not in self.reference_values:
+        #     self.reference_values[msg.axis] = msg.value
+
+        # max_delta = 0.0
+        # for axis, ref_val in self.reference_values.items():
+        #     val = self.last_values[axis]
+        #     if (delta := abs(val - ref_val)) > max_delta:
+        #         max_delta = delta
+
+        # if max_delta > 0.02:
+        #     power = numpy.clip(max_delta, 0, 1)
+        #     print("EEK!", max_delta, power)
+        #     self.send(output.SetActivePower(power=max_delta * 100))
+        # else:
+        #     self.send(output.SetActivePower(power=0))
 
     @check_hub
     def receive(self, msg: Message):
         match msg:
             case JoystickAxisMoved():
                 if self.is_active():
-                    self.last_values[msg.axis] = msg.value
+                    if (axis := self.axes.get(msg.axis)) is None:
+                        axis = Axis()
+                        self.axes[msg.axis] = axis
 
-                    if msg.axis not in self.reference_values:
-                        self.reference_values[msg.axis] = msg.value
-
-                    max_delta = 0.0
-                    for axis, ref_val in self.reference_values.items():
-                        val = self.last_values[axis]
-                        if (delta := abs(val - ref_val)) > max_delta:
-                            max_delta = delta
-
-                    if max_delta > 0.02:
-                        power = numpy.clip(max_delta, 0, 1)
-                        print("EEK!", max_delta, power)
-                        self.send(output.SetActivePower(power=max_delta * 100))
-                    else:
-                        self.send(output.SetActivePower(power=0))
+                    axis.add(msg.value)
+                    self._check_variance()
