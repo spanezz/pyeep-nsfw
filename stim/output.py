@@ -132,6 +132,7 @@ class OutputModel(GtkComponent):
 
         label_name = Gtk.Label(label=self.output.description)
         label_name.wrap = True
+        label_name.set_halign(Gtk.Align.START)
         w.append(label_name)
 
         active = Gtk.CheckButton(label="Active")
