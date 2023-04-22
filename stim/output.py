@@ -218,36 +218,6 @@ class OutputModel(GtkComponent):
 
     def receive(self, msg: Message):
         match msg:
-            # case cnc.CncCommand():
-            #     match msg.command:
-            #         case "EMERGENCY":
-            #             self.value_override = None
-            #             self.set_value(0)
-            #         case "STOP":
-            #             if self.is_active():
-            #                 self.set_value(0)
-            #         case "SPEED UP":
-            #             if self.is_active():
-            #                 self.add_value(
-            #                     self.adjustment.get_minimum_increment())
-            #         case "SLOW DOWN":
-            #             if self.is_active():
-            #                 self.add_value(
-            #                     -self.adjustment.get_minimum_increment())
-            #         case "+Z":
-            #             if self.is_active():
-            #                 self.value_override = 100
-            #                 self.set_value(self.last_value)
-            #         case "-Z":
-            #             if self.is_active():
-            #                 self.value_override = None
-            #                 self.set_value(self.last_value)
-            #         case "F+":
-            #             if self.is_active():
-            #                 self.add_value(1)
-            #         case "F-":
-            #             if self.is_active():
-            #                 self.add_value(-1)
             case EmergencyStop():
                 self.manual.set_state(GLib.Variant.new_boolean(True))
                 self.power.set_value(0)

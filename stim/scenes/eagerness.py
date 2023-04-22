@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from pyeep.app import check_hub
+from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib, Gtk
 
-from .. import output
+from .. import output, cnc
 from .base import Scene, register
 
 
 @register
 class Eagerness(Scene):
     TITLE = "Eagerness"
+    BPM_START = 6
+    INCREMENT_START = 2
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.bpm = Gtk.Adjustment(lower=1, upper=600, step_increment=1, page_increment=5, value=1)
+        self.bpm = Gtk.Adjustment(
+                lower=1, upper=600, step_increment=1, page_increment=5, value=self.BPM_START)
         self.bpm.connect("value-changed", self.on_value_changed)
-        self.increment = Gtk.Adjustment(lower=0, upper=100, step_increment=1, page_increment=5, value=2)
+        self.increment = Gtk.Adjustment(
+                lower=0, upper=100, step_increment=1, page_increment=5, value=self.INCREMENT_START)
         self.timeout: int | None = None
 
     def build(self) -> Gtk.Expander:
@@ -71,10 +75,39 @@ class Eagerness(Scene):
             self.update_timer()
 
     def on_stop(self, button):
-        self.send(output.SetActivePower(power=0))
-        self.bpm.set_value(self.bpm.get_value() * 1.2)
+        self.stop()
 
     def on_tick(self):
         amount = self.increment.get_value()
         self.send(output.IncreaseActivePower(amount=amount))
         return True
+
+    def stop(self):
+        self.send(output.SetActivePower(power=0))
+        self.speed_up()
+
+    def speed_up(self):
+        self.bpm.set_value(self.bpm.get_value() * 1.2)
+
+    def slow_down(self):
+        self.bpm.set_value(self.bpm.get_value() / 1.2)
+
+    @check_hub
+    def receive(self, msg: Message):
+        match msg:
+            case cnc.CncCommand():
+                match msg.command:
+                    case "STOP":
+                        self.stop()
+                    case "SPEED UP":
+                        self.speed_up()
+                    case "SLOW DOWN":
+                        self.slow_down()
+                    case "F+":
+                        self.increment.set_value(self.increment.get_value() + 1)
+                    case "F-":
+                        self.increment.set_value(self.increment.get_value() - 1)
+                    case "CYCLE START":
+                        self.bpm.set_value(self.BPM_START)
+                        self.increment.set_value(self.INCREMENT_START)
+                        self.send(output.SetActivePower(power=0))
