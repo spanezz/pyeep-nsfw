@@ -21,7 +21,7 @@ class Sample(NamedTuple):
 
 
 class Axis:
-    def __init__(self, window_width: float = 5.0):
+    def __init__(self, window_width: float = 3.0):
         self.values: deque[Sample] = deque()
         # Window width in seconds
         self.window_width: float = window_width
@@ -34,24 +34,12 @@ class Axis:
         while self.values and self.values[0].time < threshold:
             self.values.popleft()
 
-    def deltas(self) -> Iterator[float]:
-        if not self.values:
-            return
-
-        last_time = self.values[-1].time
-        old: float | None = None
-        for sample in self.values:
-            if old is None:
-                old = sample.value
-            else:
-                age = last_time - sample.time
-                yield abs(sample.value - old) / ((1 + age)**1.4)
-                old = sample.value
-
     def movement(self) -> float:
         if len(self.values) < 2:
             return 0.0
-        return statistics.mean(self.deltas())
+        mean = statistics.mean((x.value for x in self.values))
+        delta = abs(self.values[-1].value - mean)
+        return delta
 
     def tick(self):
         if not self.values:
@@ -118,8 +106,10 @@ class JSBondage(Scene):
         else:
             movement = 0.0
 
-        threshold = 0.0015
-        cap = 0.005
+        # threshold = 0.0015
+        # cap = 0.005
+        threshold = 0.01
+        cap = 0.6
         if movement > threshold:
             power = numpy.clip((movement - threshold) / cap, 0, 1)
             print(f"EEK! {movement:.5f} {power}")
