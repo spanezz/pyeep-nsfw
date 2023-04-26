@@ -94,6 +94,8 @@ class Eagerness(Scene):
 
     @check_hub
     def receive(self, msg: Message):
+        if not self.is_active():
+            return
         match msg:
             case cnc.CncCommand():
                 match msg.command:
