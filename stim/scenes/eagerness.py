@@ -111,3 +111,7 @@ class Eagerness(Scene):
                         self.bpm.set_value(self.BPM_START)
                         self.increment.set_value(self.INCREMENT_START)
                         self.send(output.SetActivePower(power=0))
+                    case "+X":
+                        self.send(output.IncreaseActivePower(amount=+5))
+                    case "-X":
+                        self.send(output.IncreaseActivePower(amount=-5))
