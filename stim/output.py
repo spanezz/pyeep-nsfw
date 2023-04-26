@@ -104,14 +104,20 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
 
 
 class OutputModel(GtkComponent):
-    def __init__(self, *, output: Output, active_action: Gio.Action, **kwargs):
+    def __init__(self, *, output: Output, **kwargs):  # active_action: Gio.Action
         kwargs.setdefault("name", "output_model_" + output.name)
         super().__init__(**kwargs)
         self.output = output
 
-        self.active_action = active_action
-        if not self.active_action.get_state().get_string():
-            self.active_action.set_state(GLib.Variant.new_string(self.name))
+        # self.active_action = active_action
+        # if not self.active_action.get_state().get_string():
+        #     self.active_action.set_state(GLib.Variant.new_string(self.name))
+        self.active = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-") + "-active",
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        # self.active.connect("activate", self.on_activate)
+        self.hub.app.gtk_app.add_action(self.active)
 
         self.power = Gtk.Adjustment(
                 value=0,
@@ -174,11 +180,12 @@ class OutputModel(GtkComponent):
         w.append(buttons)
 
         active = Gtk.CheckButton(label="Active")
-        detailed_name = Gio.Action.print_detailed_name(
-                "app." + self.active_action.get_name(),
-                GLib.Variant.new_string(self.name))
-        active.set_detailed_action_name(detailed_name)
-        active.set_action_target_value(GLib.Variant.new_string(self.name))
+        active.set_action_name("app." + self.active.get_name())
+        # detailed_name = Gio.Action.print_detailed_name(
+        #         "app." + self.active_action.get_name(),
+        #         GLib.Variant.new_string(self.name))
+        # active.set_detailed_action_name(detailed_name)
+        # active.set_action_target_value(GLib.Variant.new_string(self.name))
         buttons.append(active)
 
         manual = Gtk.ToggleButton(label="Manual")
@@ -203,8 +210,9 @@ class OutputModel(GtkComponent):
 
     @check_hub
     def is_active(self) -> bool:
-        current = self.active_action.get_state().get_string()
-        return current == self.name
+        # current = self.active_action.get_state().get_string()
+        # return current == self.name
+        return self.active.get_state().get_boolean()
 
     @check_hub
     def set_value(self, value: float):
@@ -234,11 +242,11 @@ class OutputsModel(GtkComponent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.output_models: list[OutputModel] = []
-        self.active_action = Gio.SimpleAction.new_stateful(
-            name="current-output",
-            parameter_type=GLib.VariantType("s"),
-            state=GLib.Variant.new_string(""))
-        self.hub.app.gtk_app.add_action(self.active_action)
+        # self.active_action = Gio.SimpleAction.new_stateful(
+        #     name="current-output",
+        #     parameter_type=GLib.VariantType("s"),
+        #     state=GLib.Variant.new_string(""))
+        # self.hub.app.gtk_app.add_action(self.active_action)
 
     def build(self) -> Gtk.Frame:
         w = Gtk.Frame(label="Outputs")
@@ -250,39 +258,39 @@ class OutputsModel(GtkComponent):
     #     if button.get_active():
     #         self.send(SetActiveOutput(output=self.output))
 
-    @check_hub
-    def get_active_index(self) -> int:
-        names = [m.name for m in self.output_models]
-        current = self.active_action.get_state().get_string()
-        try:
-            return names.index(current)
-        except ValueError:
-            self.logger.warning("%s: current output %r not in %r", current, names)
-            return 0
+    # @check_hub
+    # def get_active_index(self) -> int:
+    #     names = [m.name for m in self.output_models]
+    #     current = self.active_action.get_state().get_string()
+    #     try:
+    #         return names.index(current)
+    #     except ValueError:
+    #         self.logger.warning("%s: current output %r not in %r", current, names)
+    #         return 0
 
-    @check_hub
-    def activate_next(self):
-        current = self.get_active_index()
-        current = (current + 1) % len(self.output_models)
-        self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
+    # @check_hub
+    # def activate_next(self):
+    #     current = self.get_active_index()
+    #     current = (current + 1) % len(self.output_models)
+    #     self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
 
-    @check_hub
-    def activate_prev(self):
-        current = self.get_active_index()
-        current = (current - 1) % len(self.output_models)
-        self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
+    # @check_hub
+    # def activate_prev(self):
+    #     current = self.get_active_index()
+    #     current = (current - 1) % len(self.output_models)
+    #     self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
 
     @check_hub
     def receive(self, msg: Message):
         match msg:
             case NewOutput():
                 output_model = self.hub.app.add_component(
-                        OutputModel, output=msg.output, active_action=self.active_action)
+                        OutputModel, output=msg.output)  # active_action=self.active_action)
                 self.output_models.append(output_model)
                 self.widget.get_child().append(output_model.widget)
-            case cnc.CncCommand():
-                match msg.command:
-                    case "+A":
-                        self.activate_next()
-                    case "-A":
-                        self.activate_prev()
+            # case cnc.CncCommand():
+            #     match msg.command:
+            #         case "+A":
+            #             self.activate_next()
+            #         case "-A":
+            #             self.activate_prev()
