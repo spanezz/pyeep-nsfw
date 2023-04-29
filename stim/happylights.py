@@ -19,7 +19,7 @@ COMMAND_CHARACTERISTIC = '0000ffd9-0000-1000-8000-00805f9b34fb'
 
 class HappyLights(Output, pyeep.aio.AIOComponent):
     def __init__(self, address: str, **kwargs):
-        kwargs.setdefault("rate", 256)
+        kwargs.setdefault("rate", 32)
         super().__init__(**kwargs)
         self.address = address
         self.client: bleak.BleakClient | None = None

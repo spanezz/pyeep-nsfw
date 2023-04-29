@@ -5,27 +5,45 @@ from typing import Type
 
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
-from pyeep.gtk import Gdk, Gio, GLib, Gtk, GtkComponent
+from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
 from .messages import Decrement, EmergencyStop, Increment, Pause, Resume
+from .types import Color
 
 log = logging.getLogger(__name__)
 
 
 class PowerAnimation:
-    def __init__(self, rate: int):
-        self.rate = rate
+    def __init__(self):
+        self.rate: int
 
-    def get_power(self, frame: int) -> float:
+    def get_power(self, frame: int) -> float | None:
         raise NotImplementedError(f"{self.__class__.__name__}.get_power not implemented")
 
 
 class ColorAnimation:
-    def __init__(self, rate: int):
-        self.rate = rate
+    def __init__(self):
+        self.rate: int
 
-    def get_color(self, frame: int) -> tuple[float, float, float]:
+    def get_color(self, frame: int) -> Color | None:
         raise NotImplementedError(f"{self.__class__.__name__}.get_color not implemented")
+
+
+class ColorPulse(ColorAnimation):
+    def __init__(self, *, color=Color, duration: float = 0.2, **kwargs):
+        super().__init__(**kwargs)
+        self.color = color
+        self.duration = duration
+
+    def __str__(self):
+        return f"ColorPulse(color={self.color}, duration={self.duration})"
+
+    def get_color(self, frame: int) -> Color | None:
+        t = frame / self.rate
+        if t > self.duration:
+            return None
+        envelope = self.duration - t
+        return Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
 
 
 class NewOutput(Message):
@@ -48,7 +66,7 @@ class SetPower(Message):
 
 
 class SetColor(Message):
-    def __init__(self, *, output: "Output", color: tuple[float, float, float], **kwargs):
+    def __init__(self, *, output: "Output", color: Color, **kwargs):
         super().__init__(**kwargs)
         self.output = output
         self.color = color
@@ -77,12 +95,12 @@ class SetActiveColor(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, color: tuple[float, float, float] | ColorAnimation, **kwargs):
+    def __init__(self, *, color: Color | ColorAnimation, **kwargs):
         super().__init__(**kwargs)
         self.color = color
 
     def __str__(self) -> str:
-        return super().__str__() + f"(red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
+        return super().__str__() + f"(color={self.color}"
 
 
 class IncreaseActivePower(Message):
@@ -388,28 +406,83 @@ class ColoredOutputController(OutputController):
         super().__init__(**kwargs)
         self.color = Gtk.ColorButton()
         self.color.connect("color-activated", self.on_color)
+        self.color_animation_timeout: int | None = None
+        self.color_animation: ColorAnimation | None = None
+        self.color_animation_frame: int = 0
+        self.color_animation_next: ColorAnimation | None = None
 
     @check_hub
     def receive(self, msg: Message):
         match msg:
             case SetActiveColor():
                 if self.is_active:
-                    # TODO
-                    color = Gdk.RGBA()
-                    color.red = msg.color[0]
-                    color.green = msg.color[1]
-                    color.blue = msg.color[2]
-                    color.alpha = 1
-                    self.color.set_rgba(color)
-                    self.send(SetColor(output=self.output, color=msg.color))
+                    match msg.color:
+                        case Color():
+                            self.set_color(msg.color)
+                        case ColorPulse():
+                            # self.stop_animation()
+                            if self.color_animation:
+                                self.color_animation_next = msg.color
+                            else:
+                                self.start_animation(msg.color)
             case _:
                 super().receive(msg)
 
+    def start_animation(self, animation: ColorAnimation):
+        self.color_animation = animation
+        self.color_animation.rate = self.output.rate
+        self.color_animation_frame = 0
+        self.color_animation_timeout = GLib.timeout_add(
+                round(1 / self.output.rate * 1000),
+                self.on_animation_frame)
+
+    def stop_animation(self):
+        if self.color_animation_timeout is not None:
+            GLib.source_remove(self.color_animation_timeout)
+            self.clear_animation()
+
+    def clear_animation(self):
+        self.color_animation_timeout = None
+        self.color_animation = None
+        self.color_animation_frame = 0
+
+    def start_next_animation(self):
+        if (animation := self.color_animation_next) is None:
+            return
+        self.color_animation_next = None
+        self.start_animation(animation)
+
+    def on_animation_frame(self):
+        if not self.color_animation:
+            self.clear_animation()
+            return False
+        frame = self.color_animation_frame
+        color = self.color_animation.get_color(frame)
+        if color is None:
+            self.clear_animation()
+            color = Color(0, 0, 0)
+            self.color.set_rgba(color.as_rgba())
+            self.send(SetColor(output=self.output, color=color))
+            self.start_next_animation()
+            return False
+
+        self.color.set_rgba(color.as_rgba())
+        self.send(SetColor(output=self.output, color=color))
+
+        self.color_animation_frame += 1
+        return True
+
     def on_color(self, color):
+        self.stop_animation()
         rgba = color.get_rgba()
         self.send(SetColor(
             output=self.output,
             color=(rgba.red, rgba.green, rgba.blue)))
+
+    def set_color(self, color: Color):
+        self.stop_animation()
+        self.color.set_rgba(color.as_rgba)
+        self.send(SetColor(output=self.output, color=color))
 
     def build(self) -> Gtk.Grid:
         grid = super().build()

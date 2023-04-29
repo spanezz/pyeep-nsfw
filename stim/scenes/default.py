@@ -6,6 +6,7 @@ from pyeep.gtk import GLib
 from .. import keyboards, messages, output
 from .base import Scene, register
 from ..muse2 import HeadShaken
+from ..types import Color
 
 
 class KeyboardShortcutMixin:
@@ -71,11 +72,13 @@ class Default(KeyboardShortcutMixin, Scene):
                     match msg.axis:
                         case "z":
                             # No
-                            self.send(output.SetActiveColor(color=(
-                                value, 0, 0
-                            )))
+                            color = Color(value, 0, 0)
+                            # self.send(output.SetActiveColor(color=color))
+                            self.send(output.SetActiveColor(
+                                color=output.ColorPulse(color=color)))
                         case "y":
                             # Yes
-                            self.send(output.SetActiveColor(color=(
-                                0, value, 0
-                            )))
+                            color = Color(0, value, 0)
+                            # self.send(output.SetActiveColor(color=color)
+                            self.send(output.SetActiveColor(
+                                color=output.ColorPulse(color=color)))
