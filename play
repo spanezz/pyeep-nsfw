@@ -31,7 +31,10 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
-        self.add_component(keyboards.DeviceManager)
+        self.add_component(keyboards.DeviceManager, device_map={
+            "usb-04d9_1203-event-kbd": keyboards.CNCControlPanel,
+            "bluetooth-40:28:c6:3f:39:91:1b-kbd": keyboards.PageTurner,
+        })
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
 

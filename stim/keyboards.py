@@ -139,13 +139,9 @@ class PageTurner(EvdevInput):
 
 
 class DeviceManager(pyeep.aio.AIOComponent):
-    DEVICE_MAP: dict[str, Type[Input]] = {
-        "usb-04d9_1203-event-kbd": CNCControlPanel,
-        "bluetooth-40:28:c6:3f:39:91:1b-kbd": PageTurner,
-    }
-
-    def __init__(self, **kwargs):
+    def __init__(self, device_map: dict[str, Type[Input]], **kwargs):
         super().__init__(**kwargs)
+        self.device_map = device_map
         self.components: dict[Path, Input] = {}
         self.root = Path('/dev/input/by-id')
         self.watcher = aionotify.Watcher()
@@ -154,7 +150,7 @@ class DeviceManager(pyeep.aio.AIOComponent):
         if path in self.components:
             return
 
-        if (component_cls := self.DEVICE_MAP.get(path.name)) is None:
+        if (component_cls := self.device_map.get(path.name)) is None:
             return
 
         try:
