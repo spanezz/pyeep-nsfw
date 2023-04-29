@@ -6,7 +6,6 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
-from . import keyboards
 from .messages import EmergencyStop
 
 log = logging.getLogger(__name__)
@@ -146,6 +145,13 @@ class OutputModel(GtkComponent):
                 page_size=0)
         self.power_max.connect("value_changed", self.on_power_max)
 
+        self.pause = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-") + "-pause",
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        self.pause.connect("change-state", self.on_pause)
+        self.hub.app.gtk_app.add_action(self.pause)
+
         self.manual = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-manual",
                 parameter_type=None,
@@ -153,7 +159,9 @@ class OutputModel(GtkComponent):
         self.manual.connect("change-state", self.on_manual)
         self.hub.app.gtk_app.add_action(self.manual)
 
-        self.last_value: float = 0.0
+        self.last_set_value: float = 0.0
+
+    # UI handlers
 
     @check_hub
     def on_power(self, adj):
@@ -162,7 +170,8 @@ class OutputModel(GtkComponent):
         power level
         """
         val = round(adj.get_value())
-        self.send(SetPower(output=self.output, power=val / 100.0))
+        if not self._is_paused:
+            self.send(SetPower(output=self.output, power=val / 100.0))
 
     @check_hub
     def on_power_min(self, adj):
@@ -183,21 +192,90 @@ class OutputModel(GtkComponent):
         """
         When the Scale value is changed, activate manual mode
         """
-        self.manual.set_state(GLib.Variant.new_boolean(True))
-
-    @check_hub
-    def is_manual(self) -> bool:
-        return self.manual.get_state().get_boolean()
+        self.set_manual_power(int(round(value)))
 
     @check_hub
     def on_manual(self, action, parameter):
         """
-        When the manual mode is disabled, restore the previous value
+        When the manual mode is disabled, leave the previous value
         """
         new_state = not self.manual.get_state().get_boolean()
         self.manual.set_state(GLib.Variant.new_boolean(new_state))
-        if new_state is False:
-            self.set_value(self.last_value)
+        if new_state:
+            self.set_manual_power(int(round(self.power.get_value())))
+        else:
+            self.exit_manual_mode()
+
+    @check_hub
+    def on_pause(self, action, parameter):
+        """
+        When the pause mode is disabled, restore the previous value
+        """
+        new_state = not self.pause.get_state().get_boolean()
+        self.set_paused(new_state)
+
+    # High-level actions
+
+    @property
+    def _is_paused(self) -> bool:
+        return self.pause.get_state().get_boolean()
+
+    @property
+    def _is_manual(self) -> bool:
+        return self.manual.get_state().get_boolean()
+
+    @check_hub
+    def set_power(self, power: int):
+        """
+        Set power to use when not in manual mode and not paused
+        """
+        if not self._is_paused and not self._is_manual:
+            self.power.set_value(power)
+        self.last_set_value = power
+
+    @check_hub
+    def adjust_power(self, delta: int):
+        """
+        Add the given amount to the current power value
+        """
+        if not self._is_paused and not self._is_manual:
+            self.set_power(
+                self.power.get_value() + delta)
+        else:
+            self.last_set_value += delta
+            if self.last_set_value < self.power.get_lower():
+                self.last_set_value = self.power.get_lower()
+            if self.last_set_value > self.power.get_upper():
+                self.last_set_value = self.power.get_upper()
+
+    @check_hub
+    def set_manual_power(self, power: int):
+        """
+        Set manual mode and maunal mode power
+        """
+        if not self._is_manual:
+            self.manual.set_state(GLib.Variant.new_boolean(True))
+        self.last_set_value = power
+
+    @check_hub
+    def exit_manual_mode(self):
+        """
+        Exit manual mode
+        """
+        self.manual.set_state(GLib.Variant.new_boolean(False))
+
+    @check_hub
+    def set_paused(self, paused: bool):
+        """
+        Enter/exit pause mode
+        """
+        if self._is_paused != paused:
+            self.pause.set_state(GLib.Variant.new_boolean(paused))
+            if paused:
+                self.power.set_value(0)
+                self.send(SetPower(output=self.output, power=0))
+            else:
+                self.power.set_value(self.last_set_value)
 
     def build(self) -> Gtk.Grid:
         grid = Gtk.Grid()
@@ -215,6 +293,10 @@ class OutputModel(GtkComponent):
         # active.set_detailed_action_name(detailed_name)
         # active.set_action_target_value(GLib.Variant.new_string(self.name))
         grid.attach(active, 0, 1, 1, 1)
+
+        pause = Gtk.ToggleButton(label="Paused")
+        pause.set_action_name("app." + self.pause.get_name())
+        grid.attach(pause, 1, 1, 1, 1)
 
         manual = Gtk.ToggleButton(label="Manual")
         manual.set_action_name("app." + self.manual.get_name())
@@ -235,6 +317,12 @@ class OutputModel(GtkComponent):
             )
         grid.attach(power, 0, 2, 3, 1)
 
+        def disable_scale_on_pause(action, parameter):
+            power.set_sensitive(
+                    not self.pause.get_state().get_boolean())
+
+        self.pause.connect("change-state", disable_scale_on_pause)
+
         power_min = Gtk.SpinButton()
         power_min.set_adjustment(self.power_min)
         grid.attach(power_min, 0, 3, 1, 1)
@@ -253,28 +341,14 @@ class OutputModel(GtkComponent):
         # return current == self.name
         return self.active.get_state().get_boolean()
 
-    @check_hub
-    def set_value(self, value: float):
-        if not self.is_manual():
-            self.power.set_value(value)
-        self.last_value = value
-
-    @check_hub
-    def add_value(self, value: float):
-        self.set_value(
-            self.power.get_value() + value)
-
     def receive(self, msg: Message):
         match msg:
             case EmergencyStop():
-                self.manual.set_state(GLib.Variant.new_boolean(True))
-                self.power.set_value(0)
+                self.set_paused(True)
             case SetActivePower():
-                if self.is_active():
-                    self.set_value(msg.power)
+                self.set_power(msg.power)
             case IncreaseActivePower():
-                if self.is_active() and not self.is_manual():
-                    self.add_value(msg.amount)
+                self.adjust_power(msg.amount)
 
 
 class OutputsModel(GtkComponent):
