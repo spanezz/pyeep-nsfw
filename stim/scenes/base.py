@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Type
 
 from pyeep.app import check_hub
-from pyeep.gtk import Gtk, GtkComponent
+from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
 SCENES: list[Type["Scene"]] = []
 
@@ -18,17 +18,25 @@ class Scene(GtkComponent):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # TODO: move the action for the active switch here
-        self.active = Gtk.Switch()
-        self.active.connect("state-set", self.on_active)
+
+        self.active = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-") + "-active",
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        self.active.connect("activate", self.on_active)
+        self.hub.app.gtk_app.add_action(self.active)
 
     def build(self) -> Gtk.Expander:
         expander = Gtk.Expander(label=self.TITLE)
         label = expander.get_label_widget()
-        # TODO: move backend to __init__
+
         box = Gtk.Box()
         expander.set_label_widget(box)
-        box.append(self.active)
+
+        active = Gtk.Switch()
+        active.set_action_name("app." + self.active.get_name())
+
+        box.append(active)
         box.append(label)
 
         # self.set_title(self.TITLE)
@@ -36,14 +44,17 @@ class Scene(GtkComponent):
         return expander
 
     def on_active(self, switch, state):
-        if state:
+        new_state = not self.active.get_state().get_boolean()
+        print("OA", new_state)
+        self.active.set_state(GLib.Variant.new_boolean(new_state))
+        if new_state:
             self.start()
         else:
             self.pause()
 
     @check_hub
-    def is_active(self):
-        return self.active.get_state()
+    def is_active(self) -> bool:
+        return self.active.get_state().get_boolean()
 
     @check_hub
     def start(self):

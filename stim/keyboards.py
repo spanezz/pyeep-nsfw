@@ -8,7 +8,16 @@ from pyeep.app import Message
 from .messages import EmergencyStop
 
 
-class CncCommand(Message):
+class CNCCommand(Message):
+    def __init__(self, *, command: str, **kwargs):
+        super().__init__(**kwargs)
+        self.command = command
+
+    def __str__(self):
+        return super().__str__() + f"(command={self.command})"
+
+
+class TurnerCommand(Message):
     def __init__(self, *, command: str, **kwargs):
         super().__init__(**kwargs)
         self.command = command
@@ -59,21 +68,26 @@ class CNCControlPanel(EvdevInput):
         return f"CNC {self.device.name}"
 
     async def on_evdev(self, ev: evdev.InputEvent):
-        if ev.type == evdev.ecodes.EV_KEY and ev.value != 0:
-            if (val := self.KEY_MAP.get(ev.code)):
-                match val:
-                    case "EMERGENCY":
-                        self.send(EmergencyStop())
-                    case _:
-                        if self.active:
-                            self.send(CncCommand(command=val))
+        if ev.type != evdev.ecodes.EV_KEY:
+            return
+        if ev.value == 0:
+            return
+        if (val := self.KEY_MAP.get(ev.code)) is None:
+            return
+        if val == "EMERGENCY":
+            self.send(EmergencyStop())
+            return
+        self.mode(val)
+
+    def mode_default(self, value: str):
+        self.send(CNCCommand(command=value))
 
 
 class PageTurner(EvdevInput):
     KEY_MAP = {
-        evdev.ecodes.KEY_UP: "REDO",
+        evdev.ecodes.KEY_UP: "CYCLE START",
         evdev.ecodes.KEY_DOWN: "STOP",
-        evdev.ecodes.KEY_LEFT: "REDO",
+        evdev.ecodes.KEY_LEFT: "CYCLE START",
         evdev.ecodes.KEY_RIGHT: "STOP",
     }
 
@@ -82,9 +96,15 @@ class PageTurner(EvdevInput):
         return f"Page Turner {self.device.name}"
 
     async def on_evdev(self, ev: evdev.InputEvent):
-        if ev.type == evdev.ecodes.EV_KEY and ev.value != 0:
-            if (val := self.KEY_MAP.get(ev.code)):
-                match val:
-                    case _:
-                        if self.active:
-                            self.send(CncCommand(command=val))
+        if not self.active:
+            return
+        if ev.type != evdev.ecodes.EV_KEY:
+            return
+        if ev.value == 0:
+            return
+        if (val := self.KEY_MAP.get(ev.code)) is None:
+            return
+        self.mode(val)
+
+    def mode_default(self, value: str):
+        self.send(TurnerCommand(command=value))

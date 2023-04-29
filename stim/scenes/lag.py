@@ -44,7 +44,7 @@ class Lag(Scene):
         self.lag.set_value(self.lag.get_value() + 1)
 
     @check_hub
-    def _process_cnc_command(self, msg: keyboards.CncCommand):
+    def _process_cnc_command(self, msg: keyboards.CNCCommand):
         if not self.is_active:
             return False
         match msg.command:
@@ -68,7 +68,7 @@ class Lag(Scene):
         if not self.is_active():
             return
         match msg:
-            case keyboards.CncCommand():
+            case keyboards.CNCCommand():
                 lag = self.lag.get_value()
                 if lag == 0:
                     self._process_cnc_command(msg)

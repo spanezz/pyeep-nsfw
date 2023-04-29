@@ -6,7 +6,7 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
-from .messages import EmergencyStop
+from .messages import EmergencyStop, Pause, Resume, Increment, Decrement
 
 log = logging.getLogger(__name__)
 
@@ -28,15 +28,6 @@ class SetPower(Message):
 
     def __str__(self) -> str:
         return super().__str__() + f"(power={self.power})"
-
-
-# class SetActiveOutput(Message):
-#     def __init__(self, *, output: "Output", **kwargs):
-#         super().__init__(**kwargs)
-#         self.output = output
-#
-#     def __str__(self) -> str:
-#         return super().__str__() + f"(output={self.output.description})"
 
 
 class SetActivePower(Message):
@@ -318,8 +309,14 @@ class OutputModel(GtkComponent):
 
     def receive(self, msg: Message):
         match msg:
-            case EmergencyStop():
+            case EmergencyStop() | Pause():
                 self.set_paused(True)
+            case Resume():
+                self.set_paused(False)
+            case Increment():
+                self.adjust_power(2)
+            case Decrement():
+                self.adjust_power(-2)
             case SetActivePower():
                 self.set_power(msg.power)
             case IncreaseActivePower():
@@ -338,32 +335,6 @@ class OutputsModel(GtkComponent):
         w.set_child(box)
         return w
 
-    # def on_active(self, button):
-    #     if button.get_active():
-    #         self.send(SetActiveOutput(output=self.output))
-
-    # @check_hub
-    # def get_active_index(self) -> int:
-    #     names = [m.name for m in self.output_models]
-    #     current = self.active_action.get_state().get_string()
-    #     try:
-    #         return names.index(current)
-    #     except ValueError:
-    #         self.logger.warning("%s: current output %r not in %r", current, names)
-    #         return 0
-
-    # @check_hub
-    # def activate_next(self):
-    #     current = self.get_active_index()
-    #     current = (current + 1) % len(self.output_models)
-    #     self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
-
-    # @check_hub
-    # def activate_prev(self):
-    #     current = self.get_active_index()
-    #     current = (current - 1) % len(self.output_models)
-    #     self.active_action.set_state(GLib.Variant.new_string(self.output_models[current].name))
-
     @check_hub
     def receive(self, msg: Message):
         match msg:
@@ -372,9 +343,3 @@ class OutputsModel(GtkComponent):
                         OutputModel, output=msg.output)  # active_action=self.active_action)
                 self.output_models.append(output_model)
                 self.widget.get_child().append(output_model.widget)
-            # case keyboards.CncCommand():
-            #     match msg.command:
-            #         case "+A":
-            #             self.activate_next()
-            #         case "-A":
-            #             self.activate_prev()

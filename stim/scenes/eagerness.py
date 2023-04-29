@@ -97,7 +97,7 @@ class Eagerness(Scene):
         if not self.is_active():
             return
         match msg:
-            case keyboards.CncCommand():
+            case keyboards.CNCCommand():
                 match msg.command:
                     case "STOP":
                         self.stop()
@@ -117,3 +117,36 @@ class Eagerness(Scene):
                         self.send(output.IncreaseActivePower(amount=+5))
                     case "-X":
                         self.send(output.IncreaseActivePower(amount=-5))
+        # match value:
+        #     # case "STOP":
+        #     #     self.stop()
+        #     # case "SPEED UP":
+        #     #     self.speed_up()
+        #     # case "SLOW DOWN":
+        #     #     self.slow_down()
+        #     # case "F+":
+        #     #     self.increment.set_value(self.increment.get_value() + 1)
+        #     # case "F-":
+        #     #     self.increment.set_value(self.increment.get_value() - 1)
+        #     # case "CYCLE START":
+        #     #     self.bpm.set_value(self.BPM_START)
+        #     #     self.increment.set_value(self.INCREMENT_START)
+        #     #     self.send(output.SetActivePower(power=0))
+        #     case "REDO":
+        #         self.send(Resume())
+        #     case "+X":
+        #         self.send(Increment(axis=0))
+        #     case "-X":
+        #         self.send(Decrement(axis=0))
+        #     case "+Y":
+        #         self.send(Increment(axis=1))
+        #     case "-Y":
+        #         self.send(Decrement(axis=1))
+        #     case "+Z":
+        #         self.send(Increment(axis=2))
+        #     case "-Z":
+        #         self.send(Decrement(axis=2))
+        #     case "+A":
+        #         self.send(Increment(axis=3))
+        #     case "-A":
+        #         self.send(Decrement(axis=3))
