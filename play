@@ -14,7 +14,7 @@ import pyeep.gtk
 import pyeep.inputs
 import pyeep.pygame
 from pyeep.gtk import Gio, GLib, Gtk
-from stim import joystick, keyboards, scenes
+from stim import joystick, keyboards, scenes, happylights
 from stim.buttplug import ButtplugClient, ScanAction
 from stim.muse2 import HeadMovement, HeadPosition
 from stim.output import NewOutput, NullOutput, OutputsModel
@@ -39,6 +39,8 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         })
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
+        lights = self.add_component(happylights.HappyLights, address="21:04:99:10:35:05")
+        self.send(NewOutput(output=lights))
 
     def _add_input_ui(self, input: pyeep.inputs.Input):
         input_controller = self.add_component(input.get_input_controller(), input=input)

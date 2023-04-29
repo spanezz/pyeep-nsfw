@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Type
 
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
@@ -28,6 +29,18 @@ class SetPower(Message):
 
     def __str__(self) -> str:
         return super().__str__() + f"(power={self.power})"
+
+
+class SetColor(Message):
+    def __init__(self, *, output: "Output", red: float, green: float, blue: float, **kwargs):
+        super().__init__(**kwargs)
+        self.output = output
+        self.red = red
+        self.green = green
+        self.blue = blue
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(red={self.red:.3f}, green={self.green:.3f}, blue={self.blue:.3f})"
 
 
 class SetActivePower(Message):
@@ -64,6 +77,9 @@ class Output(pyeep.app.Component):
         # Rate (changes per second) at which this output can take commands
         self.rate = rate
 
+    def get_output_controller(self) -> Type["OutputController"]:
+        return OutputController
+
     @property
     def description(self) -> str:
         return self.name
@@ -82,6 +98,9 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
     def description(self) -> str:
         return "Null output"
 
+    def get_output_controller(self) -> Type["OutputController"]:
+        return ColoredOutputController
+
     async def run(self):
         while True:
             msg = await self.next_message()
@@ -93,7 +112,7 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
                         self.power = msg.power
 
 
-class OutputModel(GtkComponent):
+class OutputController(GtkComponent):
     def __init__(self, *, output: Output, **kwargs):  # active_action: Gio.Action
         kwargs.setdefault("name", "output_model_" + output.name)
         super().__init__(**kwargs)
@@ -289,17 +308,17 @@ class OutputModel(GtkComponent):
                 position=Gtk.PositionType.BOTTOM,
                 markup=None
             )
-        grid.attach(power, 0, 2, 3, 1)
+        grid.attach(power, 0, 2, 4, 1)
 
         power_min = Gtk.SpinButton()
         power_min.set_adjustment(self.power_min)
-        grid.attach(power_min, 0, 3, 1, 1)
+        grid.attach(power_min, 0, 4, 1, 1)
 
         grid.attach(Gtk.Label(label="to"), 1, 3, 1, 1)
 
         power_max = Gtk.SpinButton()
         power_max.set_adjustment(self.power_max)
-        grid.attach(power_max, 2, 3, 1, 1)
+        grid.attach(power_max, 2, 4, 1, 1)
 
         return grid
 
@@ -333,10 +352,30 @@ class OutputModel(GtkComponent):
                     self.adjust_power(msg.amount)
 
 
+class ColoredOutputController(OutputController):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.color = Gtk.ColorButton()
+        self.color.connect("color-set", self.on_color)
+
+    def on_color(self, color):
+        rgba = color.get_rgba()
+        self.send(SetColor(
+            output=self.output,
+            red=rgba.red,
+            green=rgba.green,
+            blue=rgba.blue))
+
+    def build(self) -> Gtk.Grid:
+        grid = super().build()
+        grid.attach(self.color, 3, 1, 1, 1)
+        return grid
+
+
 class OutputsModel(GtkComponent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.output_models: list[OutputModel] = []
+        self.output_models: list[OutputController] = []
 
     def build(self) -> Gtk.Frame:
         w = Gtk.Frame(label="Outputs")
@@ -350,6 +389,7 @@ class OutputsModel(GtkComponent):
         match msg:
             case NewOutput():
                 output_model = self.hub.app.add_component(
-                        OutputModel, output=msg.output)  # active_action=self.active_action)
+                        msg.output.get_output_controller(),
+                        output=msg.output)
                 self.output_models.append(output_model)
                 self.widget.get_child().append(output_model.widget)
