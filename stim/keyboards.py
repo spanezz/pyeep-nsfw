@@ -10,7 +10,7 @@ import evdev
 import pyeep.aio
 from pyeep.app import Message, Shutdown
 
-from .inputs import Input, InputSetActive
+from pyeep.inputs import Input, InputSetActive
 from .messages import EmergencyStop
 
 

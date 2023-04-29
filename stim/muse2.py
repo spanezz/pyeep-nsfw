@@ -12,7 +12,7 @@ from pyeep.app import Message, Shutdown
 import pyeep.aio
 from pyeep.lsl import LSLComponent, LSLSamples
 
-from .inputs import Input, InputSetActive
+from pyeep.inputs import Input, InputSetActive
 
 
 class HeadMoved(Message):

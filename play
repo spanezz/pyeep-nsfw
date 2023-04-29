@@ -10,12 +10,13 @@ from typing import Type
 import pyeep.aio
 import pyeep.app
 import pyeep.gtk
+import pyeep.inputs
 import pyeep.pygame
-from pyeep.gtk import Gtk, Gio, GLib
-from stim import scenes, inputs, joystick, keyboards
-from stim.output import NullOutput, NewOutput, OutputsModel
+from pyeep.gtk import Gio, GLib, Gtk
+from stim import joystick, keyboards, scenes
 from stim.buttplug import ButtplugClient, ScanAction
-from stim.muse2 import HeadPosition, HeadMovement
+from stim.muse2 import HeadMovement, HeadPosition
+from stim.output import NewOutput, NullOutput, OutputsModel
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)
         self.outputs = self.add_component(OutputsModel)
-        self.inputs: list[input.Input] = []
+        self.inputs: list[pyeep.inputs.Input] = []
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(HeadPosition)
@@ -38,16 +39,19 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
 
-    def _add_input(self, input: inputs.Input):
+    def _add_input_ui(self, input: pyeep.inputs.Input):
+        input_controller = self.add_component(input.get_input_controller(), input=input)
+        self.inputs_box.append(input_controller.widget)
+
+    def _add_input(self, input: pyeep.inputs.Input):
         # TODO: also remove on remove_component
         self.inputs.append(input)
-        if (inputs_box := getattr(self, "inputs_box", None)):
-            input_model = self.add_component(input.get_model(), input=input)
-            inputs_box.append(input_model.widget)
+        if hasattr(self, "inputs_box"):
+            self._add_input_ui(input)
 
     def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
         component = super().add_component(component_cls, **kwargs)
-        if isinstance(component, inputs.Input):
+        if isinstance(component, pyeep.inputs.Input):
             GLib.idle_add(self._add_input, component)
         return component
 
@@ -63,8 +67,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.inputs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_inputs.set_child(self.inputs_box)
         for inp in self.inputs:
-            input_model = self.add_component(inputs.InputModel, input=inp)
-            self.inputs_box.append(input_model.widget)
+            self._add_input_ui(inp)
 
         self.frame_scenes = Gtk.Frame(label="Scenes")
         self.frame_scenes.set_vexpand(True)

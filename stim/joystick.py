@@ -4,7 +4,7 @@ import pyeep.pygame
 from pyeep.app import Message, check_hub
 from pyeep.pygame import pygame
 
-from .inputs import Input, InputSetActive
+from pyeep.inputs import Input, InputSetActive
 
 
 class JoystickAxisMoved(Message):
