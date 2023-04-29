@@ -108,9 +108,6 @@ class OutputModel(GtkComponent):
         super().__init__(**kwargs)
         self.output = output
 
-        # self.active_action = active_action
-        # if not self.active_action.get_state().get_string():
-        #     self.active_action.set_state(GLib.Variant.new_string(self.name))
         self.active = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-active",
                 parameter_type=None,
@@ -278,11 +275,6 @@ class OutputModel(GtkComponent):
 
         active = Gtk.CheckButton(label="Active")
         active.set_action_name("app." + self.active.get_name())
-        # detailed_name = Gio.Action.print_detailed_name(
-        #         "app." + self.active_action.get_name(),
-        #         GLib.Variant.new_string(self.name))
-        # active.set_detailed_action_name(detailed_name)
-        # active.set_action_target_value(GLib.Variant.new_string(self.name))
         grid.attach(active, 0, 1, 1, 1)
 
         pause = Gtk.ToggleButton(label="Paused")
@@ -322,8 +314,6 @@ class OutputModel(GtkComponent):
 
     @check_hub
     def is_active(self) -> bool:
-        # current = self.active_action.get_state().get_string()
-        # return current == self.name
         return self.active.get_state().get_boolean()
 
     def receive(self, msg: Message):
@@ -340,11 +330,6 @@ class OutputsModel(GtkComponent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.output_models: list[OutputModel] = []
-        # self.active_action = Gio.SimpleAction.new_stateful(
-        #     name="current-output",
-        #     parameter_type=GLib.VariantType("s"),
-        #     state=GLib.Variant.new_string(""))
-        # self.hub.app.gtk_app.add_action(self.active_action)
 
     def build(self) -> Gtk.Frame:
         w = Gtk.Frame(label="Outputs")
