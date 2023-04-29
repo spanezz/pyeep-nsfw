@@ -62,14 +62,16 @@ class HappyLights(Output, pyeep.aio.AIOComponent):
                     case Shutdown():
                         break
                     case SetPower():
-                        cmd = self.cmd_white(int(round(msg.power * 255)))
-                        self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                        await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+                        if msg.output == self:
+                            cmd = self.cmd_white(int(round(msg.power * 255)))
+                            self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+                            await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
                     case SetColor():
-                        cmd = self.cmd_color(
-                             int(round(msg.color[0] * 255)),
-                             int(round(msg.color[1] * 255)),
-                             int(round(msg.color[2] * 255)),
-                        )
-                        self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                        await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+                        if msg.output == self:
+                            cmd = self.cmd_color(
+                                 int(round(msg.color[0] * 255)),
+                                 int(round(msg.color[1] * 255)),
+                                 int(round(msg.color[2] * 255)),
+                            )
+                            self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+                            await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)

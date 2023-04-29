@@ -54,7 +54,11 @@ class SetColor(Message):
         self.color = color
 
     def __str__(self) -> str:
-        return super().__str__() + f"(red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
+        return (
+            super().__str__() +
+            f"(output={self.output.description},"
+            f" red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
+        )
 
 
 class SetActivePower(Message):
@@ -383,7 +387,7 @@ class ColoredOutputController(OutputController):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.color = Gtk.ColorButton()
-        self.color.connect("color-set", self.on_color)
+        self.color.connect("color-activated", self.on_color)
 
     @check_hub
     def receive(self, msg: Message):
