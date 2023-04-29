@@ -159,8 +159,6 @@ class OutputModel(GtkComponent):
         self.manual.connect("change-state", self.on_manual)
         self.hub.app.gtk_app.add_action(self.manual)
 
-        self.last_set_value: float = 0.0
-
     # UI handlers
 
     @check_hub
@@ -229,24 +227,17 @@ class OutputModel(GtkComponent):
         """
         Set power to use when not in manual mode and not paused
         """
-        if not self._is_paused and not self._is_manual:
+        if not self._is_manual:
             self.power.set_value(power)
-        self.last_set_value = power
 
     @check_hub
     def adjust_power(self, delta: int):
         """
         Add the given amount to the current power value
         """
-        if not self._is_paused and not self._is_manual:
+        if not self._is_manual:
             self.set_power(
                 self.power.get_value() + delta)
-        else:
-            self.last_set_value += delta
-            if self.last_set_value < self.power.get_lower():
-                self.last_set_value = self.power.get_lower()
-            if self.last_set_value > self.power.get_upper():
-                self.last_set_value = self.power.get_upper()
 
     @check_hub
     def set_manual_power(self, power: int):
@@ -255,7 +246,7 @@ class OutputModel(GtkComponent):
         """
         if not self._is_manual:
             self.manual.set_state(GLib.Variant.new_boolean(True))
-        self.last_set_value = power
+        self.power.set_value(power)
 
     @check_hub
     def exit_manual_mode(self):
@@ -272,10 +263,10 @@ class OutputModel(GtkComponent):
         if self._is_paused != paused:
             self.pause.set_state(GLib.Variant.new_boolean(paused))
             if paused:
-                self.power.set_value(0)
                 self.send(SetPower(output=self.output, power=0))
             else:
-                self.power.set_value(self.last_set_value)
+                power = self.power.get_value() / 100.0
+                self.send(SetPower(output=self.output, power=power))
 
     def build(self) -> Gtk.Grid:
         grid = Gtk.Grid()
@@ -316,12 +307,6 @@ class OutputModel(GtkComponent):
                 markup=None
             )
         grid.attach(power, 0, 2, 3, 1)
-
-        def disable_scale_on_pause(action, parameter):
-            power.set_sensitive(
-                    not self.pause.get_state().get_boolean())
-
-        self.pause.connect("change-state", disable_scale_on_pause)
 
         power_min = Gtk.SpinButton()
         power_min.set_adjustment(self.power_min)
