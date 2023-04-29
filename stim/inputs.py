@@ -65,8 +65,6 @@ class InputModel(GtkComponent):
         super().__init__(**kwargs)
         self.input = input
 
-        # self.modes: dict[str, str] = {}
-
         self.active = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-active",
                 parameter_type=None,
@@ -79,24 +77,6 @@ class InputModel(GtkComponent):
             if not name.startswith("mode_"):
                 continue
             self.modes.append([name[5:], inspect.getdoc(value)])
-
-        # self.mode = Gio.SimpleAction.new_stateful(
-        #         name=self.name.replace("_", "-") + "-mode",
-        #         parameter_type=GLib.VariantType("s"),
-        #         state=GLib.Variant.new_string("default"))
-        # self.hub.app.gtk_app.add_action(self.mode)
-
-        # if not self.active_action.get_state().get_string():
-        #     self.active_action.set_state(GLib.Variant.new_string(self.name))
-
-        # current = self.active_action.get_state().get_string()
-        # return current == self.name
-
-        # detailed_name = Gio.Action.print_detailed_name(
-        #         "app." + self.active_action.get_name(),
-        #         GLib.Variant.new_string(self.name))
-        # active.set_detailed_action_name(detailed_name)
-        # active.set_action_target_value(GLib.Variant.new_string(self.name))
 
     def is_active(self) -> bool:
         return self.active.get_state().get_boolean()
@@ -111,7 +91,7 @@ class InputModel(GtkComponent):
         if tree_iter is not None:
             model = combo.get_model()
             mode = model[tree_iter][0]
-            print("Selected: mode", mode)
+            self.send(InputSetMode(input=self.input, mode=mode))
 
     def build(self) -> Gtk.Box:
         grid = Gtk.Grid()
