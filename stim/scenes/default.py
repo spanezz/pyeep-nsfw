@@ -3,8 +3,9 @@ from __future__ import annotations
 from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib
 
-from .. import keyboards, messages
+from .. import keyboards, messages, output
 from .base import Scene, register
+from ..muse2 import HeadShaken
 
 
 class KeyboardShortcutMixin:
@@ -49,3 +50,32 @@ class Default(KeyboardShortcutMixin, Scene):
         match msg:
             case keyboards.Shortcut():
                 self.handle_keyboard_shortcut(msg.command)
+            case HeadShaken():
+                if self.is_active:
+                    # Normalized frequency and power
+                    # freq: 0..5.5
+                    # power: 50..72
+                    freq = msg.freq / 5.5
+                    if freq < 0:
+                        freq = 0
+                    elif freq > 1:
+                        freq = 1
+
+                    power = (msg.power - 50) / 22
+                    if power < 0:
+                        power = 0
+                    elif power > 1:
+                        power = 1
+
+                    value = 0.1 + max(freq, power) * 0.9
+                    match msg.axis:
+                        case "z":
+                            # No
+                            self.send(output.SetActiveColor(color=(
+                                value, 0, 0
+                            )))
+                        case "y":
+                            # Yes
+                            self.send(output.SetActiveColor(color=(
+                                0, value, 0
+                            )))

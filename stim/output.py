@@ -5,11 +5,27 @@ from typing import Type
 
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
-from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
+from pyeep.gtk import Gdk, Gio, GLib, Gtk, GtkComponent
 
-from .messages import EmergencyStop, Pause, Resume, Increment, Decrement
+from .messages import Decrement, EmergencyStop, Increment, Pause, Resume
 
 log = logging.getLogger(__name__)
+
+
+class PowerAnimation:
+    def __init__(self, rate: int):
+        self.rate = rate
+
+    def get_power(self, frame: int) -> float:
+        raise NotImplementedError(f"{self.__class__.__name__}.get_power not implemented")
+
+
+class ColorAnimation:
+    def __init__(self, rate: int):
+        self.rate = rate
+
+    def get_color(self, frame: int) -> tuple[float, float, float]:
+        raise NotImplementedError(f"{self.__class__.__name__}.get_color not implemented")
 
 
 class NewOutput(Message):
@@ -32,27 +48,37 @@ class SetPower(Message):
 
 
 class SetColor(Message):
-    def __init__(self, *, output: "Output", red: float, green: float, blue: float, **kwargs):
+    def __init__(self, *, output: "Output", color: tuple[float, float, float], **kwargs):
         super().__init__(**kwargs)
         self.output = output
-        self.red = red
-        self.green = green
-        self.blue = blue
+        self.color = color
 
     def __str__(self) -> str:
-        return super().__str__() + f"(red={self.red:.3f}, green={self.green:.3f}, blue={self.blue:.3f})"
+        return super().__str__() + f"(red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
 
 
 class SetActivePower(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, power: float, **kwargs):
+    def __init__(self, *, power: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
         self.power = power
 
     def __str__(self) -> str:
         return super().__str__() + f"(power={self.power})"
+
+
+class SetActiveColor(Message):
+    """
+    Set the power of the active output
+    """
+    def __init__(self, *, color: tuple[float, float, float] | ColorAnimation, **kwargs):
+        super().__init__(**kwargs)
+        self.color = color
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
 
 
 class IncreaseActivePower(Message):
@@ -327,6 +353,7 @@ class OutputController(GtkComponent):
     def is_active(self) -> bool:
         return self.active.get_state().get_boolean()
 
+    @check_hub
     def receive(self, msg: Message):
         match msg:
             case EmergencyStop():
@@ -358,13 +385,27 @@ class ColoredOutputController(OutputController):
         self.color = Gtk.ColorButton()
         self.color.connect("color-set", self.on_color)
 
+    @check_hub
+    def receive(self, msg: Message):
+        match msg:
+            case SetActiveColor():
+                if self.is_active:
+                    # TODO
+                    color = Gdk.RGBA()
+                    color.red = msg.color[0]
+                    color.green = msg.color[1]
+                    color.blue = msg.color[2]
+                    color.alpha = 1
+                    self.color.set_rgba(color)
+                    self.send(SetColor(output=self.output, color=msg.color))
+            case _:
+                super().receive(msg)
+
     def on_color(self, color):
         rgba = color.get_rgba()
         self.send(SetColor(
             output=self.output,
-            red=rgba.red,
-            green=rgba.green,
-            blue=rgba.blue))
+            color=(rgba.red, rgba.green, rgba.blue)))
 
     def build(self) -> Gtk.Grid:
         grid = super().build()

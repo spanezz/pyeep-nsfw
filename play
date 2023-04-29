@@ -42,6 +42,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         lights = self.add_component(happylights.HappyLights, address="21:04:99:10:35:05")
         self.send(NewOutput(output=lights))
 
+    def setup_logging(self):
+        super().setup_logging()
+        if self.args.debug:
+            logging.getLogger("bleak.backends.bluezdbus.manager").setLevel(logging.INFO)
+
     def _add_input_ui(self, input: pyeep.inputs.Input):
         input_controller = self.add_component(input.get_input_controller(), input=input)
         self.inputs_box.append(input_controller.widget)

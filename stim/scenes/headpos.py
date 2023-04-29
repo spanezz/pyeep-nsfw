@@ -74,7 +74,7 @@ class HeadPosition(Scene):
     def receive(self, msg: Message):
         match msg:
             case HeadMoved():
-                if self.is_active():
+                if self.is_active:
                     if self.reference_roll is None:
                         self.reference_roll = msg.roll
 
@@ -115,7 +115,7 @@ class HeadYesNo(Scene):
     def receive(self, msg: Message):
         match msg:
             case HeadShaken():
-                if self.is_active():
+                if self.is_active:
                     match msg.axis:
                         case "z":
                             # No
