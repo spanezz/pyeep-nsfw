@@ -107,7 +107,7 @@ class CNCControlPanel(EvdevInput):
         return f"CNC {self.device.name}"
 
     async def on_evdev(self, ev: evdev.InputEvent):
-        if ev.type == evdev.ecodes.EV_KEY:
+        if ev.type == evdev.ecodes.EV_KEY and ev.value != 0:
             if (val := self.KEY_MAP.get(ev.code)):
                 match val:
                     case "EMERGENCY":
@@ -130,7 +130,7 @@ class PageTurner(EvdevInput):
         return f"Page Turner {self.device.name}"
 
     async def on_evdev(self, ev: evdev.InputEvent):
-        if ev.type == evdev.ecodes.EV_KEY:
+        if ev.type == evdev.ecodes.EV_KEY and ev.value != 0:
             if (val := self.KEY_MAP.get(ev.code)):
                 match val:
                     case _:
