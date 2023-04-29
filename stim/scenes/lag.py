@@ -67,7 +67,6 @@ class Lag(Scene):
     def receive(self, msg: Message):
         if not self.is_active():
             return
-        print("LAG", msg)
         match msg:
             case keyboards.CncCommand():
                 lag = self.lag.get_value()

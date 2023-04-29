@@ -56,6 +56,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.window.set_child(self.grid)
 
         self.frame_inputs = Gtk.Frame(label="Inputs")
+        self.frame_inputs.set_vexpand(True)
         self.inputs_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_inputs.set_child(self.inputs_box)
         for inp in self.inputs:
@@ -63,6 +64,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
             self.inputs_box.append(input_model.widget)
 
         self.frame_scenes = Gtk.Frame(label="Scenes")
+        self.frame_scenes.set_vexpand(True)
         self.scenes_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.frame_scenes.set_child(self.scenes_box)
 

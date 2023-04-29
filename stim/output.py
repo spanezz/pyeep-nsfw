@@ -128,6 +128,24 @@ class OutputModel(GtkComponent):
                 page_size=0)
         self.power.connect("value_changed", self.on_power)
 
+        self.power_min = Gtk.Adjustment(
+                value=0,
+                lower=0,
+                upper=100,
+                step_increment=5,
+                page_increment=10,
+                page_size=0)
+        self.power_min.connect("value_changed", self.on_power_min)
+
+        self.power_max = Gtk.Adjustment(
+                value=100,
+                lower=0,
+                upper=100,
+                step_increment=5,
+                page_increment=10,
+                page_size=0)
+        self.power_max.connect("value_changed", self.on_power_max)
+
         self.manual = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-manual",
                 parameter_type=None,
@@ -145,6 +163,20 @@ class OutputModel(GtkComponent):
         """
         val = round(adj.get_value())
         self.send(SetPower(output=self.output, power=val / 100.0))
+
+    @check_hub
+    def on_power_min(self, adj):
+        val = round(adj.get_value())
+        self.power.set_lower(val)
+        if (power := round(self.power.get_value())) < val:
+            self.power.set_value(power)
+
+    @check_hub
+    def on_power_max(self, adj):
+        val = round(adj.get_value())
+        self.power.set_upper(val)
+        if (power := round(self.power.get_value())) > val:
+            self.power.set_value(power)
 
     @check_hub
     def on_manual_power(self, scale, scroll, value):
@@ -167,17 +199,13 @@ class OutputModel(GtkComponent):
         if new_state is False:
             self.set_value(self.last_value)
 
-    def build(self) -> Gtk.Box:
-        w = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        w.set_hexpand(True)
+    def build(self) -> Gtk.Grid:
+        grid = Gtk.Grid()
 
         label_name = Gtk.Label(label=self.output.description)
         label_name.wrap = True
         label_name.set_halign(Gtk.Align.START)
-        w.append(label_name)
-
-        buttons = Gtk.Box()
-        w.append(buttons)
+        grid.attach(label_name, 0, 0, 3, 1)
 
         active = Gtk.CheckButton(label="Active")
         active.set_action_name("app." + self.active.get_name())
@@ -186,17 +214,18 @@ class OutputModel(GtkComponent):
         #         GLib.Variant.new_string(self.name))
         # active.set_detailed_action_name(detailed_name)
         # active.set_action_target_value(GLib.Variant.new_string(self.name))
-        buttons.append(active)
+        grid.attach(active, 0, 1, 1, 1)
 
         manual = Gtk.ToggleButton(label="Manual")
         manual.set_action_name("app." + self.manual.get_name())
-        buttons.append(manual)
+        grid.attach(manual, 2, 1, 1, 1)
 
         power = Gtk.Scale(
                 orientation=Gtk.Orientation.HORIZONTAL,
                 adjustment=self.power)
         power.set_digits(2)
         power.set_draw_value(False)
+        power.set_hexpand(True)
         power.connect("change-value", self.on_manual_power)
         for mark in (25, 50, 75):
             power.add_mark(
@@ -204,9 +233,19 @@ class OutputModel(GtkComponent):
                 position=Gtk.PositionType.BOTTOM,
                 markup=None
             )
-        w.append(power)
+        grid.attach(power, 0, 2, 3, 1)
 
-        return w
+        power_min = Gtk.SpinButton()
+        power_min.set_adjustment(self.power_min)
+        grid.attach(power_min, 0, 3, 1, 1)
+
+        grid.attach(Gtk.Label(label="to"), 1, 3, 1, 1)
+
+        power_max = Gtk.SpinButton()
+        power_max.set_adjustment(self.power_max)
+        grid.attach(power_max, 2, 3, 1, 1)
+
+        return grid
 
     @check_hub
     def is_active(self) -> bool:
@@ -250,6 +289,7 @@ class OutputsModel(GtkComponent):
 
     def build(self) -> Gtk.Frame:
         w = Gtk.Frame(label="Outputs")
+        w.set_vexpand(True)
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         w.set_child(box)
         return w
