@@ -117,9 +117,31 @@ class CNCControlPanel(EvdevInput):
                             self.send(CncCommand(command=val))
 
 
+class PageTurner(EvdevInput):
+    KEY_MAP = {
+        evdev.ecodes.KEY_UP: "REDO",
+        evdev.ecodes.KEY_DOWN: "STOP",
+        evdev.ecodes.KEY_LEFT: "REDO",
+        evdev.ecodes.KEY_RIGHT: "STOP",
+    }
+
+    @property
+    def description(self) -> str:
+        return f"Page Turner {self.device.name}"
+
+    async def on_evdev(self, ev: evdev.InputEvent):
+        if ev.type == evdev.ecodes.EV_KEY:
+            if (val := self.KEY_MAP.get(ev.code)):
+                match val:
+                    case _:
+                        if self.active:
+                            self.send(CncCommand(command=val))
+
+
 class DeviceManager(pyeep.aio.AIOComponent):
     DEVICE_MAP: dict[str, Type[Input]] = {
         "usb-04d9_1203-event-kbd": CNCControlPanel,
+        "bluetooth-40:28:c6:3f:39:91:1b-kbd": PageTurner,
     }
 
     def __init__(self, **kwargs):
