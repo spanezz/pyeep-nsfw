@@ -42,7 +42,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         # TODO: also remove on remove_component
         self.inputs.append(input)
         if (inputs_box := getattr(self, "inputs_box", None)):
-            input_model = self.add_component(inputs.InputModel, input=input)
+            input_model = self.add_component(input.get_model(), input=input)
             inputs_box.append(input_model.widget)
 
     def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:

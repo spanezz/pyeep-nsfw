@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from pyeep.app import Message
+from typing import Type
+
 import pyeep.aio
+from pyeep.app import Message
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
 
@@ -25,6 +27,9 @@ class Input(pyeep.app.Component):
     @property
     def description(self) -> str:
         return self.name
+
+    def get_model(self) -> Type["InputModel"]:
+        return InputModel
 
     def is_active(self) -> bool:
         raise NotImplementedError(f"{self.__class__.__name__}._is_active not implemented")
@@ -52,16 +57,15 @@ class InputModel(GtkComponent):
         self.send(InputSetActive(input=self.input, value=new_state))
 
     def build(self) -> Gtk.Box:
-        w = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        w.set_hexpand(True)
+        grid = Gtk.Grid()
 
         label_name = Gtk.Label(label=self.input.description)
         label_name.wrap = True
         label_name.set_halign(Gtk.Align.START)
-        w.append(label_name)
+        grid.attach(label_name, 0, 0, 1, 1)
 
         active = Gtk.CheckButton(label="Active")
         active.set_action_name("app." + self.active.get_name())
-        w.append(active)
+        grid.attach(active, 0, 1, 1, 1)
 
-        return w
+        return grid
