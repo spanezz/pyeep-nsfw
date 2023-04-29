@@ -54,6 +54,10 @@ class CNCControlPanel(EvdevInput):
         evdev.ecodes.KEY_PAGEUP: "+Z",
     }
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.active = True
+
     @property
     def description(self) -> str:
         return f"CNC {self.device.name}"
@@ -68,6 +72,8 @@ class CNCControlPanel(EvdevInput):
         if val == "EMERGENCY":
             self.send(EmergencyStop())
             return
+        if not self.active:
+            return
         self.mode(val)
 
     def mode_default(self, value: str):
@@ -81,6 +87,10 @@ class PageTurner(EvdevInput):
         evdev.ecodes.KEY_LEFT: "CYCLE START",
         evdev.ecodes.KEY_RIGHT: "STOP",
     }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.active = True
 
     @property
     def description(self) -> str:

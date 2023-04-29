@@ -314,7 +314,8 @@ class OutputModel(GtkComponent):
                 self.set_power(0)
                 self.set_paused(True)
             case Pause():
-                self.set_paused(True)
+                if self.is_active:
+                    self.set_paused(True)
             case Resume():
                 if self.is_active:
                     self.set_paused(False)
