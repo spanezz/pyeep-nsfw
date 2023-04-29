@@ -3,7 +3,7 @@ from __future__ import annotations
 from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib, Gtk
 
-from .. import output, cnc
+from .. import output, keyboards
 from .base import Scene, register
 
 
@@ -97,7 +97,7 @@ class Eagerness(Scene):
         if not self.is_active():
             return
         match msg:
-            case cnc.CncCommand():
+            case keyboards.CncCommand():
                 match msg.command:
                     case "STOP":
                         self.stop()

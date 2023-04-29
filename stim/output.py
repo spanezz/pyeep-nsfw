@@ -6,7 +6,7 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
 
-from . import cnc
+from . import keyboards
 from .messages import EmergencyStop
 
 log = logging.getLogger(__name__)
@@ -288,7 +288,7 @@ class OutputsModel(GtkComponent):
                         OutputModel, output=msg.output)  # active_action=self.active_action)
                 self.output_models.append(output_model)
                 self.widget.get_child().append(output_model.widget)
-            # case cnc.CncCommand():
+            # case keyboards.CncCommand():
             #     match msg.command:
             #         case "+A":
             #             self.activate_next()

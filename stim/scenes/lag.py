@@ -5,7 +5,7 @@ import functools
 from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib, Gtk
 
-from .. import output, cnc
+from .. import output, keyboards
 from .base import Scene, register
 
 
@@ -44,7 +44,7 @@ class Lag(Scene):
         self.lag.set_value(self.lag.get_value() + 1)
 
     @check_hub
-    def _process_cnc_command(self, msg: cnc.CncCommand):
+    def _process_cnc_command(self, msg: keyboards.CncCommand):
         if not self.is_active:
             return False
         match msg.command:
@@ -69,7 +69,7 @@ class Lag(Scene):
             return
         print("LAG", msg)
         match msg:
-            case cnc.CncCommand():
+            case keyboards.CncCommand():
                 lag = self.lag.get_value()
                 if lag == 0:
                     self._process_cnc_command(msg)
