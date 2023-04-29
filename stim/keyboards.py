@@ -8,16 +8,7 @@ from pyeep.app import Message
 from .messages import EmergencyStop
 
 
-class CNCCommand(Message):
-    def __init__(self, *, command: str, **kwargs):
-        super().__init__(**kwargs)
-        self.command = command
-
-    def __str__(self):
-        return super().__str__() + f"(command={self.command})"
-
-
-class TurnerCommand(Message):
+class Shortcut(Message):
     def __init__(self, *, command: str, **kwargs):
         super().__init__(**kwargs)
         self.command = command
@@ -80,7 +71,7 @@ class CNCControlPanel(EvdevInput):
         self.mode(val)
 
     def mode_default(self, value: str):
-        self.send(CNCCommand(command=value))
+        self.send(Shortcut(command=value))
 
 
 class PageTurner(EvdevInput):
@@ -107,4 +98,4 @@ class PageTurner(EvdevInput):
         self.mode(val)
 
     def mode_default(self, value: str):
-        self.send(TurnerCommand(command=value))
+        self.send(Shortcut(command=value))

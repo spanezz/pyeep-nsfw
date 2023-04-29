@@ -303,24 +303,33 @@ class OutputModel(GtkComponent):
 
         return grid
 
+    @property
     @check_hub
     def is_active(self) -> bool:
         return self.active.get_state().get_boolean()
 
     def receive(self, msg: Message):
         match msg:
-            case EmergencyStop() | Pause():
+            case EmergencyStop():
+                self.set_power(0)
+                self.set_paused(True)
+            case Pause():
                 self.set_paused(True)
             case Resume():
-                self.set_paused(False)
+                if self.is_active:
+                    self.set_paused(False)
             case Increment():
-                self.adjust_power(2)
+                if self.is_active:
+                    self.adjust_power(2)
             case Decrement():
-                self.adjust_power(-2)
+                if self.is_active:
+                    self.adjust_power(-2)
             case SetActivePower():
-                self.set_power(msg.power)
+                if self.is_active:
+                    self.set_power(msg.power)
             case IncreaseActivePower():
-                self.adjust_power(msg.amount)
+                if self.is_active:
+                    self.adjust_power(msg.amount)
 
 
 class OutputsModel(GtkComponent):
