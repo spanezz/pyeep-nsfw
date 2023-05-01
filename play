@@ -47,7 +47,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def setup_logging(self):
         super().setup_logging()
         if self.args.debug:
-            logging.getLogger("bleak.backends.bluezdbus.manager").setLevel(logging.INFO)
+            for name in ("bleak.backends.bluezdbus.manager",
+                         "bleak.backends.bluezdbus.client",
+                         "websockets.client",
+                         "buttplug_client.websocket_connector"):
+                logging.getLogger(name).setLevel(logging.INFO)
 
     def _add_input_ui(self, input: pyeep.inputs.Input):
         input_controller = self.add_component(input.get_input_controller(), input=input)
