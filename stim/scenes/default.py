@@ -3,7 +3,7 @@ from __future__ import annotations
 from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib
 
-from .. import keyboards, messages, output
+from .. import keyboards, messages, output, animation
 from .base import Scene, register
 from ..muse2 import HeadShaken
 from ..types import Color
@@ -35,7 +35,7 @@ class KeyboardShortcutMixin:
                 self.send(messages.Decrement(axis=3))
             case "PULSE":
                 self.send(output.SetActiveColor(
-                    color=output.ColorPulse(color=Color(1, 0, 0))))
+                    color=animation.ColorPulse(color=Color(1, 0, 0))))
 
 
 @register
