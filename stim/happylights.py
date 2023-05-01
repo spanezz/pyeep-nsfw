@@ -61,11 +61,11 @@ class HappyLights(Output, pyeep.aio.AIOComponent):
                 match (msg := await self.next_message()):
                     case Shutdown():
                         break
-                    case SetPower():
-                        if msg.output == self:
-                            cmd = self.cmd_white(int(round(msg.power * 255)))
-                            self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                            await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+                    # case SetPower():
+                    #     if msg.output == self:
+                    #         cmd = self.cmd_white(int(round(msg.power * 255)))
+                    #         self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+                    #         await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
                     case SetColor():
                         if msg.output == self:
                             cmd = self.cmd_color(
