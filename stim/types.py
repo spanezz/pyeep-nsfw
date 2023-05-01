@@ -17,6 +17,24 @@ class Color(NamedTuple):
             f"{int(round(self.blue * 255)):02x}"
         )
 
+    @staticmethod
+    def _clip(val: float) -> float:
+        """
+        Clip a value between 0 to 1 inclusive
+        """
+        if val < 0:
+            return 0
+        if val > 1:
+            return 1
+        return val
+
+    def __add__(self, color: Color):
+        return Color(
+            self._clip(self.red + color.red),
+            self._clip(self.green + color.green),
+            self._clip(self.blue + color.blue),
+        )
+
     def as_rgba(self) -> Gdk.RGBA:
         color = Gdk.RGBA()
         color.red = self.red

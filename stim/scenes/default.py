@@ -33,6 +33,9 @@ class KeyboardShortcutMixin:
                 self.send(messages.Increment(axis=3))
             case "-A":
                 self.send(messages.Decrement(axis=3))
+            case "PULSE":
+                self.send(output.SetActiveColor(
+                    color=output.ColorPulse(color=Color(1, 0, 0))))
 
 
 @register
