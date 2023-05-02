@@ -86,10 +86,10 @@ class Default(KeyboardShortcutMixin, Scene):
                             color = Color(value, 0, 0)
                             # self.send(output.SetActiveColor(color=color))
                             self.send(output.SetActiveColor(
-                                color=output.ColorPulse(color=color)))
+                                color=animation.ColorPulse(color=color)))
                         case "y":
                             # Yes
                             color = Color(0, value, 0)
                             # self.send(output.SetActiveColor(color=color)
                             self.send(output.SetActiveColor(
-                                color=output.ColorPulse(color=color)))
+                                color=animation.ColorPulse(color=color)))
