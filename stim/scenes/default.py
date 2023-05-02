@@ -38,6 +38,12 @@ class KeyboardShortcutMixin:
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
                 self.send(output.SetActiveColor(
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
+            case "TAP" | "SWIPE LEFT" | "SWIPE RIGHT" | "SWIPE UP" | "SWIPE DOWN" | "VOLUME UP" | "VOLUME DOWN":
+                # Temporary thing to hook something into the scroll ring events
+                self.send(output.IncreaseActivePower(
+                    amount=animation.PowerPulse(power=0.3, duration=0.5)))
+                self.send(output.SetActiveColor(
+                    color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
 
 
 @register
