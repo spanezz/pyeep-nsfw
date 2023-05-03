@@ -380,7 +380,7 @@ class OutputController(GtkComponent):
                     self.adjust_power(-2)
             case SetActivePower():
                 if self.is_active:
-                    self.set_power(msg.power)
+                    self.set_power(round(msg.power * 100.0))
             case IncreaseActivePower():
                 if self.is_active:
                     match msg.amount:

@@ -97,7 +97,7 @@ class HeadPosition(Scene):
                             self.logger.warning("Unknown mode %r", self.mode)
                             power = 0
 
-                    self.send(output.SetActivePower(power=power * 100))
+                    self.send(output.SetActivePower(power=power))
 
 
 @register

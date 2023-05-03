@@ -113,7 +113,7 @@ class JSBondage(Scene):
         if movement > threshold:
             power = numpy.clip((movement - threshold) / cap, 0, 1)
             print(f"EEK! {movement:.5f} {power}")
-            self.send(output.SetActivePower(power=power * 100))
+            self.send(output.SetActivePower(power=power))
         else:
             print(f"OK {movement:.5f}")
             self.send(output.SetActivePower(power=0))
