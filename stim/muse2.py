@@ -44,6 +44,7 @@ class HeadPosition(Input, LSLComponent):
         self.active = False
 
     @pyeep.aio.export
+    @property
     def is_active(self) -> bool:
         return self.active
 
@@ -128,6 +129,7 @@ class HeadMovement(Input, LSLComponent):
         self.active = False
 
     @pyeep.aio.export
+    @property
     def is_active(self) -> bool:
         return self.active
 

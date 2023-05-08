@@ -33,6 +33,7 @@ class Joystick(Input, pyeep.pygame.PygameComponent):
         self.active = False
 
     @pyeep.aio.export
+    @property
     def is_active(self) -> bool:
         return self.active
 

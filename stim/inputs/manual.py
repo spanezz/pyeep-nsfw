@@ -14,6 +14,10 @@ class Manual(Input, GtkComponent):
         super().__init__(**kwargs)
         self.active = True
 
+    @property
+    def is_active(self) -> bool:
+        return self.active
+
     def build(self) -> None:
         return None
 
