@@ -28,6 +28,7 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
             disconnected_callback=self._on_disconnect,
         )
         self.connect_task: asyncio.Task | None = None
+        self.task_group = asyncio.TaskGroup()
 
     def _on_disconnect(self, client: bleak.BleakClient):
         self.receive(BluetoothDisconnect())
@@ -49,18 +50,33 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
         self.logger.info("connected")
         self.connect_task = None
 
-    async def run(self):
-        async with asyncio.TaskGroup() as tg:
-            self.connect_task = tg.create_task(self._connect())
+    async def run_start(self):
+        self.connect_task = asyncio.create_task(self._connect())
 
+    async def run_end(self):
+        if self.connect_task is not None:
+            self.connect_task.cancel()
+            await self.connect_task
+            self.connect_task = None
+
+    async def run_message(self):
+        pass
+
+    async def run(self):
+        await self.run_start()
+        try:
             while True:
-                match await self.next_message():
+                match (msg := await self.next_message()):
                     case Shutdown():
                         break
                     case BluetoothDisconnect():
                         self.logger.warning("device disconnected")
                         if self.connect_task is None:
-                            self.connect_task = tg.create_task(self._connect())
+                            self.connect_task = self.task_group.create_task(self._connect())
+                    case _:
+                        await self.run_message(msg)
+        finally:
+            await self.run_end()
 
 
 class Bluetooth(pyeep.aio.AIOComponent):

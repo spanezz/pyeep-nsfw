@@ -4,29 +4,28 @@ import asyncio
 import logging
 from typing import Type
 
-import bleak
+from pyeep.app import Shutdown, Message
 
-import pyeep.aio
-from pyeep.app import Shutdown
-
+from . import bluetooth
 from .output import (ColoredOutputController, Output, OutputController,
-                     SetColor, SetPower)
+                     SetColor, NewOutput)
 
 log = logging.getLogger(__name__)
 
 COMMAND_CHARACTERISTIC = '0000ffd9-0000-1000-8000-00805f9b34fb'
 
 
-class HappyLights(Output, pyeep.aio.AIOComponent):
-    def __init__(self, address: str, **kwargs):
+class HappyLights(Output, bluetooth.BluetoothComponent):
+    def __init__(self, **kwargs):
         kwargs.setdefault("rate", 32)
         super().__init__(**kwargs)
-        self.address = address
-        self.client: bleak.BleakClient | None = None
         self.red: int = 0
         self.green: int = 0
         self.blue: int = 0
         self.update_event = asyncio.Event()
+        # TODO: remove this, remove the need of NewOutput, catch new outputs
+        # being added directly in App
+        self.hub.app.send(NewOutput(output=self))
 
     def get_output_controller(self) -> Type["OutputController"]:
         return ColoredOutputController
@@ -50,28 +49,19 @@ class HappyLights(Output, pyeep.aio.AIOComponent):
     async def update(self):
         self.update_event.set()
 
-    async def run(self):
-        # device = await bleak.BleakScanner.find_device_by_address(self.address)
-        # if device is None:
-        #     self.logger.error("%s: happy ligths not found", self.address)
-        # async with bleak.BleakClient(device) as client:
-
-        async with bleak.BleakClient(self.address) as client:
-            while True:
-                match (msg := await self.next_message()):
-                    case Shutdown():
-                        break
-                    # case SetPower():
-                    #     if msg.output == self:
-                    #         cmd = self.cmd_white(int(round(msg.power * 255)))
-                    #         self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                    #         await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
-                    case SetColor():
-                        if msg.output == self:
-                            cmd = self.cmd_color(
-                                 int(round(msg.color[0] * 255)),
-                                 int(round(msg.color[1] * 255)),
-                                 int(round(msg.color[2] * 255)),
-                            )
-                            self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                            await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+    async def run_message(self, msg: Message):
+        match msg:
+            # case SetPower():
+            #     if msg.output == self:
+            #         cmd = self.cmd_white(int(round(msg.power * 255)))
+            #         self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+            #         await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+            case SetColor():
+                if msg.output == self:
+                    cmd = self.cmd_color(
+                         int(round(msg.color[0] * 255)),
+                         int(round(msg.color[1] * 255)),
+                         int(round(msg.color[2] * 255)),
+                    )
+                    self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+                    await self.client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)

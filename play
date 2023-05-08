@@ -35,6 +35,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(stim.inputs.manual.Manual)
         self.add_component(stim.bluetooth.Bluetooth, devices={
             "CD:E3:36:F6:BB:74": stim.bluetooth.BluetoothComponent,
+            "21:04:99:10:35:05": happylights.HappyLights,
         })
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
@@ -46,8 +47,6 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         })
         null_output = self.add_component(NullOutput, name="null_output")
         self.send(NewOutput(output=null_output))
-        lights = self.add_component(happylights.HappyLights, address="21:04:99:10:35:05")
-        self.send(NewOutput(output=lights))
 
     def setup_logging(self):
         super().setup_logging()
