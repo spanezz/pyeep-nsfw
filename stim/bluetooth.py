@@ -30,6 +30,12 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
         self.connect_task: asyncio.Task | None = None
         self.task_group = asyncio.TaskGroup()
 
+    async def on_connect(self):
+        """
+        Hook called when the device connects
+        """
+        pass
+
     def _on_disconnect(self, client: bleak.BleakClient):
         self.receive(BluetoothDisconnect())
 
@@ -38,7 +44,7 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
         Connect to the device, waiting for it to come back in range if not
         reachable
         """
-        while True:
+        while not self.client.is_connected:
             self.logger.info("(re)connecting device")
             try:
                 await self.client.connect()
@@ -47,6 +53,7 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
             else:
                 break
             await asyncio.sleep(0.3)
+        await self.on_connect()
         self.logger.info("connected")
         self.connect_task = None
 

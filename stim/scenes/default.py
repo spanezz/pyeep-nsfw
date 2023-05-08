@@ -3,7 +3,7 @@ from __future__ import annotations
 from pyeep.app import check_hub, Message
 from pyeep.gtk import GLib
 
-from .. import keyboards, messages, output, animation
+from .. import keyboards, messages, output, animation, heartbeat
 from .base import Scene, register
 from ..muse2 import HeadShaken
 from ..types import Color
@@ -106,3 +106,9 @@ class Default(KeyboardShortcutMixin, Scene):
                             # self.send(output.SetActiveColor(color=color)
                             self.send(output.SetActiveColor(
                                 color=animation.ColorPulse(color=color)))
+            case heartbeat.HeartBeat():
+                if self.is_active:
+                    self.send(output.SetActiveColor(
+                        color=animation.ColorHeartPulse(
+                            color=Color(0.5, 0, 0),
+                            duration=60 / msg.sample.rate)))

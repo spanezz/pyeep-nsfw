@@ -61,6 +61,32 @@ class ColorPulse(ColorAnimation):
         yield Color(0, 0, 0)
 
 
+class ColorHeartPulse(ColorAnimation):
+    def __init__(self, *, color=Color, duration: float = 0.2, **kwargs):
+        super().__init__(**kwargs)
+        self.color = color
+        self.duration = duration
+
+    def __str__(self):
+        return f"ColorPulse(color={self.color}, duration={self.duration})"
+
+    def values(self, rate: int) -> Generator[Color]:
+        # See https://www.nhlbi.nih.gov/health/heart/heart-beats
+        frame_count = math.floor(self.duration * rate)
+        atrial_frames = round(frame_count / 3)
+        ventricular_frames = frame_count - atrial_frames
+
+        for frame in range(atrial_frames):
+            envelope = 0.8 * (atrial_frames - frame) / atrial_frames
+            yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
+
+        for frame in range(ventricular_frames):
+            envelope = (ventricular_frames - frame) / ventricular_frames
+            yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
+
+        yield Color(0, 0, 0)
+
+
 class Animator(Generic[T]):
     def __init__(self, name: str, rate: int, on_value: Callable[[T], None]):
         self.name = name

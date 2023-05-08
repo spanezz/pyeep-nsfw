@@ -14,10 +14,11 @@ import pyeep.gtk
 import pyeep.inputs
 import pyeep.pygame
 import stim.bluetooth
+import stim.heartbeat
+import stim.inputs.manual
 import stim.output
 from pyeep.gtk import Gio, GLib, Gtk
-from stim import joystick, keyboards, scenes, happylights
-import stim.inputs.manual
+from stim import happylights, joystick, keyboards, scenes
 from stim.buttplug import ButtplugClient, ScanAction
 from stim.muse2 import HeadMovement, HeadPosition
 from stim.output import NewOutput, NullOutput, OutputsModel
@@ -35,7 +36,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(stim.inputs.manual.Manual)
         self.add_component(stim.bluetooth.Bluetooth, devices={
-            "CD:E3:36:F6:BB:74": stim.bluetooth.BluetoothComponent,
+            "CD:E3:36:F6:BB:74": stim.heartbeat.HeartRateMonitor,
             "21:04:99:10:35:05": happylights.HappyLights,
         })
         self.add_component(HeadPosition)
