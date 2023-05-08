@@ -13,6 +13,7 @@ import pyeep.evdev
 import pyeep.gtk
 import pyeep.inputs
 import pyeep.pygame
+import stim.bluetooth
 from pyeep.gtk import Gio, GLib, Gtk
 from stim import joystick, keyboards, scenes, happylights
 import stim.inputs.manual
@@ -32,6 +33,9 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
 
         self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(stim.inputs.manual.Manual)
+        self.add_component(stim.bluetooth.Bluetooth, devices={
+            "CD:E3:36:F6:BB:74": stim.bluetooth.BluetoothComponent,
+        })
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
