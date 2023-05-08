@@ -4,11 +4,10 @@ import asyncio
 import logging
 from typing import Type
 
-from pyeep.app import Shutdown, Message
+from pyeep.app import Message
 
 from . import bluetooth
-from .output import (ColoredOutputController, Output, OutputController,
-                     SetColor, NewOutput)
+from .output import ColoredOutputController, Output, OutputController, SetColor
 
 log = logging.getLogger(__name__)
 
@@ -23,9 +22,6 @@ class HappyLights(Output, bluetooth.BluetoothComponent):
         self.green: int = 0
         self.blue: int = 0
         self.update_event = asyncio.Event()
-        # TODO: remove this, remove the need of NewOutput, catch new outputs
-        # being added directly in App
-        self.hub.app.send(NewOutput(output=self))
 
     def get_output_controller(self) -> Type["OutputController"]:
         return ColoredOutputController

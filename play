@@ -14,6 +14,7 @@ import pyeep.gtk
 import pyeep.inputs
 import pyeep.pygame
 import stim.bluetooth
+import stim.output
 from pyeep.gtk import Gio, GLib, Gtk
 from stim import joystick, keyboards, scenes, happylights
 import stim.inputs.manual
@@ -45,8 +46,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
             "bluetooth-40:28:c6:3f:39:91:1b-kbd": keyboards.PageTurner,
             "bluetooth-22c:28:c6:3f:39:91:1b": keyboards.RingRemote,
         })
-        null_output = self.add_component(NullOutput, name="null_output")
-        self.send(NewOutput(output=null_output))
+        self.add_component(NullOutput, name="null_output")
 
     def setup_logging(self):
         super().setup_logging()
@@ -67,10 +67,17 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         if hasattr(self, "inputs_box"):
             self._add_input_ui(input)
 
+    def _add_output(self, output: stim.output.Output):
+        # Notify of the new output
+        self.send(stim.output.NewOutput(output=output))
+
     def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
         component = super().add_component(component_cls, **kwargs)
-        if isinstance(component, pyeep.inputs.Input):
-            GLib.idle_add(self._add_input, component)
+        match component:
+            case pyeep.inputs.Input():
+                GLib.idle_add(self._add_input, component)
+            case stim.output.Output():
+                GLib.idle_add(self._add_output, component)
         return component
 
     def build_main_window(self):

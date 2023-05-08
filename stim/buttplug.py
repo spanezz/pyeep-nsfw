@@ -7,7 +7,7 @@ import pyeep.aio
 from pyeep.app import Message, Shutdown, Component
 from pyeep.gtk import Gio, GLib
 
-from .output import NewOutput, Output, SetPower
+from .output import Output, SetPower
 
 log = logging.getLogger(__name__)
 
@@ -57,8 +57,7 @@ class ButtplugClient(pyeep.aio.AIOComponent):
         name = f"bp_dev{dev.index}"
 
         for a in dev.actuators:
-            actuator = self.hub.app.add_component(Actuator, name=f"{name}_act{a.index}", actuator=a)
-            self.send(NewOutput(output=actuator))
+            self.hub.app.add_component(Actuator, name=f"{name}_act{a.index}", actuator=a)
 
         # for a in dev.linear_actuators:
         #     print(f"* Linear actuator {a.description} {a.__class__.__name__}")
