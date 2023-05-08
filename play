@@ -17,13 +17,34 @@ import stim.bluetooth
 import stim.heartbeat
 import stim.inputs.manual
 import stim.output
+from pyeep.app import Component
 from pyeep.gtk import Gio, GLib, Gtk
 from stim import happylights, joystick, keyboards, scenes
-from stim.buttplug import ButtplugClient, ScanAction
+import stim.buttplug
 from stim.muse2 import HeadMovement, HeadPosition
-from stim.output import NewOutput, NullOutput, OutputsModel
+from stim.output import NullOutput, OutputsModel
 
 log = logging.getLogger(__name__)
+
+
+class ScanAction(Component):
+    HUB = "gtk"
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("name", "device_scan")
+        super().__init__(**kwargs)
+        self.action = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-"),
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        self.action.connect("activate", self.on_activate)
+        self.hub.app.gtk_app.add_action(self.action)
+
+    def on_activate(self, action, parameter):
+        new_state = not self.action.get_state().get_boolean()
+        self.action.set_state(GLib.Variant.new_boolean(new_state))
+        self.send(stim.buttplug.ScanRequest(scan=new_state))
+        self.send(stim.bluetooth.ScanRequest())
 
 
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
@@ -33,12 +54,12 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.outputs = self.add_component(OutputsModel)
         self.inputs: list[pyeep.inputs.Input] = []
 
-        self.add_component(ButtplugClient, client_name=self.title, iface=args.iface)
+        self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=args.iface)
         self.add_component(stim.inputs.manual.Manual)
-        self.add_component(stim.bluetooth.Bluetooth, devices={
-            "CD:E3:36:F6:BB:74": stim.heartbeat.HeartRateMonitor,
-            "21:04:99:10:35:05": happylights.HappyLights,
-        })
+        self.add_component(stim.bluetooth.Bluetooth, devices=[
+            stim.bluetooth.Device("CD:E3:36:F6:BB:74", stim.heartbeat.HeartRateMonitor, ("0000180d-",)),
+            stim.bluetooth.Device("21:04:99:10:35:05", happylights.HappyLights),
+        ])
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
@@ -114,7 +135,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(ScanAction)
 
         devices_menu = Gio.Menu()
-        devices_menu.append("Device scan", "app.buttplug-scan")
+        devices_menu.append("Device scan", "app.device-scan")
 
         menu = pyeep.gtk.Gio.Menu()
         menu.append_submenu("Devices", devices_menu)

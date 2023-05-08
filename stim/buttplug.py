@@ -103,22 +103,3 @@ class ButtplugClient(pyeep.aio.AIOComponent):
             if scanning:
                 await self.client.stop_scanning()
             await self.client.disconnect()
-
-
-class ScanAction(Component):
-    HUB = "gtk"
-
-    def __init__(self, **kwargs):
-        kwargs.setdefault("name", "buttplug_scan")
-        super().__init__(**kwargs)
-        self.action = Gio.SimpleAction.new_stateful(
-                name=self.name.replace("_", "-"),
-                parameter_type=None,
-                state=GLib.Variant.new_boolean(False))
-        self.action.connect("activate", self.on_activate)
-        self.hub.app.gtk_app.add_action(self.action)
-
-    def on_activate(self, action, parameter):
-        new_state = not self.action.get_state().get_boolean()
-        self.action.set_state(GLib.Variant.new_boolean(new_state))
-        self.send(ScanRequest(scan=new_state))
