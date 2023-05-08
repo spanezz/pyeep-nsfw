@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Type
+from typing import NamedTuple, Sequence, Type
 
 import bleak
 import bleak.assigned_numbers
@@ -10,8 +10,17 @@ import bleak.assigned_numbers
 import pyeep.aio
 from pyeep.app import Message, Shutdown
 
-
 re_mangle = re.compile(r"[^\w]+")
+
+
+class Device(NamedTuple):
+    address: str
+    component_cls: Type["BluetoothComponent"]
+    service_uuid: tuple[str] = ()
+
+
+class ScanRequest(Message):
+    pass
 
 
 class BluetoothDisconnect(Message):
@@ -59,14 +68,21 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
         self.logger.info("connected")
         self.connect_task = None
 
+    async def connect(self):
+        if self.connect_task is None:
+            self.connect_task = asyncio.create_task(self._connect())
+
     async def run_start(self):
-        self.connect_task = asyncio.create_task(self._connect())
+        await self.connect()
 
     async def run_end(self):
         if self.connect_task is not None:
             self.connect_task.cancel()
             await self.connect_task
             self.connect_task = None
+        # else:
+        #     if self.client.is_connected:
+        #         await self.client.disconnect()
 
     async def run_message(self):
         pass
@@ -80,8 +96,7 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
                         break
                     case BluetoothDisconnect():
                         self.logger.warning("device disconnected")
-                        if self.connect_task is None:
-                            self.connect_task = self.task_group.create_task(self._connect())
+                        self.connect()
                     case _:
                         await self.run_message(msg)
         finally:
@@ -89,10 +104,10 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
 
 
 class Bluetooth(pyeep.aio.AIOComponent):
-    def __init__(self, devices: dict[str, Type[BluetoothComponent]], **kwargs):
+    def __init__(self, devices: Sequence[Device], **kwargs):
         super().__init__(**kwargs)
         # Map device MAC addresses to Component classes to use for them
-        self.devices = devices
+        self.devices = {d.address: d for d in devices}
         # Cache of already insantiated components
         self.components: dict[str, BluetoothComponent] = {}
         self.scanner = bleak.BleakScanner(
@@ -107,39 +122,65 @@ class Bluetooth(pyeep.aio.AIOComponent):
             #     ]
             # }
         )
-        self.stop_event = asyncio.Event()
+        self.scan_task: asyncio.Task | None = None
 
     def _scanner_event(
             self,
             device: bleak.backends.device.BLEDevice,
             advertising_data: bleak.backends.scanner.AdvertisementData):
-        if (component_cls := self.devices.get(device.address)) is None:
+        # print("DEVICE", device.address, device.name)
+        # print("EVENT", repr(device), repr(advertising_data))
+        if (devinfo := self.devices.get(device.address)) is None:
             return
 
         # Already discovered
         if device.address in self.components:
             return
 
+        # Filter by service UUID
+        if devinfo.service_uuid:
+            # print("LOOK for", devinfo.service_uuid, "IN", advertising_data.service_uuids)
+            for val in devinfo.service_uuid:
+                for uuid in advertising_data.service_uuids:
+                    if uuid.startswith(val):
+                        break
+                else:
+                    self.logger.warning(
+                            "device %s %s service uuids %r do not match %r",
+                            device.address, device.name,
+                            advertising_data.service_uuids,
+                            devinfo.service_uuid)
+                    return
+
         self.logger.info("found device %s %s %s", device.address, device.name, advertising_data.rssi)
 
         self.components[device.address] = self.hub.app.add_component(
-                component_cls, device=device)
+                devinfo.component_cls, device=device)
 
-    async def _scan(self):
-        # TODO: allow to turn scanning on/off
+    async def _scan(self, duration: float = 2.0):
+        self.logger.info("started scanning")
         await self.scanner.start()
-        await self.stop_event.wait()
+        await asyncio.sleep(duration)
         await self.scanner.stop()
+        self.scan_task = None
+        self.logger.info("stopped scanning")
+
+    async def scan(self, duration: float = 2.0):
+        if self.scan_task is None:
+            self.scan_task = asyncio.create_task(self._scan(duration=duration))
 
     async def run(self):
-        async with asyncio.TaskGroup() as tg:
-            scanner = tg.create_task(self._scan())
+        await self.scan()
 
-            try:
-                while True:
-                    match await self.next_message():
-                        case Shutdown():
-                            break
-            finally:
-                self.stop_event.set()
-                scanner.cancel()
+        try:
+            while True:
+                match await self.next_message():
+                    case Shutdown():
+                        break
+                    case ScanRequest():
+                        self.scan()
+        finally:
+            if self.scan_task is not None:
+                self.scan_task.cancel()
+                await self.scan_task
+                self.scan_task = None
