@@ -49,7 +49,9 @@ class BluetoothComponent(pyeep.aio.AIOComponent):
             try:
                 await self.client.connect()
             except bleak.exc.BleakError as e:
-                print(repr(e))
+                self.logger.warning("Cannot connect: %s", e)
+            except TimeoutError as e:
+                self.logger.warning("Connect timeout: %s", e)
             else:
                 break
             await asyncio.sleep(0.3)
@@ -118,8 +120,8 @@ class Bluetooth(pyeep.aio.AIOComponent):
         if device.address in self.components:
             return
 
-        # print("DEVICE", device.address, device.name, device.rssi)
-        # print("EVENT", repr(device), repr(advertising_data))
+        self.logger.info("found device %s %s %s", device.address, device.name, advertising_data.rssi)
+
         self.components[device.address] = self.hub.app.add_component(
                 component_cls, device=device)
 
