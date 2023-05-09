@@ -320,22 +320,22 @@ class OutputController(pyeep.outputs.base.OutputController):
                 self.set_power(0)
                 self.set_paused(True)
             case Pause():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     self.set_paused(True)
             case Resume():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     self.set_paused(False)
             case Increment():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     self.adjust_power(2)
             case Decrement():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     self.adjust_power(-2)
             case SetGroupPower():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     self.set_power(round(msg.power * 100.0))
             case IncreaseGroupPower():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     match msg.amount:
                         case float():
                             self.adjust_power(msg.amount)
@@ -354,7 +354,7 @@ class ColoredOutputController(OutputController):
     def receive(self, msg: Message):
         match msg:
             case SetGroupColor():
-                if self.group.get_value() == msg.group:
+                if self.in_group(msg.group):
                     match msg.color:
                         case Color():
                             self.set_color(msg.color)
