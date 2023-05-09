@@ -7,7 +7,7 @@ from pyeep.gtk import GLib, Gtk
 from pyeep.types import Color
 
 from .. import animation, output
-from ..muse2 import HeadMoved, HeadShaken
+from ..muse2 import HeadMoved, HeadShaken, HeadTurn
 from .base import SingleGroupScene, register
 
 
@@ -174,3 +174,23 @@ class Consent(SingleGroupScene):
                             self.send(output.SetGroupColor(
                                 group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))
+
+
+@register
+class ColorDance(SingleGroupScene):
+    TITLE = "Color dance"
+
+    @check_hub
+    def receive(self, msg: Message):
+        match msg:
+            case HeadTurn():
+                if self.is_active:
+                    max_dps = 30.0
+                    color = Color(
+                        numpy.clip(msg.x / max_dps, 0, 1),
+                        numpy.clip(msg.y / max_dps, 0, 1),
+                        numpy.clip(msg.z / max_dps, 0, 1),
+                    )
+                    self.send(output.SetGroupColor(
+                        group=self.get_group(),
+                        color=animation.ColorPulse(color=color)))

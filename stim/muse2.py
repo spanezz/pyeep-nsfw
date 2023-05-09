@@ -263,7 +263,7 @@ class GyroAxis:
                 self.calibration_path.write_text(json.dumps({"bias": self.bias}))
             self.window.append(sample - self.bias)
 
-    def value(self) -> tuple[float, float]:
+    def fft_value(self) -> tuple[float, float]:
         """
         Return frequency and power for the frequency band with the highest
         power, computed on the samples in the window
@@ -277,10 +277,20 @@ class GyroAxis:
         else:
             return 0, 0
 
+    def total_value(self) -> float:
+        """
+        Return the angular velocity along this axis
+        """
+        # TODO: use a filter instead of an average
+        if len(self.window) == self.window_len:
+            return numpy.mean(self.window)
+        else:
+            return 0
 
-class ModeHeadMovement(ModeBase):
+
+class ModeHeadGestures(ModeBase):
     """
-    Head movement
+    Head gestures
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -298,7 +308,7 @@ class ModeHeadMovement(ModeBase):
 
         selected = None
         for axis in (self.x_axis, self.y_axis, self.z_axis):
-            freq, power = axis.value()
+            freq, power = axis.fft_value()
             if selected is None or selected[2] < power:
                 selected = (axis.name, freq, power)
 
@@ -308,6 +318,36 @@ class ModeHeadMovement(ModeBase):
             )
 
 
+class ModeHeadTurn(ModeBase):
+    """
+    Head turn
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.x_axis = GyroAxis("x")
+        self.y_axis = GyroAxis("y")
+        self.z_axis = GyroAxis("z")
+
+    def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
+        for sample in data[0, :]:
+            self.x_axis.add(sample)
+        for sample in data[1, :]:
+            self.y_axis.add(sample)
+        for sample in data[2, :]:
+            self.z_axis.add(sample)
+
+        values = []
+        for axis in (self.x_axis, self.y_axis, self.z_axis):
+            values.append(axis.total_value())
+
+        self.muse2.send(
+            HeadTurn(
+                x=self.x_axis.total_value(),
+                y=self.y_axis.total_value(),
+                z=self.z_axis.total_value())
+        )
+
+
 class Muse2(Input, bluetooth.BluetoothComponent):
     """
     Monitor a Bluetooth LE heart rate monitor
@@ -315,7 +355,8 @@ class Muse2(Input, bluetooth.BluetoothComponent):
     MODES = {
         "default": ModeDefault,
         "headpos": ModeHeadPosition,
-        "headmov": ModeHeadMovement,
+        "headgest": ModeHeadGestures,
+        "headturn": ModeHeadTurn,
     }
 
     # This has been tested with a Moofit HW401
@@ -397,6 +438,17 @@ class HeadShaken(Message):
 
     def __str__(self):
         return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
+
+
+class HeadTurn(Message):
+    def __init__(self, *, x: float, y: float, z: float, **kwargs):
+        super().__init__(**kwargs)
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __str__(self):
+        return super().__str__() + f"(x={self.x}, y={self.y}, z={self.z})"
 
 
 class HeadPosition(Input, LSLComponent):
@@ -482,7 +534,7 @@ class HeadMovement(Input, LSLComponent):
 
         selected = None
         for axis in (self.x_axis, self.y_axis, self.z_axis):
-            freq, power = axis.value()
+            freq, power = axis.fft_value()
             if selected is None or selected[2] < power:
                 selected = (axis.name, freq, power)
 
