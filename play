@@ -17,6 +17,7 @@ import pyeep.inputs.manual
 import pyeep.messages
 import pyeep.pygame
 import stim.buttplug
+import stim.muse2
 import stim.output
 from pyeep.app import Component
 from pyeep.gtk import Gio, GLib, Gtk
@@ -57,9 +58,10 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
             pyeep.bluetooth.Device("21:04:99:10:35:05", happylights.HappyLights),
+            pyeep.bluetooth.Device("00:55:DA:B7:DE:A1", stim.muse2.Muse2),
         ])
-        self.add_component(HeadPosition)
-        self.add_component(HeadMovement)
+        # self.add_component(HeadPosition)
+        # self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
         self.add_component(pyeep.inputs.evdev.EvdevDeviceManager, device_map={
             "usb-04d9_1203-event-kbd": pyeep.inputs.keyboards.CNCControlPanel,

@@ -4,7 +4,7 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.messages import EmergencyStop, Resume, Shortcut
 
-from .. import messages, output
+from .. import output
 from .base import SingleGroupScene, register
 from .default import KeyboardShortcutMixin
 
