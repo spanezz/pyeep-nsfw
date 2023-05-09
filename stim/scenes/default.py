@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib
-from pyeep.inputs.heartrate import HeartBeat
 from pyeep.messages import Shortcut
 from pyeep.types import Color
 
@@ -114,10 +113,3 @@ class Default(KeyboardShortcutMixin, Scene):
                             self.send(output.SetGroupColor(
                                 group=1,
                                 color=animation.ColorPulse(color=color)))
-            case HeartBeat():
-                if self.is_active:
-                    self.send(output.SetGroupColor(
-                        group=1,
-                        color=animation.ColorHeartPulse(
-                            color=Color(0.5, 0, 0),
-                            duration=60 / msg.sample.rate)))
