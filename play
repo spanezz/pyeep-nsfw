@@ -9,20 +9,21 @@ from typing import Type
 
 import pyeep.aio
 import pyeep.app
-import pyeep.gtk
-from pyeep.inputs.base import Input
-import pyeep.pygame
 import pyeep.bluetooth
+import pyeep.gtk
 import pyeep.inputs.heartrate
-import pyeep.inputs.manual
 import pyeep.inputs.keyboards
+import pyeep.inputs.manual
+import pyeep.pygame
+import stim.buttplug
 import stim.output
 from pyeep.app import Component
 from pyeep.gtk import Gio, GLib, Gtk
+from pyeep.inputs.base import Input
+from pyeep.outputs.base import NewOutput, Output, OutputsModel
 from stim import happylights, joystick, scenes
-import stim.buttplug
 from stim.muse2 import HeadMovement, HeadPosition
-from stim.output import NullOutput, OutputsModel
+from stim.output import NullOutput
 
 log = logging.getLogger(__name__)
 
@@ -89,16 +90,16 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         if hasattr(self, "inputs_box"):
             self._add_input_ui(input)
 
-    def _add_output(self, output: stim.output.Output):
+    def _add_output(self, output: Output):
         # Notify of the new output
-        self.send(stim.output.NewOutput(output=output))
+        self.send(NewOutput(output=output))
 
     def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
         component = super().add_component(component_cls, **kwargs)
         match component:
             case Input():
                 GLib.idle_add(self._add_input, component)
-            case stim.output.Output():
+            case Output():
                 GLib.idle_add(self._add_output, component)
         return component
 

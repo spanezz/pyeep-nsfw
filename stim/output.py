@@ -5,23 +5,16 @@ from typing import Type
 
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
-from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
+from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.animation import PowerAnimation, ColorAnimation, PowerAnimator, ColorAnimator
+import pyeep.outputs.base
+from pyeep.outputs.base import Output
 
 from pyeep.messages import EmergencyStop
 from .messages import Decrement, Increment, Pause, Resume
 from pyeep.types import Color
 
 log = logging.getLogger(__name__)
-
-
-class NewOutput(Message):
-    def __init__(self, *, output: "Output", **kwargs):
-        super().__init__(**kwargs)
-        self.output = output
-
-    def __str__(self):
-        return super().__str__() + f"({self.output.description})"
 
 
 class SetPower(Message):
@@ -84,27 +77,6 @@ class IncreaseActivePower(Message):
         return super().__str__() + f"(amount={self.amount})"
 
 
-class Output(pyeep.app.Component):
-    """
-    Generic base for output components
-    """
-    def __init__(self, *, rate: int, **kwargs):
-        super().__init__(**kwargs)
-
-        # Rate (changes per second) at which this output can take commands
-        self.rate = rate
-
-    def __str__(self) -> str:
-        return f"Output({self.description})"
-
-    def get_output_controller(self) -> Type["OutputController"]:
-        return OutputController
-
-    @property
-    def description(self) -> str:
-        return self.name
-
-
 class NullOutput(Output, pyeep.aio.AIOComponent):
     """
     Output that does nothing besides tracking the last set power value
@@ -132,11 +104,9 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
                         self.power = msg.power
 
 
-class OutputController(GtkComponent):
-    def __init__(self, *, output: Output, **kwargs):  # active_action: Gio.Action
-        kwargs.setdefault("name", "output_model_" + output.name)
+class OutputController(pyeep.outputs.base.OutputController):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.output = output
 
         self.active = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-active",
@@ -434,26 +404,3 @@ class ColoredOutputController(OutputController):
         grid = super().build()
         grid.attach(self.color, 3, 1, 1, 1)
         return grid
-
-
-class OutputsModel(GtkComponent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.output_models: list[OutputController] = []
-
-    def build(self) -> Gtk.Frame:
-        w = Gtk.Frame(label="Outputs")
-        w.set_vexpand(True)
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        w.set_child(box)
-        return w
-
-    @check_hub
-    def receive(self, msg: Message):
-        match msg:
-            case NewOutput():
-                output_model = self.hub.app.add_component(
-                        msg.output.get_output_controller(),
-                        output=msg.output)
-                self.output_models.append(output_model)
-                self.widget.get_child().append(output_model.widget)
