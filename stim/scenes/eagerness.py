@@ -80,7 +80,7 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
 
     def on_tick(self):
         amount = self.increment.get_value()
-        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=amount))
+        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=amount / 100.0))
         return True
 
     def do_stop(self):

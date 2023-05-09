@@ -262,7 +262,7 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
                 if self.in_group(msg.group):
                     match msg.amount:
                         case float():
-                            self.adjust_power(msg.amount)
+                            self.adjust_power(msg.amount * 100.0)
                         case PowerAnimation():
                             self.power_animator.start(msg.amount)
             case _:

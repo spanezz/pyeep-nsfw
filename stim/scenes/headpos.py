@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from pyeep.app import Message, check_hub
-from pyeep.gtk import Gtk
+from pyeep.gtk import GLib, Gtk
 from pyeep.types import Color
 
 from .. import animation, output
@@ -105,7 +105,24 @@ class Consent(SingleGroupScene):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # TODO: optional decay
+        self.timeout: int | None = None
+
+    @check_hub
+    def start(self):
+        super().start()
+        self.timeout = GLib.timeout_add(500, self._tick)
+
+    @check_hub
+    def pause(self):
+        if self.timeout is not None:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+        super().pause()
+
+    def _tick(self):
+        # Slow decay
+        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-0.005))
+        return True
 
     @check_hub
     def receive(self, msg: Message):
@@ -115,10 +132,10 @@ class Consent(SingleGroupScene):
                     match msg.axis:
                         case "z":
                             # No
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq / 5))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq / 500))
                         case "y":
                             # Yes
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq / 5))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq / 500))
 
                     # Normalized frequency and power
                     # freq: 0..5.5
