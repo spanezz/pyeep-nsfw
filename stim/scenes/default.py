@@ -6,7 +6,6 @@ from pyeep.messages import Pause, Resume, Shortcut
 from pyeep.types import Color
 
 from .. import animation, messages, output
-from ..muse2 import HeadShaken
 from .base import SingleGroupScene, register
 
 
@@ -80,36 +79,3 @@ class Default(KeyboardShortcutMixin, SingleGroupScene):
         match msg:
             case Shortcut():
                 self.handle_keyboard_shortcut(msg.command)
-            case HeadShaken():
-                if self.is_active:
-                    # Normalized frequency and power
-                    # freq: 0..5.5
-                    # power: 50..72
-                    freq = msg.freq / 5.5
-                    if freq < 0:
-                        freq = 0
-                    elif freq > 1:
-                        freq = 1
-
-                    power = (msg.power - 50) / 22
-                    if power < 0:
-                        power = 0
-                    elif power > 1:
-                        power = 1
-
-                    value = 0.1 + max(freq, power) * 0.9
-                    match msg.axis:
-                        case "z":
-                            # No
-                            color = Color(value, 0, 0)
-                            # self.send(output.SetActiveColor(color=color))
-                            self.send(output.SetGroupColor(
-                                group=self.get_group(),
-                                color=animation.ColorPulse(color=color)))
-                        case "y":
-                            # Yes
-                            color = Color(0, value, 0)
-                            # self.send(output.SetActiveColor(color=color)
-                            self.send(output.SetGroupColor(
-                                group=self.get_group(),
-                                color=animation.ColorPulse(color=color)))

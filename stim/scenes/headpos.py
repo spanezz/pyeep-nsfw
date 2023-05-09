@@ -4,8 +4,9 @@ import numpy
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import Gtk
+from pyeep.types import Color
 
-from .. import output
+from .. import animation, output
 from ..muse2 import HeadMoved, HeadShaken
 from .base import SingleGroupScene, register
 
@@ -99,8 +100,8 @@ class HeadPosition(SingleGroupScene):
 
 
 @register
-class HeadYesNo(SingleGroupScene):
-    TITLE = "Head yes/no"
+class Consent(SingleGroupScene):
+    TITLE = "Consent"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -114,7 +115,45 @@ class HeadYesNo(SingleGroupScene):
                     match msg.axis:
                         case "z":
                             # No
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq / 5))
                         case "y":
                             # Yes
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq / 5))
+
+                    # Normalized frequency and power
+                    # freq: 0..5.5
+                    # power: 50..72
+                    freq = msg.freq / 5.5
+                    if freq < 0:
+                        freq = 0
+                    elif freq > 1:
+                        freq = 1
+
+                    power = (msg.power - 50) / 22
+                    if power < 0:
+                        power = 0
+                    elif power > 1:
+                        power = 1
+
+                    value = 0.1 + max(freq, power) * 0.9
+                    match msg.axis:
+                        case "x":
+                            # Meh
+                            color = Color(value/2, value/2, 0)
+                            self.send(output.SetGroupColor(
+                                group=self.get_group(),
+                                color=animation.ColorPulse(color=color)))
+                        case "z":
+                            # No
+                            color = Color(value, 0, 0)
+                            # self.send(output.SetActiveColor(color=color))
+                            self.send(output.SetGroupColor(
+                                group=self.get_group(),
+                                color=animation.ColorPulse(color=color)))
+                        case "y":
+                            # Yes
+                            color = Color(0, value, 0)
+                            # self.send(output.SetActiveColor(color=color)
+                            self.send(output.SetGroupColor(
+                                group=self.get_group(),
+                                color=animation.ColorPulse(color=color)))
