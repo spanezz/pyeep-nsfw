@@ -6,12 +6,12 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.messages import Shortcut, EmergencyStop
 
-from .base import Scene, register
+from .base import SingleGroupScene, register
 from .default import KeyboardShortcutMixin
 
 
 @register
-class Lag(KeyboardShortcutMixin, Scene):
+class Lag(KeyboardShortcutMixin, SingleGroupScene):
     TITLE = "Lag"
     LAG_START = 1.5
 
@@ -23,15 +23,14 @@ class Lag(KeyboardShortcutMixin, Scene):
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
-        grid = Gtk.Grid()
-        expander.set_child(grid)
+        grid = expander.get_child()
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.lag)
         spinbutton.set_digits(1)
-        grid.attach(spinbutton, 0, 0, 1, 1)
+        grid.attach(spinbutton, 0, 1, 1, 1)
 
-        grid.attach(Gtk.Label(label="seconds of lag"), 1, 0, 1, 1)
+        grid.attach(Gtk.Label(label="seconds of lag"), 1, 1, 1, 1)
 
         return expander
 

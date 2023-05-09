@@ -7,11 +7,11 @@ from pyeep.gtk import Gtk
 
 from .. import output
 from ..muse2 import HeadMoved, HeadShaken
-from .base import Scene, register
+from .base import SingleGroupScene, register
 
 
 @register
-class HeadPosition(Scene):
+class HeadPosition(SingleGroupScene):
     TITLE = "Head position"
 
     def __init__(self, **kwargs):
@@ -27,37 +27,35 @@ class HeadPosition(Scene):
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        expander.set_child(box)
+        grid = expander.get_child()
 
         zero_center = Gtk.CheckButton(label="Zero on center")
         zero_center.connect("toggled", self.set_mode, "center_zero")
         zero_center.set_active(True)
-        box.append(zero_center)
+        grid.attach(zero_center, 0, 1, 2, 1)
 
         mid_center_increase_up = Gtk.CheckButton(label="Middle on center, up increases")
         mid_center_increase_up.set_group(zero_center)
         mid_center_increase_up.connect("toggled", self.set_mode, "center_middle_increase_up")
-        box.append(mid_center_increase_up)
+        grid.attach(mid_center_increase_up, 0, 2, 2, 1)
 
         mid_center_increase_down = Gtk.CheckButton(label="Middle on center, down increases")
         mid_center_increase_down.set_group(zero_center)
         mid_center_increase_down.connect("toggled", self.set_mode, "center_middle_increase_down")
-        box.append(mid_center_increase_down)
+        grid.attach(mid_center_increase_down, 0, 3, 2, 1)
 
         max_center = Gtk.CheckButton(label="Max on center")
         max_center.set_group(zero_center)
         max_center.connect("toggled", self.set_mode, "center_max")
-        box.append(max_center)
+        grid.attach(max_center, 0, 4, 2, 1)
 
         control_angle_button = Gtk.SpinButton()
         control_angle_button.set_adjustment(self.control_angle)
-        box.append(control_angle_button)
+        grid.attach(control_angle_button, 0, 5, 2, 1)
 
         center = Gtk.Button.new_with_label("Recenter")
         center.connect("clicked", self.set_center)
-        box.append(center)
+        grid.attach(center, 0, 6, 2, 1)
 
         return expander
 
@@ -97,19 +95,16 @@ class HeadPosition(Scene):
                             self.logger.warning("Unknown mode %r", self.mode)
                             power = 0
 
-                    self.send(output.SetGroupPower(group=1, power=power))
+                    self.send(output.SetGroupPower(group=self.get_group(), power=power))
 
 
 @register
-class HeadYesNo(Scene):
+class HeadYesNo(SingleGroupScene):
     TITLE = "Head yes/no"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # TODO: optional decay
-
-    def build(self) -> Gtk.Expander:
-        return super().build()
 
     @check_hub
     def receive(self, msg: Message):
@@ -119,7 +114,7 @@ class HeadYesNo(Scene):
                     match msg.axis:
                         case "z":
                             # No
-                            self.send(output.IncreaseGroupPower(group=1, amount=-msg.freq))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq))
                         case "y":
                             # Yes
-                            self.send(output.IncreaseGroupPower(group=1, amount=msg.freq))
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq))

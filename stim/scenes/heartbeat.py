@@ -6,11 +6,11 @@ from pyeep.inputs.heartrate import HeartBeat
 from pyeep.types import Color
 
 from .. import animation, output
-from .base import Scene, register
+from .base import SingleGroupScene, register
 
 
 @register
-class Heartbeat(Scene):
+class Heartbeat(SingleGroupScene):
     TITLE = "Heartbeat"
 
     def __init__(self, **kwargs):
@@ -22,15 +22,14 @@ class Heartbeat(Scene):
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
-        grid = Gtk.Grid()
-        expander.set_child(grid)
+        grid = expander.get_child()
 
-        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, 0, 1, 1)
+        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, 1, 1, 1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.atrial_duration_ratio)
         spinbutton.set_digits(1)
-        grid.attach(spinbutton, 1, 0, 1, 1)
+        grid.attach(spinbutton, 1, 1, 1, 1)
 
         return expander
 
@@ -50,7 +49,7 @@ class Heartbeat(Scene):
             return False
 
         self.send(output.SetGroupColor(
-            group=1,
+            group=self.get_group(),
             color=animation.ColorHeartPulse(
                 color=Color(0.5, 0, 0),
                 duration=0.9 * 60 / self.last_rate,

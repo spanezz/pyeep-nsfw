@@ -15,9 +15,9 @@ class KeyboardShortcutMixin:
     def handle_keyboard_shortcut(self, shortcut: str):
         match shortcut:
             case "STOP":
-                self.send(messages.Pause(group=1))
+                self.send(messages.Pause(group=self.get_group()))
             case "CYCLE START":
-                self.send(messages.Resume(group=1))
+                self.send(messages.Resume(group=self.get_group()))
             case "+X":
                 self.send(messages.Increment(group=1))
             case "-X":
@@ -36,31 +36,31 @@ class KeyboardShortcutMixin:
                 self.send(messages.Decrement(group=4))
             case "PULSE":
                 self.send(output.IncreaseGroupPower(
-                    group=1,
+                    group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
                 self.send(output.SetGroupColor(
-                    group=1,
+                    group=self.get_group(),
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
             case "SWIPE UP":
-                self.send(messages.Decrement(group=1))
+                self.send(messages.Decrement(group=self.get_group()))
             case "SWIPE DOWN":
-                self.send(messages.Increment(group=1))
+                self.send(messages.Increment(group=self.get_group()))
             case "SWIPE RIGHT":
-                self.send(messages.Increment(group=1))
-                self.send(messages.Increment(group=1))
+                self.send(messages.Increment(group=self.get_group()))
+                self.send(messages.Increment(group=self.get_group()))
             case "SWIPE LEFT":
-                self.send(messages.Decrement(group=1))
-                self.send(messages.Decrement(group=1))
+                self.send(messages.Decrement(group=self.get_group()))
+                self.send(messages.Decrement(group=self.get_group()))
             case "VOLUME UP":
-                self.send(output.SetGroupPower(group=1, power=1))
+                self.send(output.SetGroupPower(group=self.get_group(), power=1))
             case "VOLUME DOWN":
-                self.send(output.SetGroupPower(group=1, power=0))
+                self.send(output.SetGroupPower(group=self.get_group(), power=0))
             case "TAP":
                 self.send(output.IncreaseGroupPower(
-                    group=1,
+                    group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
                 self.send(output.SetGroupColor(
-                    group=1,
+                    group=self.get_group(),
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
 
 
@@ -104,12 +104,12 @@ class Default(KeyboardShortcutMixin, Scene):
                             color = Color(value, 0, 0)
                             # self.send(output.SetActiveColor(color=color))
                             self.send(output.SetGroupColor(
-                                group=1,
+                                group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))
                         case "y":
                             # Yes
                             color = Color(0, value, 0)
                             # self.send(output.SetActiveColor(color=color)
                             self.send(output.SetGroupColor(
-                                group=1,
+                                group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))

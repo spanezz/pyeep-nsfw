@@ -39,8 +39,6 @@ class Scene(GtkComponent):
         box.append(active)
         box.append(label)
 
-        # self.set_title(self.TITLE)
-        # self.set_default_size(600, 300)
         return expander
 
     def on_active_changed(self, switch, value):
@@ -63,3 +61,32 @@ class Scene(GtkComponent):
     @check_hub
     def pause(self):
         pass
+
+
+class SingleGroupScene(Scene):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Output group
+        self.group = Gtk.Adjustment(
+                value=1,
+                lower=1,
+                upper=99,
+                step_increment=1,
+                page_increment=1,
+                page_size=0)
+
+    def get_group(self) -> int:
+        return self.group.get_value()
+
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = Gtk.Grid()
+        expander.set_child(grid)
+
+        grid.attach(Gtk.Label(label="Output group"), 0, 0, 1, 1)
+
+        group = Gtk.SpinButton(adjustment=self.group, climb_rate=1.0, digits=0)
+        grid.attach(group, 1, 0, 1, 1)
+
+        return expander

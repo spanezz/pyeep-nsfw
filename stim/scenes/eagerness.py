@@ -5,12 +5,12 @@ from pyeep.gtk import GLib, Gtk
 from pyeep.messages import EmergencyStop, Shortcut
 
 from .. import messages, output
-from .base import Scene, register
+from .base import SingleGroupScene, register
 from .default import KeyboardShortcutMixin
 
 
 @register
-class Eagerness(KeyboardShortcutMixin, Scene):
+class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
     TITLE = "Eagerness"
     BPM_START = 6
     INCREMENT_START = 2
@@ -26,22 +26,21 @@ class Eagerness(KeyboardShortcutMixin, Scene):
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
-        grid = Gtk.Grid()
-        expander.set_child(grid)
+        grid = expander.get_child()
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.bpm)
-        grid.attach(spinbutton, 0, 0, 1, 1)
+        grid.attach(spinbutton, 0, 1, 1, 1)
 
-        grid.attach(Gtk.Label(label="times per minute, increase by"), 1, 0, 1, 1)
+        grid.attach(Gtk.Label(label="times per minute, increase by"), 1, 1, 1, 1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.increment)
-        grid.attach(spinbutton, 2, 0, 1, 1)
+        grid.attach(spinbutton, 2, 1, 1, 1)
 
         stop = Gtk.Button(label="Stop!")
         stop.connect("clicked", self.on_stop)
-        grid.attach(stop, 0, 1, 4, 1)
+        grid.attach(stop, 0, 2, 4, 1)
 
         return expander
 
@@ -81,11 +80,11 @@ class Eagerness(KeyboardShortcutMixin, Scene):
 
     def on_tick(self):
         amount = self.increment.get_value()
-        self.send(output.IncreaseGroupPower(group=1, amount=amount))
+        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=amount))
         return True
 
     def do_stop(self):
-        self.send(output.SetGroupPower(group=1, power=0))
+        self.send(output.SetGroupPower(group=self.get_group(), power=0))
         self.do_speed_up()
 
     def do_speed_up(self):
@@ -99,7 +98,7 @@ class Eagerness(KeyboardShortcutMixin, Scene):
         match shortcut:
             case "CYCLE START":
                 self.start()
-                self.send(messages.Resume(group=1))
+                self.send(messages.Resume(group=self.get_group()))
             case "STOP":
                 self.do_stop()
             case "SPEED UP":
@@ -113,7 +112,7 @@ class Eagerness(KeyboardShortcutMixin, Scene):
             case "REDO":
                 self.bpm.set_value(self.BPM_START)
                 self.increment.set_value(self.INCREMENT_START)
-                self.send(output.SetGroupPower(group=1, power=0))
+                self.send(output.SetGroupPower(group=self.get_group(), power=0))
             case _:
                 super().handle_keyboard_shortcut(shortcut)
 
