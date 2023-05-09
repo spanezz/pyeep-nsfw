@@ -1,24 +1,13 @@
 from __future__ import annotations
 
-import logging
+import asyncio
 
 import buttplug
 import pyeep.aio
-from pyeep.app import Message, Shutdown, Component
-from pyeep.gtk import Gio, GLib
+from pyeep.app import Shutdown
+from pyeep.messages import DeviceScanRequest
 
 from .output import Output, SetPower
-
-log = logging.getLogger(__name__)
-
-
-class ScanRequest(Message):
-    def __init__(self, *, scan: bool = True, **kwargs):
-        super().__init__(**kwargs)
-        self.scan = scan
-
-    def __str__(self):
-        return "scan request"
 
 
 class Actuator(Output, pyeep.aio.AIOComponent):
@@ -52,6 +41,7 @@ class ButtplugClient(pyeep.aio.AIOComponent):
         self.client = buttplug.Client(client_name, buttplug.ProtocolSpec.v3)
         self.connector = buttplug.WebsocketConnector(iface, logger=self.logger)
         self.devices_seen: set[buttplug.client.client.Device] = set()
+        self.scan_task: asyncio.Task | None = None
 
     def _new_device(self, dev: buttplug.client.client.Device):
         name = f"bp_dev{dev.index}"
@@ -69,8 +59,19 @@ class ButtplugClient(pyeep.aio.AIOComponent):
         #     value = await s.read()
         #     print(f"* Sensor: {s.description} {s.__class__.__name__}: {value}")
 
+    async def _scan(self, duration: float = 2.0):
+        self.logger.info("started scanning")
+        await self.client.start_scanning()
+        await asyncio.sleep(duration)
+        await self.client.stop_scanning()
+        self.scan_task = None
+        self.logger.info("stopped scanning")
+
+    async def scan(self, duration: float = 2.0):
+        if self.scan_task is None:
+            self.scan_task = asyncio.create_task(self._scan(duration=duration))
+
     async def run(self):
-        scanning = False
         await self.client.connect(self.connector)
         try:
             # Create components for initially known devices
@@ -85,12 +86,8 @@ class ButtplugClient(pyeep.aio.AIOComponent):
                 match msg:
                     case Shutdown():
                         break
-                    case ScanRequest():
-                        if msg.scan:
-                            await self.client.start_scanning()
-                        else:
-                            await self.client.stop_scanning()
-                        scanning = msg.scan
+                    case DeviceScanRequest():
+                        await self.scan(duration=msg.duration)
                     case None:
                         pass
 
@@ -100,6 +97,8 @@ class ButtplugClient(pyeep.aio.AIOComponent):
                         self.devices_seen.add(dev)
                         self._new_device(dev)
         finally:
-            if scanning:
-                await self.client.stop_scanning()
+            if self.scan_task is not None:
+                self.scan_task.cancel()
+                await self.scan_task
+                self.scan_task = None
             await self.client.disconnect()
