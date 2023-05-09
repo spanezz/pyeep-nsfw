@@ -56,11 +56,12 @@ class ColorHeartPulse(ColorAnimation):
     def values(self, rate: int) -> Generator[Color]:
         # See https://www.nhlbi.nih.gov/health/heart/heart-beats
         frame_count = math.floor(self.duration * rate)
-        atrial_frames = round(frame_count / 3)
+        # atrial_frames = round(frame_count / 4)
+        atrial_frames = 0
         ventricular_frames = frame_count - atrial_frames
 
         for frame in range(atrial_frames):
-            envelope = 0.8 * (atrial_frames - frame) / atrial_frames
+            envelope = 0.5 * (atrial_frames - frame) / atrial_frames
             yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
 
         for frame in range(ventricular_frames):
