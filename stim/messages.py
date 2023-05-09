@@ -4,26 +4,36 @@ from pyeep.app import Message
 
 
 class Pause(Message):
-    pass
+    def __init__(self, *, group: int, **kwargs):
+        super().__init__(**kwargs)
+        self.group = group
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(group={self.group})"
 
 
 class Resume(Message):
-    pass
+    def __init__(self, *, group: int, **kwargs):
+        super().__init__(**kwargs)
+        self.group = group
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(group={self.group})"
 
 
 class Increment(Message):
-    def __init__(self, *, axis: int, **kwargs):
+    def __init__(self, *, group: int, **kwargs):
         super().__init__(**kwargs)
-        self.axis = axis
+        self.group = group
 
     def __str__(self) -> str:
-        return super().__str__() + f"(axis={self.axis})"
+        return super().__str__() + f"(group={self.group})"
 
 
 class Decrement(Message):
-    def __init__(self, *, axis: int, **kwargs):
+    def __init__(self, *, group: int, **kwargs):
         super().__init__(**kwargs)
-        self.axis = axis
+        self.group = group
 
     def __str__(self) -> str:
-        return super().__str__() + f"(axis={self.axis})"
+        return super().__str__() + f"(group={self.group})"

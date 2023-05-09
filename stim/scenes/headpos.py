@@ -97,7 +97,7 @@ class HeadPosition(Scene):
                             self.logger.warning("Unknown mode %r", self.mode)
                             power = 0
 
-                    self.send(output.SetActivePower(power=power))
+                    self.send(output.SetGroupPower(group=1, power=power))
 
 
 @register
@@ -119,7 +119,7 @@ class HeadYesNo(Scene):
                     match msg.axis:
                         case "z":
                             # No
-                            self.send(output.IncreaseActivePower(amount=-msg.freq))
+                            self.send(output.IncreaseGroupPower(group=1, amount=-msg.freq))
                         case "y":
                             # Yes
-                            self.send(output.IncreaseActivePower(amount=msg.freq))
+                            self.send(output.IncreaseGroupPower(group=1, amount=msg.freq))

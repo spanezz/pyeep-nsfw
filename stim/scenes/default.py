@@ -16,48 +16,52 @@ class KeyboardShortcutMixin:
     def handle_keyboard_shortcut(self, shortcut: str):
         match shortcut:
             case "STOP":
-                self.send(messages.Pause())
+                self.send(messages.Pause(group=1))
             case "CYCLE START":
-                self.send(messages.Resume())
+                self.send(messages.Resume(group=1))
             case "+X":
-                self.send(messages.Increment(axis=0))
+                self.send(messages.Increment(group=1))
             case "-X":
-                self.send(messages.Decrement(axis=0))
+                self.send(messages.Decrement(group=1))
             case "+Y":
-                self.send(messages.Increment(axis=1))
+                self.send(messages.Increment(group=2))
             case "-Y":
-                self.send(messages.Decrement(axis=1))
+                self.send(messages.Decrement(group=2))
             case "+Z":
-                self.send(messages.Increment(axis=2))
+                self.send(messages.Increment(group=3))
             case "-Z":
-                self.send(messages.Decrement(axis=2))
+                self.send(messages.Decrement(group=3))
             case "+A":
-                self.send(messages.Increment(axis=3))
+                self.send(messages.Increment(group=4))
             case "-A":
-                self.send(messages.Decrement(axis=3))
+                self.send(messages.Decrement(group=4))
             case "PULSE":
-                self.send(output.IncreaseActivePower(
+                self.send(output.IncreaseGroupPower(
+                    group=1,
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
-                self.send(output.SetActiveColor(
+                self.send(output.SetGroupColor(
+                    group=1,
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
             case "SWIPE UP":
-                self.send(messages.Decrement(axis=0))
+                self.send(messages.Decrement(group=1))
             case "SWIPE DOWN":
-                self.send(messages.Increment(axis=0))
+                self.send(messages.Increment(group=1))
             case "SWIPE RIGHT":
-                self.send(messages.Increment(axis=0))
-                self.send(messages.Increment(axis=0))
+                self.send(messages.Increment(group=1))
+                self.send(messages.Increment(group=1))
             case "SWIPE LEFT":
-                self.send(messages.Decrement(axis=0))
-                self.send(messages.Decrement(axis=0))
+                self.send(messages.Decrement(group=1))
+                self.send(messages.Decrement(group=1))
             case "VOLUME UP":
-                self.send(output.SetActivePower(power=1))
+                self.send(output.SetGroupPower(group=1, power=1))
             case "VOLUME DOWN":
-                self.send(output.SetActivePower(power=0))
+                self.send(output.SetGroupPower(group=1, power=0))
             case "TAP":
-                self.send(output.IncreaseActivePower(
+                self.send(output.IncreaseGroupPower(
+                    group=1,
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
-                self.send(output.SetActiveColor(
+                self.send(output.SetGroupColor(
+                    group=1,
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
 
 
@@ -100,17 +104,20 @@ class Default(KeyboardShortcutMixin, Scene):
                             # No
                             color = Color(value, 0, 0)
                             # self.send(output.SetActiveColor(color=color))
-                            self.send(output.SetActiveColor(
+                            self.send(output.SetGroupColor(
+                                group=1,
                                 color=animation.ColorPulse(color=color)))
                         case "y":
                             # Yes
                             color = Color(0, value, 0)
                             # self.send(output.SetActiveColor(color=color)
-                            self.send(output.SetActiveColor(
+                            self.send(output.SetGroupColor(
+                                group=1,
                                 color=animation.ColorPulse(color=color)))
             case HeartBeat():
                 if self.is_active:
-                    self.send(output.SetActiveColor(
+                    self.send(output.SetGroupColor(
+                        group=1,
                         color=animation.ColorHeartPulse(
                             color=Color(0.5, 0, 0),
                             duration=60 / msg.sample.rate)))

@@ -81,12 +81,12 @@ class Eagerness(KeyboardShortcutMixin, Scene):
 
     def on_tick(self):
         amount = self.increment.get_value()
-        self.send(output.IncreaseActivePower(amount=amount))
+        self.send(output.IncreaseGroupPower(group=1, amount=amount))
         return True
 
     def do_stop(self):
-        self.send(output.SetActivePower(power=0))
-        self.speed_up()
+        self.send(output.SetGroupPower(group=1, power=0))
+        self.do_speed_up()
 
     def do_speed_up(self):
         self.bpm.set_value(self.bpm.get_value() * 1.2)
@@ -99,7 +99,7 @@ class Eagerness(KeyboardShortcutMixin, Scene):
         match shortcut:
             case "CYCLE START":
                 self.start()
-                self.send(messages.Resume())
+                self.send(messages.Resume(group=1))
             case "STOP":
                 self.do_stop()
             case "SPEED UP":
@@ -113,7 +113,7 @@ class Eagerness(KeyboardShortcutMixin, Scene):
             case "REDO":
                 self.bpm.set_value(self.BPM_START)
                 self.increment.set_value(self.INCREMENT_START)
-                self.send(output.SetActivePower(power=0))
+                self.send(output.SetGroupPower(group=1, power=0))
             case _:
                 super().handle_keyboard_shortcut(shortcut)
 

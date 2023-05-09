@@ -41,40 +41,43 @@ class SetColor(Message):
         )
 
 
-class SetActivePower(Message):
+class SetGroupPower(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, power: float | PowerAnimation, **kwargs):
+    def __init__(self, *, group: int, power: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
+        self.group = group
         self.power = power
 
     def __str__(self) -> str:
-        return super().__str__() + f"(power={self.power})"
+        return super().__str__() + f"(group={self.group}, power={self.power})"
 
 
-class SetActiveColor(Message):
+class SetGroupColor(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, color: Color | ColorAnimation, **kwargs):
+    def __init__(self, *, group: int, color: Color | ColorAnimation, **kwargs):
         super().__init__(**kwargs)
+        self.group = group
         self.color = color
 
     def __str__(self) -> str:
-        return super().__str__() + f"(color={self.color}"
+        return super().__str__() + f"(group={self.group}, color={self.color}"
 
 
-class IncreaseActivePower(Message):
+class IncreaseGroupPower(Message):
     """
     Increase the power of the active output by a given amount
     """
-    def __init__(self, *, amount: float | PowerAnimation, **kwargs):
+    def __init__(self, *, group: int, amount: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
+        self.group = group
         self.amount = amount
 
     def __str__(self) -> str:
-        return super().__str__() + f"(amount={self.amount})"
+        return super().__str__() + f"(group={self.group}, amount={self.amount})"
 
 
 class NullOutput(Output, pyeep.aio.AIOComponent):
@@ -280,16 +283,7 @@ class OutputController(pyeep.outputs.base.OutputController):
                 self.send(SetPower(output=self.output, power=power))
 
     def build(self) -> Gtk.Grid:
-        grid = Gtk.Grid()
-
-        label_name = Gtk.Label(label=self.output.description)
-        label_name.wrap = True
-        label_name.set_halign(Gtk.Align.START)
-        grid.attach(label_name, 0, 0, 3, 1)
-
-        active = Gtk.CheckButton(label="Active")
-        active.set_action_name("app." + self.active.get_name())
-        grid.attach(active, 0, 1, 1, 1)
+        grid = super().build()
 
         pause = Gtk.ToggleButton(label="Paused")
         pause.set_action_name("app." + self.pause.get_name())
@@ -338,22 +332,22 @@ class OutputController(pyeep.outputs.base.OutputController):
                 self.set_power(0)
                 self.set_paused(True)
             case Pause():
-                if self.is_active:
+                if self.group.get_value() == msg.group:
                     self.set_paused(True)
             case Resume():
-                if self.is_active:
+                if self.group.get_value() == msg.group:
                     self.set_paused(False)
             case Increment():
-                if self.is_active:
+                if self.group.get_value() == msg.group:
                     self.adjust_power(2)
             case Decrement():
-                if self.is_active:
+                if self.group.get_value() == msg.group:
                     self.adjust_power(-2)
-            case SetActivePower():
-                if self.is_active:
+            case SetGroupPower():
+                if self.group.get_value() == msg.group:
                     self.set_power(round(msg.power * 100.0))
-            case IncreaseActivePower():
-                if self.is_active:
+            case IncreaseGroupPower():
+                if self.group.get_value() == msg.group:
                     match msg.amount:
                         case float():
                             self.adjust_power(msg.amount)
@@ -371,8 +365,8 @@ class ColoredOutputController(OutputController):
     @check_hub
     def receive(self, msg: Message):
         match msg:
-            case SetActiveColor():
-                if self.is_active:
+            case SetGroupColor():
+                if self.group.get_value() == msg.group:
                     match msg.color:
                         case Color():
                             self.set_color(msg.color)
