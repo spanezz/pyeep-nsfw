@@ -43,7 +43,7 @@ class SetColor(Message):
 
 class SetGroupPower(Message):
     """
-    Set the power of the active output
+    Set the power of the outputs in the given group
     """
     def __init__(self, *, group: int, power: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
@@ -56,7 +56,7 @@ class SetGroupPower(Message):
 
 class SetGroupColor(Message):
     """
-    Set the power of the active output
+    Set the power of the outputs in the given group
     """
     def __init__(self, *, group: int, color: Color | ColorAnimation, **kwargs):
         super().__init__(**kwargs)
@@ -69,7 +69,7 @@ class SetGroupColor(Message):
 
 class IncreaseGroupPower(Message):
     """
-    Increase the power of the active output by a given amount
+    Increase the power of an output group by a given amount
     """
     def __init__(self, *, group: int, amount: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
@@ -110,13 +110,6 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
 class OutputController(pyeep.outputs.base.OutputController):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        self.active = Gio.SimpleAction.new_stateful(
-                name=self.name.replace("_", "-") + "-active",
-                parameter_type=None,
-                state=GLib.Variant.new_boolean(False))
-        # self.active.connect("activate", self.on_activate)
-        self.hub.app.gtk_app.add_action(self.active)
 
         self.power = Gtk.Adjustment(
                 value=0,
@@ -319,11 +312,6 @@ class OutputController(pyeep.outputs.base.OutputController):
         grid.attach(power_max, 2, 4, 1, 1)
 
         return grid
-
-    @property
-    @check_hub
-    def is_active(self) -> bool:
-        return self.active.get_state().get_boolean()
 
     @check_hub
     def receive(self, msg: Message):
