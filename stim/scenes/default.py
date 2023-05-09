@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib
-from pyeep.messages import Shortcut
+from pyeep.messages import Pause, Resume, Shortcut
 from pyeep.types import Color
 
 from .. import animation, messages, output
 from ..muse2 import HeadShaken
-from .base import Scene, register
+from .base import SingleGroupScene, register
 
 
 class KeyboardShortcutMixin:
@@ -15,9 +15,9 @@ class KeyboardShortcutMixin:
     def handle_keyboard_shortcut(self, shortcut: str):
         match shortcut:
             case "STOP":
-                self.send(messages.Pause(group=self.get_group()))
+                self.send(Pause(group=self.get_group()))
             case "CYCLE START":
-                self.send(messages.Resume(group=self.get_group()))
+                self.send(Resume(group=self.get_group()))
             case "+X":
                 self.send(messages.Increment(group=1))
             case "-X":
@@ -65,7 +65,7 @@ class KeyboardShortcutMixin:
 
 
 @register
-class Default(KeyboardShortcutMixin, Scene):
+class Default(KeyboardShortcutMixin, SingleGroupScene):
     TITLE = "Default"
 
     def __init__(self, **kwargs):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import EmergencyStop, Shortcut
+from pyeep.messages import EmergencyStop, Resume, Shortcut
 
 from .. import messages, output
 from .base import SingleGroupScene, register
@@ -98,7 +98,7 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
         match shortcut:
             case "CYCLE START":
                 self.start()
-                self.send(messages.Resume(group=self.get_group()))
+                self.send(Resume(group=self.get_group()))
             case "STOP":
                 self.do_stop()
             case "SPEED UP":
