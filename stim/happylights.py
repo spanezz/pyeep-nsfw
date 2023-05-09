@@ -7,15 +7,31 @@ from typing import Type
 import pyeep.outputs
 from pyeep import bluetooth
 from pyeep.app import Message
+from pyeep.types import Color
 
-from .output import ColoredOutputController, Output, SetColor
+from .output import ColoredOutputController, ColorOutput
 
 log = logging.getLogger(__name__)
 
 COMMAND_CHARACTERISTIC = '0000ffd9-0000-1000-8000-00805f9b34fb'
 
 
-class HappyLights(Output, bluetooth.BluetoothComponent):
+class SetColor(Message):
+    """
+    Internal use only
+    """
+    def __init__(self, color: Color, **kwargs):
+        super().__init__(**kwargs)
+        self.color = color
+
+    def __str__(self) -> str:
+        return (
+            super().__str__() +
+            f"(red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
+        )
+
+
+class HappyLights(ColorOutput, bluetooth.BluetoothComponent):
     def __init__(self, **kwargs):
         kwargs.setdefault("rate", 32)
         super().__init__(**kwargs)
@@ -43,6 +59,10 @@ class HappyLights(Output, bluetooth.BluetoothComponent):
     def cmd_off() -> bytes:
         return bytes([0xcc, 0x24, 0x33])
 
+    @pyeep.aio.export
+    def set_color(self, color: Color):
+        self.receive(SetColor(color=color))
+
     async def update(self):
         self.update_event.set()
 
@@ -54,11 +74,10 @@ class HappyLights(Output, bluetooth.BluetoothComponent):
             #         self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
             #         await client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
             case SetColor():
-                if msg.output == self:
-                    cmd = self.cmd_color(
-                         int(round(msg.color[0] * 255)),
-                         int(round(msg.color[1] * 255)),
-                         int(round(msg.color[2] * 255)),
-                    )
-                    self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
-                    await self.client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)
+                cmd = self.cmd_color(
+                     int(round(msg.color[0] * 255)),
+                     int(round(msg.color[1] * 255)),
+                     int(round(msg.color[2] * 255)),
+                )
+                self.logger.debug("HappyLights command: %s", " ".join(f"{c:x}" for c in cmd))
+                await self.client.write_gatt_char(COMMAND_CHARACTERISTIC, cmd)

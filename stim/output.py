@@ -16,28 +16,14 @@ from pyeep.types import Color
 log = logging.getLogger(__name__)
 
 
-class SetPower(Message):
-    def __init__(self, *, output: "Output", power: float, **kwargs):
-        super().__init__(**kwargs)
-        self.output = output
-        self.power = power
-
-    def __str__(self) -> str:
-        return super().__str__() + f"(output={self.output}, power={self.power})"
+class PowerOutput(Output):
+    def set_power(self, power: float):
+        raise NotImplementedError(f"{self.__class__.__name__}.set_power not implemented")
 
 
-class SetColor(Message):
-    def __init__(self, *, output: "Output", color: Color, **kwargs):
-        super().__init__(**kwargs)
-        self.output = output
-        self.color = color
-
-    def __str__(self) -> str:
-        return (
-            super().__str__() +
-            f"(output={self.output.description},"
-            f" red={self.color[0]:.3f}, green={self.color[1]:.3f}, blue={self.color[2]:.3f})"
-        )
+class ColorOutput(Output):
+    def set_color(self, color: Color):
+        raise NotImplementedError(f"{self.__class__.__name__}.set_color not implemented")
 
 
 class SetGroupPower(Message):
@@ -79,7 +65,7 @@ class IncreaseGroupPower(Message):
         return super().__str__() + f"(group={self.group}, amount={self.amount})"
 
 
-class NullOutput(Output, pyeep.aio.AIOComponent):
+class NullOutput(PowerOutput, ColorOutput, pyeep.aio.AIOComponent):
     """
     Output that does nothing besides tracking the last set power value
     """
@@ -87,6 +73,7 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
         kwargs.setdefault("rate", 20)
         super().__init__(**kwargs)
         self.power: float = 0.0
+        self.color: Color = Color()
 
     @property
     def description(self) -> str:
@@ -97,15 +84,20 @@ class NullOutput(Output, pyeep.aio.AIOComponent):
             pass
         return Controller
 
+    @pyeep.aio.export
+    def set_power(self, power: float):
+        self.power = power
+
+    @pyeep.aio.export
+    def set_color(self, color: Color):
+        self.color = color
+
     async def run(self):
         while True:
             msg = await self.next_message()
             match msg:
                 case Shutdown():
                     break
-                case SetPower():
-                    if msg.output == self:
-                        self.power = msg.power
 
 
 class PowerOutputController(pyeep.outputs.base.OutputController):
@@ -151,7 +143,7 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
         """
         val = round(adj.get_value())
         if not self.is_paused:
-            self.send(SetPower(output=self.output, power=val / 100.0))
+            self.output.set_power(val / 100.0)
 
     @check_hub
     def on_power_min(self, adj):
@@ -200,7 +192,7 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
             value += power
             if value > 1:
                 value = 1
-            self.send(SetPower(output=self.output, power=value))
+            self.output.set_power(value)
 
     @check_hub
     def adjust_power(self, delta: int):
@@ -231,10 +223,10 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
             return
 
         if paused:
-            self.send(SetPower(output=self.output, power=0))
+            self.output.set_power(0)
         else:
             power = self.power.get_value() / 100.0
-            self.send(SetPower(output=self.output, power=power))
+            self.output.set_power(power)
 
     @check_hub
     def set_manual(self, manual: bool):
@@ -333,18 +325,16 @@ class ColoredOutputController(pyeep.outputs.base.OutputController):
     def on_color(self, color):
         self.stop_animation()
         rgba = color.get_rgba()
-        self.send(SetColor(
-            output=self.output,
-            color=(rgba.red, rgba.green, rgba.blue)))
+        self.output.set_color(Color(rgba.red, rgba.green, rgba.blue))
 
     def set_color(self, color: Color):
         self.stop_animation()
         self.color.set_rgba(color.as_rgba())
-        self.send(SetColor(output=self.output, color=color))
+        self.output.set_color(color)
 
     def set_animated_color(self, color: Color):
         self.color.set_rgba(color.as_rgba())
-        self.send(SetColor(output=self.output, color=color))
+        self.output.set_color(color)
 
     def build(self) -> Gtk.Grid:
         grid = super().build()

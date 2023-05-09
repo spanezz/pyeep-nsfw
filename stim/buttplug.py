@@ -1,16 +1,30 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Type
 
 import buttplug
 import pyeep.aio
-from pyeep.app import Shutdown
+import pyeep.outputs
+from pyeep.app import Message, Shutdown
 from pyeep.messages import DeviceScanRequest
 
-from .output import Output, SetPower
+from .output import PowerOutput, PowerOutputController
 
 
-class Actuator(Output, pyeep.aio.AIOComponent):
+class SetPower(Message):
+    """
+    Internal use only
+    """
+    def __init__(self, *, power: float, **kwargs):
+        super().__init__(**kwargs)
+        self.power = power
+
+    def __str__(self) -> str:
+        return super().__str__() + f"(power={self.power})"
+
+
+class Actuator(PowerOutput, pyeep.aio.AIOComponent):
     """
     Component driving an actuator
     """
@@ -23,6 +37,13 @@ class Actuator(Output, pyeep.aio.AIOComponent):
     def description(self) -> str:
         return f"{self.actuator._device.name} {self.name}"
 
+    def get_output_controller(self) -> Type["pyeep.outputs.base.OutputController"]:
+        return PowerOutputController
+
+    @pyeep.aio.export
+    def set_power(self, power: float):
+        self.receive(SetPower(power=power))
+
     async def run(self):
         while True:
             msg = await self.next_message()
@@ -30,8 +51,7 @@ class Actuator(Output, pyeep.aio.AIOComponent):
                 case Shutdown():
                     break
                 case SetPower():
-                    if msg.output == self:
-                        await self.actuator.command(msg.power)
+                    await self.actuator.command(msg.power)
 
 
 class ButtplugClient(pyeep.aio.AIOComponent):
