@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pyeep.app import Message, check_hub
-from pyeep.gtk import GLib
+from pyeep.gtk import GLib, Gtk
 from pyeep.inputs.heartrate import HeartBeat
 from pyeep.types import Color
 
@@ -17,6 +17,22 @@ class Heartbeat(Scene):
         super().__init__(**kwargs)
         self.timeout: int | None = None
         self.last_rate: int | None = None
+        self.atrial_duration_ratio = Gtk.Adjustment(
+                lower=0.0, upper=1.0, step_increment=0.1, page_increment=0.2, value=0.2)
+
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = Gtk.Grid()
+        expander.set_child(grid)
+
+        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, 0, 1, 1)
+
+        spinbutton = Gtk.SpinButton()
+        spinbutton.set_adjustment(self.atrial_duration_ratio)
+        spinbutton.set_digits(1)
+        grid.attach(spinbutton, 1, 0, 1, 1)
+
+        return expander
 
     def _check_timeout(self):
         if self.last_rate is None:
@@ -37,7 +53,8 @@ class Heartbeat(Scene):
             group=1,
             color=animation.ColorHeartPulse(
                 color=Color(0.5, 0, 0),
-                duration=0.9 * 60 / self.last_rate)))
+                duration=0.9 * 60 / self.last_rate,
+                atrial_duration_ratio=self.atrial_duration_ratio.get_value())))
 
         self.timeout = GLib.timeout_add(
                 60 / self.last_rate * 1000,

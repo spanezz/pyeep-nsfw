@@ -45,10 +45,11 @@ class ColorPulse(ColorAnimation):
 
 
 class ColorHeartPulse(ColorAnimation):
-    def __init__(self, *, color=Color, duration: float = 0.2, **kwargs):
+    def __init__(self, *, color=Color, duration: float = 0.2, atrial_duration_ratio: float = 0, **kwargs):
         super().__init__(**kwargs)
         self.color = color
         self.duration = duration
+        self.atrial_duration_ratio = atrial_duration_ratio
 
     def __str__(self):
         return f"ColorPulse(color={self.color}, duration={self.duration})"
@@ -56,8 +57,7 @@ class ColorHeartPulse(ColorAnimation):
     def values(self, rate: int) -> Generator[Color]:
         # See https://www.nhlbi.nih.gov/health/heart/heart-beats
         frame_count = math.floor(self.duration * rate)
-        # atrial_frames = round(frame_count / 4)
-        atrial_frames = 0
+        atrial_frames = round(frame_count * self.atrial_duration_ratio)
         ventricular_frames = frame_count - atrial_frames
 
         for frame in range(atrial_frames):
