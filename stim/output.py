@@ -6,10 +6,11 @@ from typing import Type
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
+from pyeep.animation import PowerAnimation, ColorAnimation, PowerAnimator, ColorAnimator
 
-from .messages import Decrement, EmergencyStop, Increment, Pause, Resume
-from .types import Color
-from . import animation
+from pyeep.messages import EmergencyStop
+from .messages import Decrement, Increment, Pause, Resume
+from pyeep.types import Color
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class SetActivePower(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, power: float | animation.PowerAnimation, **kwargs):
+    def __init__(self, *, power: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
         self.power = power
 
@@ -63,7 +64,7 @@ class SetActiveColor(Message):
     """
     Set the power of the active output
     """
-    def __init__(self, *, color: Color | animation.ColorAnimation, **kwargs):
+    def __init__(self, *, color: Color | ColorAnimation, **kwargs):
         super().__init__(**kwargs)
         self.color = color
 
@@ -75,7 +76,7 @@ class IncreaseActivePower(Message):
     """
     Increase the power of the active output by a given amount
     """
-    def __init__(self, *, amount: float | animation.PowerAnimation, **kwargs):
+    def __init__(self, *, amount: float | PowerAnimation, **kwargs):
         super().__init__(**kwargs)
         self.amount = amount
 
@@ -185,7 +186,7 @@ class OutputController(GtkComponent):
         self.manual.connect("change-state", self.on_manual)
         self.hub.app.gtk_app.add_action(self.manual)
 
-        self.power_animator = animation.PowerAnimator(self.name, self.output.rate, self.set_animated_power)
+        self.power_animator = PowerAnimator(self.name, self.output.rate, self.set_animated_power)
 
     # UI handlers
 
@@ -386,7 +387,7 @@ class OutputController(GtkComponent):
                     match msg.amount:
                         case float():
                             self.adjust_power(msg.amount)
-                        case animation.PowerAnimation():
+                        case PowerAnimation():
                             self.power_animator.start(msg.amount)
 
 
@@ -395,7 +396,7 @@ class ColoredOutputController(OutputController):
         super().__init__(**kwargs)
         self.color = Gtk.ColorButton()
         self.color.connect("color-activated", self.on_color)
-        self.color_animator = animation.ColorAnimator(self.name, self.output.rate, self.set_animated_color)
+        self.color_animator = ColorAnimator(self.name, self.output.rate, self.set_animated_color)
 
     @check_hub
     def receive(self, msg: Message):
@@ -405,7 +406,7 @@ class ColoredOutputController(OutputController):
                     match msg.color:
                         case Color():
                             self.set_color(msg.color)
-                        case animation.ColorAnimation():
+                        case ColorAnimation():
                             self.color_animator.start(msg.color)
             case _:
                 super().receive(msg)

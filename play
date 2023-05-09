@@ -9,17 +9,17 @@ from typing import Type
 
 import pyeep.aio
 import pyeep.app
-import pyeep.evdev
 import pyeep.gtk
-import pyeep.inputs
+from pyeep.inputs.base import Input
 import pyeep.pygame
-import stim.bluetooth
-import stim.heartbeat
-import stim.inputs.manual
+import pyeep.bluetooth
+import pyeep.inputs.heartrate
+import pyeep.inputs.manual
+import pyeep.inputs.keyboards
 import stim.output
 from pyeep.app import Component
 from pyeep.gtk import Gio, GLib, Gtk
-from stim import happylights, joystick, keyboards, scenes
+from stim import happylights, joystick, scenes
 import stim.buttplug
 from stim.muse2 import HeadMovement, HeadPosition
 from stim.output import NullOutput, OutputsModel
@@ -52,21 +52,21 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)
         self.outputs = self.add_component(OutputsModel)
-        self.inputs: list[pyeep.inputs.Input] = []
+        self.inputs: list[Input] = []
 
         self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=args.iface)
-        self.add_component(stim.inputs.manual.Manual)
-        self.add_component(stim.bluetooth.Bluetooth, devices=[
-            stim.bluetooth.Device("CD:E3:36:F6:BB:74", stim.heartbeat.HeartRateMonitor, ("0000180d-",)),
-            stim.bluetooth.Device("21:04:99:10:35:05", happylights.HappyLights),
+        self.add_component(pyeep.inputs.manual.Manual)
+        self.add_component(pyeep.bluetooth.Bluetooth, devices=[
+            pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
+            pyeep.bluetooth.Device("21:04:99:10:35:05", happylights.HappyLights),
         ])
         self.add_component(HeadPosition)
         self.add_component(HeadMovement)
         self.add_component(joystick.Joysticks)
-        self.add_component(pyeep.evdev.EvdevDeviceManager, device_map={
-            "usb-04d9_1203-event-kbd": keyboards.CNCControlPanel,
-            "bluetooth-40:28:c6:3f:39:91:1b-kbd": keyboards.PageTurner,
-            "bluetooth-22c:28:c6:3f:39:91:1b": keyboards.RingRemote,
+        self.add_component(pyeep.inputs.evdev.EvdevDeviceManager, device_map={
+            "usb-04d9_1203-event-kbd": pyeep.inputs.keyboards.CNCControlPanel,
+            "bluetooth-40:28:c6:3f:39:91:1b-kbd": pyeep.inputs.keyboards.PageTurner,
+            "bluetooth-22c:28:c6:3f:39:91:1b": pyeep.inputs.keyboards.RingRemote,
         })
         self.add_component(NullOutput, name="null_output")
 
@@ -79,11 +79,11 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
                          "buttplug_client.websocket_connector"):
                 logging.getLogger(name).setLevel(logging.INFO)
 
-    def _add_input_ui(self, input: pyeep.inputs.Input):
+    def _add_input_ui(self, input: Input):
         input_controller = self.add_component(input.get_input_controller(), input=input)
         self.inputs_box.append(input_controller.widget)
 
-    def _add_input(self, input: pyeep.inputs.Input):
+    def _add_input(self, input: Input):
         # TODO: also remove on remove_component
         self.inputs.append(input)
         if hasattr(self, "inputs_box"):
@@ -96,7 +96,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
     def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
         component = super().add_component(component_cls, **kwargs)
         match component:
-            case pyeep.inputs.Input():
+            case Input():
                 GLib.idle_add(self._add_input, component)
             case stim.output.Output():
                 GLib.idle_add(self._add_output, component)

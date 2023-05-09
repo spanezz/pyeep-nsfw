@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
+from pyeep.messages import EmergencyStop, Shortcut
 
-from .. import keyboards, messages, output
+from .. import messages, output
 from .base import Scene, register
 from .default import KeyboardShortcutMixin
 
@@ -121,7 +122,7 @@ class Eagerness(KeyboardShortcutMixin, Scene):
         if not self.is_active:
             return
         match msg:
-            case messages.EmergencyStop():
+            case EmergencyStop():
                 self.pause()
-            case keyboards.Shortcut():
+            case Shortcut():
                 self.handle_keyboard_shortcut(msg.command)

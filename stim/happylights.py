@@ -6,7 +6,7 @@ from typing import Type
 
 from pyeep.app import Message
 
-from . import bluetooth
+from pyeep import bluetooth
 from .output import ColoredOutputController, Output, OutputController, SetColor
 
 log = logging.getLogger(__name__)

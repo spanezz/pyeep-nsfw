@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from pyeep.app import check_hub, Message
+from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib
+from pyeep.inputs.heartrate import HeartBeat
+from pyeep.messages import Shortcut
+from pyeep.types import Color
 
-from .. import keyboards, messages, output, animation, heartbeat
-from .base import Scene, register
+from .. import animation, messages, output
 from ..muse2 import HeadShaken
-from ..types import Color
+from .base import Scene, register
 
 
 class KeyboardShortcutMixin:
@@ -73,7 +75,7 @@ class Default(KeyboardShortcutMixin, Scene):
         if not self.is_active:
             return
         match msg:
-            case keyboards.Shortcut():
+            case Shortcut():
                 self.handle_keyboard_shortcut(msg.command)
             case HeadShaken():
                 if self.is_active:
@@ -106,7 +108,7 @@ class Default(KeyboardShortcutMixin, Scene):
                             # self.send(output.SetActiveColor(color=color)
                             self.send(output.SetActiveColor(
                                 color=animation.ColorPulse(color=color)))
-            case heartbeat.HeartBeat():
+            case HeartBeat():
                 if self.is_active:
                     self.send(output.SetActiveColor(
                         color=animation.ColorHeartPulse(

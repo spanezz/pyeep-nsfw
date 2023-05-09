@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import functools
 
-from pyeep.app import check_hub, Message
+from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
+from pyeep.messages import Shortcut, EmergencyStop
 
-from .. import keyboards, messages
 from .base import Scene, register
 from .default import KeyboardShortcutMixin
 
@@ -61,9 +61,9 @@ class Lag(KeyboardShortcutMixin, Scene):
         if not self.is_active:
             return
         match msg:
-            case messages.EmergencyStop():
+            case EmergencyStop():
                 self.lag.set_value(self.LAG_START)
-            case keyboards.Shortcut():
+            case Shortcut():
                 lag = self.lag.get_value()
                 if lag == 0:
                     self.handle_keyboard_shortcut(msg.command)

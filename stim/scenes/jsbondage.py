@@ -3,7 +3,7 @@ from __future__ import annotations
 import statistics
 import time
 from collections import deque
-from typing import NamedTuple, Iterator
+from typing import NamedTuple
 
 import numpy
 
