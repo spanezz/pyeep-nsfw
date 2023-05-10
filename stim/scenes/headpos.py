@@ -10,6 +10,7 @@ from pyeep.types import Color
 from .. import animation, output
 from ..muse2 import HeadMoved, HeadShaken, HeadTurn
 from .base import SingleGroupScene, register
+from .. import dsp
 
 
 @register
@@ -181,17 +182,37 @@ class Consent(SingleGroupScene):
 class ColorDance(SingleGroupScene):
     TITLE = "Color dance"
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.input_rate = 52
+        self.filter_red = dsp.Butterworth(rate=self.input_rate, cutoff=10)
+        self.filter_green = dsp.Butterworth(rate=self.input_rate, cutoff=10)
+        self.filter_blue = dsp.Butterworth(rate=self.input_rate, cutoff=10)
+
     @check_hub
     def receive(self, msg: Message):
         match msg:
             case HeadTurn():
                 if self.is_active:
-                    max_dps = 30.0
+                    min_dps = 5.0
+                    max_dps = 200.0
+
+                    def norm(val: float) -> float:
+                        return numpy.clip(
+                            (abs(val) - min_dps) / (max_dps - min_dps),
+                            0, 1) ** 2
+
+                    for i in range(msg.frames):
+                        red = self.filter_red(norm(msg.y))
+                        green = self.filter_green(norm(msg.x))
+                        blue = self.filter_blue(norm(msg.z))
+
                     color = Color(
-                        numpy.clip(msg.y / max_dps, 0, 1),
-                        numpy.clip(msg.x / max_dps, 0, 1),
-                        numpy.clip(msg.z / max_dps, 0, 1),
+                        red=red,
+                        green=green,
+                        blue=blue,
                     )
+
                     self.send(SetGroupColor(
                         group=self.get_group(),
                         color=animation.ColorPulse(color=color)))

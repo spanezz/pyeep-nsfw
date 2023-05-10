@@ -29,14 +29,15 @@ class HeadShaken(Message):
 
 
 class HeadTurn(Message):
-    def __init__(self, *, x: float, y: float, z: float, **kwargs):
+    def __init__(self, *, frames: int, x: float, y: float, z: float, **kwargs):
         super().__init__(**kwargs)
+        self.frames = frames
         self.x = x
         self.y = y
         self.z = z
 
     def __str__(self):
-        return super().__str__() + f"(x={self.x}, y={self.y}, z={self.z})"
+        return super().__str__() + f"(frames={self.frames}, x={self.x}, y={self.y}, z={self.z})"
 
 
 class ModeBase:
@@ -97,7 +98,7 @@ class GyroAxisBase:
             self.bias = data["bias"]
 
     def add(self, timestamp: float, sample: float):
-        if self.bias is None and len(self.bias_samples) < 128:
+        if self.bias is None and len(self.bias_samples) < 256:
             self.bias_samples.append(sample)
         else:
             if self.bias is None:
@@ -107,7 +108,7 @@ class GyroAxisBase:
 
     def add_samples(self, timestamps: list[float], samples: numpy.ndarray):
         for ts, sample in zip(timestamps, samples):
-            self.add(ts, sample)
+            self.add(ts, sample - self.bias)
 
 
 class GyroAxisFFT(GyroAxisBase):
@@ -136,25 +137,19 @@ class GyroAxisFFT(GyroAxisBase):
             return 0, 0
 
 
-class GyroAxisMean(GyroAxisBase):
+class GyroAxisLast(GyroAxisBase):
     def __init__(self, name: str):
         super().__init__(name)
-        # sample rate = 52
-        self.window_len = 13
-        self.window: deque[float] = deque(maxlen=self.window_len)
+        self.last: float = 0
 
     def process_sample(self, timestamp: float, sample: float):
-        self.window.append(sample - self.bias)
+        self.last = sample
 
     def value(self) -> float:
         """
         Return the angular velocity along this axis
         """
-        # TODO: use a filter instead of an average
-        if len(self.window) == self.window_len:
-            return numpy.mean(self.window)
-        else:
-            return 0
+        return self.last
 
 
 class ModeHeadGestures(ModeBase):
@@ -190,20 +185,27 @@ class ModeHeadTurn(ModeBase):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.x_axis = GyroAxisMean("x")
-        self.y_axis = GyroAxisMean("y")
-        self.z_axis = GyroAxisMean("z")
+        self.rate = 52
+
+        self.x_axis = GyroAxisLast("x")
+        self.y_axis = GyroAxisLast("y")
+        self.z_axis = GyroAxisLast("z")
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
         self.x_axis.add_samples(timestamps, data[0, :])
         self.y_axis.add_samples(timestamps, data[1, :])
         self.z_axis.add_samples(timestamps, data[2, :])
 
+        x = self.x_axis.value()
+        y = self.y_axis.value()
+        z = self.z_axis.value()
+
         self.muse2.send(
             HeadTurn(
-                x=self.x_axis.value(),
-                y=self.y_axis.value(),
-                z=self.z_axis.value())
+                frames=len(timestamps),
+                x=round(x),
+                y=round(y),
+                z=round(z))
         )
 
 
