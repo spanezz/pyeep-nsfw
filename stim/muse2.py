@@ -16,6 +16,8 @@ from pyeep.app.component import ModeInfo
 from pyeep.inputs.base import Input, InputController, InputSetActive
 from pyeep.inputs.muse2.aio_muse import Muse
 
+from . import dsp
+
 
 class HeadShaken(Message):
     def __init__(self, *, axis: str, freq: float, power: float, **kwargs):
@@ -26,6 +28,17 @@ class HeadShaken(Message):
 
     def __str__(self):
         return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
+
+
+class HeadMoved(Message):
+    def __init__(self, *, frames: int, pitch: float, roll: float, **kwargs):
+        super().__init__(**kwargs)
+        self.frames = frames
+        self.pitch = pitch
+        self.roll = roll
+
+    def __str__(self):
+        return super().__str__() + f"(frames={self.frames}, pitch={self.pitch}, roll={self.roll})"
 
 
 class HeadTurn(Message):
@@ -75,16 +88,25 @@ class ModeHeadPosition(ModeBase):
     """
     Head position
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.filter_pitch = dsp.Butterworth(rate=52, cutoff=15)
+        self.filter_roll = dsp.Butterworth(rate=52, cutoff=15)
+
     def on_acc(self, data: numpy.ndarray, timestamps: list[float]):
-        # TODO: replace with a low-pass filter
-        x = numpy.mean(data[0, :])
-        y = numpy.mean(data[1, :])
-        z = numpy.mean(data[2, :])
+        frames = len(timestamps)
+        for i in range(frames):
+            x = data[0, i]
+            y = data[1, i]
+            z = data[2, i]
 
-        roll = math.atan2(y, z) / math.pi * 180
-        pitch = math.atan2(-x, math.sqrt(y*y + z*z)) / math.pi * 180
+            roll = math.atan2(y, z) / math.pi * 180
+            pitch = math.atan2(-x, math.sqrt(y*y + z*z)) / math.pi * 180
 
-        self.muse2.send(HeadMoved(pitch=pitch, roll=roll))
+            roll = self.filter_roll(roll)
+            pitch = self.filter_pitch(pitch)
+
+        self.muse2.send(HeadMoved(frames=frames, pitch=pitch, roll=roll))
 
 
 class GyroAxisBase:
@@ -276,16 +298,6 @@ class Muse2(Input, bluetooth.BluetoothComponent):
             case InputSetActive():
                 if msg.input == self:
                     self.active = msg.value
-
-
-class HeadMoved(Message):
-    def __init__(self, *, pitch: float, roll: float, **kwargs):
-        super().__init__(**kwargs)
-        self.pitch = pitch
-        self.roll = roll
-
-    def __str__(self):
-        return super().__str__() + f"(pitch={self.pitch}, roll={self.roll})"
 
 
 # Old lsl-based components

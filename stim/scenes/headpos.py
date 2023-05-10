@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import inspect
+from typing import Iterator
+
 import numpy
 
-from pyeep.app import Message, check_hub
+from pyeep.app import Message, check_hub, export
+from pyeep.app.component import ModeMixin, ModeInfo
 from pyeep.gtk import GLib, Gtk
 from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from .. import animation, output
 from ..muse2 import HeadMoved, HeadShaken, HeadTurn
-from .base import SingleGroupScene, register
+from .base import Scene, SingleGroupScene, register
 from .. import dsp
 
 
@@ -178,10 +182,21 @@ class Consent(SingleGroupScene):
                                 color=animation.ColorPulse(color=color)))
 
 
-@register
-class ColorDance(SingleGroupScene):
-    TITLE = "Color dance"
+class ModeBase:
+    """
+    Base class for Muse2 data processing modes
+    """
+    def __init__(self, *, scene: Scene):
+        self.scene = scene
 
+    def on_message(self, msg: Message):
+        pass
+
+
+class Dance(ModeBase):
+    """
+    Pitch/roll
+    """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.input_rate = 52
@@ -189,30 +204,103 @@ class ColorDance(SingleGroupScene):
         self.filter_green = dsp.Butterworth(rate=self.input_rate, cutoff=10)
         self.filter_blue = dsp.Butterworth(rate=self.input_rate, cutoff=10)
 
+    def on_message(self, msg: Message):
+        match msg:
+            case HeadMoved():
+                def norm(val: float, min_angle=0, max_angle=80) -> float:
+                    return ((abs(val) - min_angle) / (max_angle - min_angle)) ** 2
+
+                blue = self.filter_blue(norm(msg.pitch, max_angle=40))
+                green = self.filter_green(norm(msg.roll, max_angle=40))
+                red = self.filter_red(1 - max(blue, green))
+
+                color = Color(
+                    red=numpy.clip(red, 0, 1),
+                    green=numpy.clip(green, 0, 1),
+                    blue=numpy.clip(blue, 0, 1),
+                )
+
+                self.scene.send(SetGroupColor(
+                    group=self.scene.get_group(),
+                    color=color))
+            case HeadTurn():
+                min_dps = 0.0
+                max_dps = 200.0
+
+                def norm(val: float) -> float:
+                    return ((abs(val) - min_dps) / (max_dps - min_dps)) ** 2
+
+                for i in range(msg.frames):
+                    red = self.filter_red(norm(msg.y))
+                    green = self.filter_green(norm(msg.x))
+                    blue = self.filter_blue(norm(msg.z))
+
+                color = Color(
+                    red=numpy.clip(red, 0, 1),
+                    green=numpy.clip(green, 0, 1),
+                    blue=numpy.clip(blue, 0, 1),
+                )
+
+                self.scene.send(SetGroupColor(
+                    group=self.scene.get_group(),
+                    color=color))
+            case _:
+                super().on_message(msg)
+
+
+@register
+class ColorDance(ModeMixin, SingleGroupScene):
+    TITLE = "Color dance"
+
+    MODES = {
+        "default": Dance,
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.modes = Gtk.ListStore(str, str)
+        for info in self.list_modes():
+            self.modes.append([info.name, info.summary])
+
+    @export
+    def set_mode(self, name: str) -> None:
+        """
+        Set the active mode
+        """
+        self.mode = self.MODES[name](scene=self)
+
+    def list_modes(self) -> Iterator[ModeInfo, None]:
+        """
+        List available modes
+        """
+        for name, value in self.MODES.items():
+            yield ModeInfo(name, inspect.getdoc(value))
+
     @check_hub
     def receive(self, msg: Message):
-        match msg:
-            case HeadTurn():
-                if self.is_active:
-                    min_dps = 5.0
-                    max_dps = 200.0
+        if self.is_active:
+            self.mode.on_message(msg)
 
-                    def norm(val: float) -> float:
-                        return numpy.clip(
-                            (abs(val) - min_dps) / (max_dps - min_dps),
-                            0, 1) ** 2
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = expander.get_child()
 
-                    for i in range(msg.frames):
-                        red = self.filter_red(norm(msg.y))
-                        green = self.filter_green(norm(msg.x))
-                        blue = self.filter_blue(norm(msg.z))
+        if len(self.modes) > 1:
+            modes = Gtk.ComboBox(model=self.modes)
+            modes.set_id_column(0)
+            renderer = Gtk.CellRendererText()
+            modes.pack_start(renderer, True)
+            modes.add_attribute(renderer, "text", 1)
+            modes.set_active_id("default")
+            modes.connect("changed", self.on_mode_changed)
+            grid.attach(modes, 0, 1, 2, 1)
 
-                    color = Color(
-                        red=red,
-                        green=green,
-                        blue=blue,
-                    )
+        return expander
 
-                    self.send(SetGroupColor(
-                        group=self.get_group(),
-                        color=animation.ColorPulse(color=color)))
+    def on_mode_changed(self, combo):
+        tree_iter = combo.get_active_iter()
+        if tree_iter is not None:
+            model = combo.get_model()
+            mode = model[tree_iter][0]
+            self.set_mode(mode)
