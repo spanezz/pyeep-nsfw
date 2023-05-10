@@ -4,6 +4,7 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib
 from pyeep.messages import Pause, Resume, Shortcut
 from pyeep.types import Color
+from pyeep.outputs.color import SetGroupColor
 
 from .. import animation, messages, output
 from .base import SingleGroupScene, register
@@ -37,7 +38,7 @@ class KeyboardShortcutMixin:
                 self.send(output.IncreaseGroupPower(
                     group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
-                self.send(output.SetGroupColor(
+                self.send(SetGroupColor(
                     group=self.get_group(),
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
             case "SWIPE UP":
@@ -58,7 +59,7 @@ class KeyboardShortcutMixin:
                 self.send(output.IncreaseGroupPower(
                     group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
-                self.send(output.SetGroupColor(
+                self.send(SetGroupColor(
                     group=self.get_group(),
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
 

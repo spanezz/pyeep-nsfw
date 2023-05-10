@@ -3,9 +3,10 @@ from __future__ import annotations
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.inputs.heartrate import HeartBeat
+from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
-from .. import animation, output
+from .. import animation
 from .base import SingleGroupScene, register
 
 
@@ -48,7 +49,7 @@ class Heartbeat(SingleGroupScene):
         if self.last_rate is None:
             return False
 
-        self.send(output.SetGroupColor(
+        self.send(SetGroupColor(
             group=self.get_group(),
             color=animation.ColorHeartPulse(
                 color=Color(0.5, 0, 0),

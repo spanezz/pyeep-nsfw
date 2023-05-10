@@ -7,9 +7,8 @@ from typing import Type
 import pyeep.outputs
 from pyeep import bluetooth
 from pyeep.app import Message
+from pyeep.outputs.color import ColorOutput, ColorOutputController
 from pyeep.types import Color
-
-from .output import ColoredOutputController, ColorOutput
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class HappyLights(ColorOutput, bluetooth.BluetoothComponent):
         self.update_event = asyncio.Event()
 
     def get_output_controller(self) -> Type["pyeep.outputs.base.OutputController"]:
-        return ColoredOutputController
+        return ColorOutputController
 
     @staticmethod
     def cmd_color(r: int, g: int, b: int) -> bytes:

@@ -4,6 +4,7 @@ import numpy
 
 from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
+from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from .. import animation, output
@@ -157,21 +158,21 @@ class Consent(SingleGroupScene):
                         case "x":
                             # Meh
                             color = Color(value/2, value/2, 0)
-                            self.send(output.SetGroupColor(
+                            self.send(SetGroupColor(
                                 group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))
                         case "z":
                             # No
                             color = Color(value, 0, 0)
                             # self.send(output.SetActiveColor(color=color))
-                            self.send(output.SetGroupColor(
+                            self.send(SetGroupColor(
                                 group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))
                         case "y":
                             # Yes
                             color = Color(0, value, 0)
                             # self.send(output.SetActiveColor(color=color)
-                            self.send(output.SetGroupColor(
+                            self.send(SetGroupColor(
                                 group=self.get_group(),
                                 color=animation.ColorPulse(color=color)))
 
@@ -187,10 +188,10 @@ class ColorDance(SingleGroupScene):
                 if self.is_active:
                     max_dps = 30.0
                     color = Color(
-                        numpy.clip(msg.x / max_dps, 0, 1),
                         numpy.clip(msg.y / max_dps, 0, 1),
+                        numpy.clip(msg.x / max_dps, 0, 1),
                         numpy.clip(msg.z / max_dps, 0, 1),
                     )
-                    self.send(output.SetGroupColor(
+                    self.send(SetGroupColor(
                         group=self.get_group(),
                         color=animation.ColorPulse(color=color)))

@@ -6,8 +6,9 @@ from typing import Type
 import pyeep.aio
 from pyeep.app import Message, Shutdown, check_hub
 from pyeep.gtk import GLib, Gtk
-from pyeep.animation import PowerAnimation, ColorAnimation, PowerAnimator, ColorAnimator
+from pyeep.animation import PowerAnimation, PowerAnimator
 import pyeep.outputs.base
+from pyeep.outputs.color import ColorOutput, ColorOutputController
 from pyeep.outputs.base import Output
 
 from .messages import Decrement, Increment
@@ -21,11 +22,6 @@ class PowerOutput(Output):
         raise NotImplementedError(f"{self.__class__.__name__}.set_power not implemented")
 
 
-class ColorOutput(Output):
-    def set_color(self, color: Color):
-        raise NotImplementedError(f"{self.__class__.__name__}.set_color not implemented")
-
-
 class SetGroupPower(Message):
     """
     Set the power of the outputs in the given group
@@ -37,19 +33,6 @@ class SetGroupPower(Message):
 
     def __str__(self) -> str:
         return super().__str__() + f"(group={self.group}, power={self.power})"
-
-
-class SetGroupColor(Message):
-    """
-    Set the power of the outputs in the given group
-    """
-    def __init__(self, *, group: int, color: Color | ColorAnimation, **kwargs):
-        super().__init__(**kwargs)
-        self.group = group
-        self.color = color
-
-    def __str__(self) -> str:
-        return super().__str__() + f"(group={self.group}, color={self.color}"
 
 
 class IncreaseGroupPower(Message):
@@ -80,7 +63,7 @@ class NullOutput(PowerOutput, ColorOutput, pyeep.aio.AIOComponent):
         return "Null output"
 
     def get_output_controller(self) -> Type["pyeep.outputs.base.OutputController"]:
-        class Controller(PowerOutputController, ColoredOutputController):
+        class Controller(PowerOutputController, ColorOutputController):
             pass
         return Controller
 
@@ -296,47 +279,4 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
         power_max.set_adjustment(self.power_max)
         grid.attach(power_max, 2, 4, 1, 1)
 
-        return grid
-
-
-class ColoredOutputController(pyeep.outputs.base.OutputController):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.color = Gtk.ColorButton()
-        self.color.connect("color-activated", self.on_color)
-        self.color_animator = ColorAnimator(self.name, self.output.rate, self.set_animated_color)
-
-    @check_hub
-    def receive(self, msg: Message):
-        match msg:
-            case SetGroupColor():
-                if self.in_group(msg.group):
-                    match msg.color:
-                        case Color():
-                            self.set_color(msg.color)
-                        case ColorAnimation():
-                            self.color_animator.start(msg.color)
-            case _:
-                super().receive(msg)
-
-    def stop_animation(self):
-        self.color_animator.stop()
-
-    def on_color(self, color):
-        self.stop_animation()
-        rgba = color.get_rgba()
-        self.output.set_color(Color(rgba.red, rgba.green, rgba.blue))
-
-    def set_color(self, color: Color):
-        self.stop_animation()
-        self.color.set_rgba(color.as_rgba())
-        self.output.set_color(color)
-
-    def set_animated_color(self, color: Color):
-        self.color.set_rgba(color.as_rgba())
-        self.output.set_color(color)
-
-    def build(self) -> Gtk.Grid:
-        grid = super().build()
-        grid.attach(self.color, 3, 1, 1, 1)
         return grid
