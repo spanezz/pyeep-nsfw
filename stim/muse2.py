@@ -86,29 +86,37 @@ class ModeHeadPosition(ModeBase):
         self.muse2.send(HeadMoved(pitch=pitch, roll=roll))
 
 
-class GyroAxis:
+class GyroAxisBase:
     def __init__(self, name: str):
         self.name = name
         self.calibration_path = Path(f".cal_gyro_{name}")
-        # sample rate = 52
-        # 2 seconds window
-        self.window_len = 64
-        self.window: deque[float] = deque(maxlen=self.window_len)
-        self.hamming = scipy.signal.windows.hamming(self.window_len, sym=False)
         self.bias_samples: list[float] = []
         self.bias: float | None = None
         if self.calibration_path.exists():
             data = json.loads(self.calibration_path.read_text())
             self.bias = data["bias"]
 
-    def add(self, sample: float):
+    def add(self, timestamp: float, sample: float):
         if self.bias is None and len(self.bias_samples) < 128:
             self.bias_samples.append(sample)
         else:
             if self.bias is None:
                 self.bias = numpy.mean(self.bias_samples)
                 self.calibration_path.write_text(json.dumps({"bias": self.bias}))
-            self.window.append(sample - self.bias)
+            self.process_sample(timestamp, sample)
+
+
+class GyroAxis(GyroAxisBase):
+    def __init__(self, name: str):
+        super().__init__(name)
+        # sample rate = 52
+        # 2 seconds window
+        self.window_len = 64
+        self.window: deque[float] = deque(maxlen=self.window_len)
+        self.hamming = scipy.signal.windows.hamming(self.window_len, sym=False)
+
+    def process_sample(self, timestamp: float, sample: float):
+        self.window.append(sample - self.bias)
 
     def fft_value(self) -> tuple[float, float]:
         """
@@ -146,12 +154,12 @@ class ModeHeadGestures(ModeBase):
         self.z_axis = GyroAxis("z")
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
-        for sample in data[0, :]:
-            self.x_axis.add(sample)
-        for sample in data[1, :]:
-            self.y_axis.add(sample)
-        for sample in data[2, :]:
-            self.z_axis.add(sample)
+        for ts, sample in zip(timestamps, data[0, :]):
+            self.x_axis.add(ts, sample)
+        for ts, sample in zip(timestamps, data[1, :]):
+            self.y_axis.add(ts, sample)
+        for ts, sample in zip(timestamps, data[2, :]):
+            self.z_axis.add(ts, sample)
 
         selected = None
         for axis in (self.x_axis, self.y_axis, self.z_axis):
@@ -176,12 +184,12 @@ class ModeHeadTurn(ModeBase):
         self.z_axis = GyroAxis("z")
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
-        for sample in data[0, :]:
-            self.x_axis.add(sample)
-        for sample in data[1, :]:
-            self.y_axis.add(sample)
-        for sample in data[2, :]:
-            self.z_axis.add(sample)
+        for ts, sample in zip(timestamps, data[0, :]):
+            self.x_axis.add(ts, sample)
+        for ts, sample in zip(timestamps, data[1, :]):
+            self.y_axis.add(ts, sample)
+        for ts, sample in zip(timestamps, data[2, :]):
+            self.z_axis.add(ts, sample)
 
         values = []
         for axis in (self.x_axis, self.y_axis, self.z_axis):
