@@ -10,13 +10,33 @@ from typing import Iterator, Type
 import numpy
 import scipy
 
-import pyeep.aio
 from pyeep import bluetooth
-from pyeep.app import Message, Shutdown
+from pyeep.app import Message
 from pyeep.inputs.base import (Input, InputController, InputSetActive,
                                InputSetMode, ModeInfo)
-from pyeep.lsl import LSLComponent, LSLSamples
 from pyeep.inputs.muse2.aio_muse import Muse
+
+
+class HeadShaken(Message):
+    def __init__(self, *, axis: str, freq: float, power: float, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+        self.freq = freq
+        self.power = power
+
+    def __str__(self):
+        return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
+
+
+class HeadTurn(Message):
+    def __init__(self, *, x: float, y: float, z: float, **kwargs):
+        super().__init__(**kwargs)
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __str__(self):
+        return super().__str__() + f"(x={self.x}, y={self.y}, z={self.z})"
 
 
 class ModeBase:
@@ -256,116 +276,97 @@ class HeadMoved(Message):
         return super().__str__() + f"(pitch={self.pitch}, roll={self.roll})"
 
 
-class HeadShaken(Message):
-    def __init__(self, *, axis: str, freq: float, power: float, **kwargs):
-        super().__init__(**kwargs)
-        self.axis = axis
-        self.freq = freq
-        self.power = power
-
-    def __str__(self):
-        return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
-
-
-class HeadTurn(Message):
-    def __init__(self, *, x: float, y: float, z: float, **kwargs):
-        super().__init__(**kwargs)
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __str__(self):
-        return super().__str__() + f"(x={self.x}, y={self.y}, z={self.z})"
-
-
-class HeadPosition(Input, LSLComponent):
-    def __init__(self, **kwargs):
-        kwargs.setdefault("stream_type", "ACC")
-        kwargs.setdefault("max_samples", 8)
-        super().__init__(**kwargs)
-        self.active = False
-
-    @pyeep.aio.export
-    @property
-    def is_active(self) -> bool:
-        return self.active
-
-    @property
-    def description(self) -> str:
-        return "Head position"
-
-    async def run(self):
-        while True:
-            msg = await self.next_message()
-            match msg:
-                case Shutdown():
-                    break
-                case InputSetActive():
-                    if msg.input == self:
-                        self.active = msg.value
-                case LSLSamples():
-                    if self.active:
-                        await self.process_samples(msg.samples, msg.timestamps)
-
-    async def process_samples(self, samples: list, timestamps: list):
-        data = numpy.array(samples, dtype=float)
-
-        # TODO: replace with a low-pass filter?
-        x = numpy.mean(data[:, 0])
-        y = numpy.mean(data[:, 1])
-        z = numpy.mean(data[:, 2])
-
-        roll = math.atan2(y, z) / math.pi * 180
-        pitch = math.atan2(-x, math.sqrt(y*y + z*z)) / math.pi * 180
-
-        self.send(HeadMoved(pitch=pitch, roll=roll))
-
-
-class HeadMovement(Input, LSLComponent):
-    def __init__(self, **kwargs):
-        kwargs.setdefault("stream_type", "GYRO")
-        kwargs.setdefault("max_samples", 8)
-        super().__init__(**kwargs)
-        self.x_axis = GyroAxis("x")
-        self.y_axis = GyroAxis("y")
-        self.z_axis = GyroAxis("z")
-        self.active = False
-
-    @pyeep.aio.export
-    @property
-    def is_active(self) -> bool:
-        return self.active
-
-    @property
-    def description(self) -> str:
-        return "Head movement"
-
-    async def run(self):
-        while True:
-            msg = await self.next_message()
-            match msg:
-                case Shutdown():
-                    break
-                case InputSetActive():
-                    if msg.input == self:
-                        self.active = msg.value
-                case LSLSamples():
-                    if self.active:
-                        await self.process_samples(msg.samples, msg.timestamps)
-
-    async def process_samples(self, samples: list, timestamps: list):
-        for x, y, z in samples:
-            self.x_axis.add(x)
-            self.y_axis.add(y)
-            self.z_axis.add(z)
-
-        selected = None
-        for axis in (self.x_axis, self.y_axis, self.z_axis):
-            freq, power = axis.fft_value()
-            if selected is None or selected[2] < power:
-                selected = (axis.name, freq, power)
-
-        if selected[2] > 500:
-            self.send(
-                HeadShaken(axis=selected[0], freq=selected[1], power=10*math.log10(selected[2] ** 2))
-            )
+# Old lsl-based components
+# from pyeep.lsl import LSLComponent, LSLSamples
+#
+# class HeadPosition(Input, LSLComponent):
+#     def __init__(self, **kwargs):
+#         kwargs.setdefault("stream_type", "ACC")
+#         kwargs.setdefault("max_samples", 8)
+#         super().__init__(**kwargs)
+#         self.active = False
+#
+#     @pyeep.aio.export
+#     @property
+#     def is_active(self) -> bool:
+#         return self.active
+#
+#     @property
+#     def description(self) -> str:
+#         return "Head position"
+#
+#     async def run(self):
+#         while True:
+#             msg = await self.next_message()
+#             match msg:
+#                 case Shutdown():
+#                     break
+#                 case InputSetActive():
+#                     if msg.input == self:
+#                         self.active = msg.value
+#                 case LSLSamples():
+#                     if self.active:
+#                         await self.process_samples(msg.samples, msg.timestamps)
+#
+#     async def process_samples(self, samples: list, timestamps: list):
+#         data = numpy.array(samples, dtype=float)
+#
+#         # TODO: replace with a low-pass filter?
+#         x = numpy.mean(data[:, 0])
+#         y = numpy.mean(data[:, 1])
+#         z = numpy.mean(data[:, 2])
+#
+#         roll = math.atan2(y, z) / math.pi * 180
+#         pitch = math.atan2(-x, math.sqrt(y*y + z*z)) / math.pi * 180
+#
+#         self.send(HeadMoved(pitch=pitch, roll=roll))
+#
+#
+# class HeadMovement(Input, LSLComponent):
+#     def __init__(self, **kwargs):
+#         kwargs.setdefault("stream_type", "GYRO")
+#         kwargs.setdefault("max_samples", 8)
+#         super().__init__(**kwargs)
+#         self.x_axis = GyroAxis("x")
+#         self.y_axis = GyroAxis("y")
+#         self.z_axis = GyroAxis("z")
+#         self.active = False
+#
+#     @pyeep.aio.export
+#     @property
+#     def is_active(self) -> bool:
+#         return self.active
+#
+#     @property
+#     def description(self) -> str:
+#         return "Head movement"
+#
+#     async def run(self):
+#         while True:
+#             msg = await self.next_message()
+#             match msg:
+#                 case Shutdown():
+#                     break
+#                 case InputSetActive():
+#                     if msg.input == self:
+#                         self.active = msg.value
+#                 case LSLSamples():
+#                     if self.active:
+#                         await self.process_samples(msg.samples, msg.timestamps)
+#
+#     async def process_samples(self, samples: list, timestamps: list):
+#         for x, y, z in samples:
+#             self.x_axis.add(x)
+#             self.y_axis.add(y)
+#             self.z_axis.add(z)
+#
+#         selected = None
+#         for axis in (self.x_axis, self.y_axis, self.z_axis):
+#             freq, power = axis.fft_value()
+#             if selected is None or selected[2] < power:
+#                 selected = (axis.name, freq, power)
+#
+#         if selected[2] > 500:
+#             self.send(
+#                 HeadShaken(axis=selected[0], freq=selected[1], power=10*math.log10(selected[2] ** 2))
+#             )

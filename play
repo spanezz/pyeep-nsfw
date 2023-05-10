@@ -25,7 +25,6 @@ from pyeep.inputs.base import Input
 from pyeep.outputs.base import NewOutput, Output, OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from stim import joystick, scenes
-from stim.muse2 import HeadMovement, HeadPosition
 from stim.output import NullOutput
 
 log = logging.getLogger(__name__)
