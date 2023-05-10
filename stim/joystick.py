@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pyeep.pygame
-from pyeep.app import Message, check_hub
+from pyeep.app import Message, check_hub, export
 from pyeep.pygame import pygame
 
 from pyeep.inputs.base import Input, InputSetActive
@@ -32,7 +32,7 @@ class Joystick(Input, pyeep.pygame.PygameComponent):
         self.joystick = joystick
         self.active = False
 
-    @pyeep.aio.export
+    @export
     @property
     def is_active(self) -> bool:
         return self.active

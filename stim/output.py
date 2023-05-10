@@ -4,7 +4,7 @@ import logging
 from typing import Type
 
 import pyeep.aio
-from pyeep.app import Message, Shutdown, check_hub
+from pyeep.app import Message, Shutdown, check_hub, export
 from pyeep.gtk import GLib, Gtk
 from pyeep.animation import PowerAnimation, PowerAnimator
 import pyeep.outputs.base
@@ -67,11 +67,11 @@ class NullOutput(PowerOutput, ColorOutput, pyeep.aio.AIOComponent):
             pass
         return Controller
 
-    @pyeep.aio.export
+    @export
     def set_power(self, power: float):
         self.power = power
 
-    @pyeep.aio.export
+    @export
     def set_color(self, color: Color):
         self.color = color
 

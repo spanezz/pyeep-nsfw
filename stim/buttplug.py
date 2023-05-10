@@ -6,7 +6,7 @@ from typing import Type
 import buttplug
 import pyeep.aio
 import pyeep.outputs
-from pyeep.app import Message, Shutdown
+from pyeep.app import Message, Shutdown, export
 from pyeep.messages import DeviceScanRequest
 
 from .output import PowerOutput, PowerOutputController
@@ -40,7 +40,7 @@ class Actuator(PowerOutput, pyeep.aio.AIOComponent):
     def get_output_controller(self) -> Type["pyeep.outputs.base.OutputController"]:
         return PowerOutputController
 
-    @pyeep.aio.export
+    @export
     def set_power(self, power: float):
         self.receive(SetPower(power=power))
 

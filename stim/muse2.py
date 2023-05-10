@@ -11,9 +11,9 @@ import numpy
 import scipy
 
 from pyeep import bluetooth
-from pyeep.app import Message
-from pyeep.inputs.base import (Input, InputController, InputSetActive,
-                               InputSetMode, ModeInfo)
+from pyeep.app import Message, export
+from pyeep.app.component import ModeInfo
+from pyeep.inputs.base import Input, InputController, InputSetActive
 from pyeep.inputs.muse2.aio_muse import Muse
 
 
@@ -262,6 +262,7 @@ class Muse2(Input, bluetooth.BluetoothComponent):
         for name, value in self.MODES.items():
             yield ModeInfo(name, inspect.getdoc(value))
 
+    @export
     def set_mode(self, name: str) -> None:
         """
         Set the active mode
@@ -275,9 +276,6 @@ class Muse2(Input, bluetooth.BluetoothComponent):
             case InputSetActive():
                 if msg.input == self:
                     self.active = msg.value
-            case InputSetMode():
-                if msg.input == self:
-                    self.set_mode(msg.mode)
 
 
 class HeadMoved(Message):
