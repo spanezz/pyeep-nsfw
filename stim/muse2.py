@@ -105,12 +105,15 @@ class GyroAxisBase:
                 self.calibration_path.write_text(json.dumps({"bias": self.bias}))
             self.process_sample(timestamp, sample)
 
+    def add_samples(self, timestamps: list[float], samples: numpy.ndarray):
+        for ts, sample in zip(timestamps, samples):
+            self.add(ts, sample)
 
-class GyroAxis(GyroAxisBase):
+
+class GyroAxisFFT(GyroAxisBase):
     def __init__(self, name: str):
         super().__init__(name)
         # sample rate = 52
-        # 2 seconds window
         self.window_len = 64
         self.window: deque[float] = deque(maxlen=self.window_len)
         self.hamming = scipy.signal.windows.hamming(self.window_len, sym=False)
@@ -118,7 +121,7 @@ class GyroAxis(GyroAxisBase):
     def process_sample(self, timestamp: float, sample: float):
         self.window.append(sample - self.bias)
 
-    def fft_value(self) -> tuple[float, float]:
+    def value(self) -> tuple[float, float]:
         """
         Return frequency and power for the frequency band with the highest
         power, computed on the samples in the window
@@ -132,7 +135,18 @@ class GyroAxis(GyroAxisBase):
         else:
             return 0, 0
 
-    def total_value(self) -> float:
+
+class GyroAxisMean(GyroAxisBase):
+    def __init__(self, name: str):
+        super().__init__(name)
+        # sample rate = 52
+        self.window_len = 13
+        self.window: deque[float] = deque(maxlen=self.window_len)
+
+    def process_sample(self, timestamp: float, sample: float):
+        self.window.append(sample - self.bias)
+
+    def value(self) -> float:
         """
         Return the angular velocity along this axis
         """
@@ -149,21 +163,18 @@ class ModeHeadGestures(ModeBase):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.x_axis = GyroAxis("x")
-        self.y_axis = GyroAxis("y")
-        self.z_axis = GyroAxis("z")
+        self.x_axis = GyroAxisFFT("x")
+        self.y_axis = GyroAxisFFT("y")
+        self.z_axis = GyroAxisFFT("z")
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
-        for ts, sample in zip(timestamps, data[0, :]):
-            self.x_axis.add(ts, sample)
-        for ts, sample in zip(timestamps, data[1, :]):
-            self.y_axis.add(ts, sample)
-        for ts, sample in zip(timestamps, data[2, :]):
-            self.z_axis.add(ts, sample)
+        self.x_axis.add_samples(timestamps, data[0, :])
+        self.y_axis.add_samples(timestamps, data[1, :])
+        self.z_axis.add_samples(timestamps, data[2, :])
 
         selected = None
         for axis in (self.x_axis, self.y_axis, self.z_axis):
-            freq, power = axis.fft_value()
+            freq, power = axis.value()
             if selected is None or selected[2] < power:
                 selected = (axis.name, freq, power)
 
@@ -179,27 +190,20 @@ class ModeHeadTurn(ModeBase):
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.x_axis = GyroAxis("x")
-        self.y_axis = GyroAxis("y")
-        self.z_axis = GyroAxis("z")
+        self.x_axis = GyroAxisMean("x")
+        self.y_axis = GyroAxisMean("y")
+        self.z_axis = GyroAxisMean("z")
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
-        for ts, sample in zip(timestamps, data[0, :]):
-            self.x_axis.add(ts, sample)
-        for ts, sample in zip(timestamps, data[1, :]):
-            self.y_axis.add(ts, sample)
-        for ts, sample in zip(timestamps, data[2, :]):
-            self.z_axis.add(ts, sample)
-
-        values = []
-        for axis in (self.x_axis, self.y_axis, self.z_axis):
-            values.append(axis.total_value())
+        self.x_axis.add_samples(timestamps, data[0, :])
+        self.y_axis.add_samples(timestamps, data[1, :])
+        self.z_axis.add_samples(timestamps, data[2, :])
 
         self.muse2.send(
             HeadTurn(
-                x=self.x_axis.total_value(),
-                y=self.y_axis.total_value(),
-                z=self.z_axis.total_value())
+                x=self.x_axis.value(),
+                y=self.y_axis.value(),
+                z=self.z_axis.value())
         )
 
 
