@@ -23,7 +23,8 @@ from pyeep.app import Component
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
 from pyeep.outputs.base import NewOutput, Output, OutputsModel
-from stim import happylights, joystick, scenes
+from pyeep.outputs.happylights import HappyLights
+from stim import joystick, scenes
 from stim.muse2 import HeadMovement, HeadPosition
 from stim.output import NullOutput
 
@@ -57,7 +58,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         self.add_component(pyeep.inputs.manual.Manual)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
-            pyeep.bluetooth.Device("21:04:99:10:35:05", happylights.HappyLights),
+            pyeep.bluetooth.Device("21:04:99:10:35:05", HappyLights),
             pyeep.bluetooth.Device("00:55:DA:B7:DE:A1", stim.muse2.Muse2),
         ])
         # self.add_component(HeadPosition)
