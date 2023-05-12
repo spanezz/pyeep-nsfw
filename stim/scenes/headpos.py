@@ -113,6 +113,9 @@ class Consent(SingleGroupScene):
         super().__init__(**kwargs)
         self.timeout: int | None = None
 
+        self.streak_start: HeadYesNo | None = None
+        self.streak_last: HeadYesNo | None = None
+
         self.instant_no = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-instant_no",
                 parameter_type=None,
@@ -173,6 +176,15 @@ class Consent(SingleGroupScene):
                 if msg.intensity < 0.1:
                     return
 
+                if (self.streak_start is None
+                        or self.streak_start.gesture != msg.gesture
+                        or msg.ts - self.streak_last.ts > 0.3):
+                    self.streak_start = msg
+                    self.streak_last = msg
+
+                in_streak = round(msg.ts - self.streak_start.ts)
+                self.streak_last = msg
+
                 # Time in seconds it takes to reach from min to max at the maximum speed
                 match msg.gesture:
                     case "meh":
@@ -184,7 +196,7 @@ class Consent(SingleGroupScene):
                     case "yes":
                         min_time_to_max = 5
 
-                # print(msg.gesture, f"{msg.intensity:.3f}")
+                # print(msg.gesture, f"{msg.intensity:.3f}", in_streak, self.streak_start.ts, self.streak_last.ts, msg.ts)
 
                 value = msg.intensity / 52 * msg.frames / min_time_to_max
                 if value > 0.001:
@@ -198,6 +210,8 @@ class Consent(SingleGroupScene):
                             self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
                             self._reset_timeout()
                         case "yes":
+                            if in_streak:
+                                value *= in_streak + 1
                             self.send(output.IncreaseGroupPower(group=self.get_group(), amount=value))
                             self._reset_timeout()
 
