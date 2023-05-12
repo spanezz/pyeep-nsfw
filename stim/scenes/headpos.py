@@ -11,8 +11,8 @@ from pyeep.gtk import GLib, Gtk
 from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
-from .. import animation, output
-from ..muse2 import HeadMoved, HeadShaken, HeadTurn
+from .. import output
+from ..muse2 import HeadMoved, HeadYesNo, HeadTurn
 from .base import Scene, SingleGroupScene, register
 from .. import dsp
 
@@ -114,11 +114,6 @@ class Consent(SingleGroupScene):
         self.timeout: int | None = None
 
     @check_hub
-    def start(self):
-        super().start()
-        self.timeout = GLib.timeout_add(500, self._tick)
-
-    @check_hub
     def pause(self):
         if self.timeout is not None:
             GLib.source_remove(self.timeout)
@@ -127,59 +122,43 @@ class Consent(SingleGroupScene):
 
     def _tick(self):
         # Slow decay
-        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-0.005))
+        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-0.02))
         return True
+
+    def _reset_timeout(self):
+        if self.timeout is not None:
+            GLib.source_remove(self.timeout)
+            self.timeout = None
+        self.timeout = GLib.timeout_add(500, self._tick)
 
     @check_hub
     def receive(self, msg: Message):
+        if not self.is_active:
+            return
+
         match msg:
-            case HeadShaken():
-                if self.is_active:
-                    match msg.axis:
-                        case "z":
-                            # No
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-msg.freq / 500))
-                        case "y":
-                            # Yes
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=msg.freq / 500))
+            case HeadYesNo():
+                # Time in seconds it takes to reach from min to max at the maximum speed
+                match msg.gesture:
+                    case "meh":
+                        min_time_to_max = 10
+                    case "no":
+                        min_time_to_max = 2
+                    case "yes":
+                        min_time_to_max = 5
 
-                    # Normalized frequency and power
-                    # freq: 0..5.5
-                    # power: 50..72
-                    freq = msg.freq / 5.5
-                    if freq < 0:
-                        freq = 0
-                    elif freq > 1:
-                        freq = 1
-
-                    power = (msg.power - 50) / 22
-                    if power < 0:
-                        power = 0
-                    elif power > 1:
-                        power = 1
-
-                    value = 0.1 + max(freq, power) * 0.9
-                    match msg.axis:
-                        case "x":
-                            # Meh
-                            color = Color(value/2, value/2, 0)
-                            self.send(SetGroupColor(
-                                group=self.get_group(),
-                                color=animation.ColorPulse(color=color)))
-                        case "z":
-                            # No
-                            color = Color(value, 0, 0)
-                            # self.send(output.SetActiveColor(color=color))
-                            self.send(SetGroupColor(
-                                group=self.get_group(),
-                                color=animation.ColorPulse(color=color)))
-                        case "y":
-                            # Yes
-                            color = Color(0, value, 0)
-                            # self.send(output.SetActiveColor(color=color)
-                            self.send(SetGroupColor(
-                                group=self.get_group(),
-                                color=animation.ColorPulse(color=color)))
+                value = msg.intensity / 52 * msg.frames / min_time_to_max
+                if value > 0.001:
+                    match msg.gesture:
+                        case "meh":
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
+                            self._reset_timeout()
+                        case "no":
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
+                            self._reset_timeout()
+                        case "yes":
+                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=value))
+                            self._reset_timeout()
 
 
 class ModeBase:
@@ -206,6 +185,39 @@ class Dance(ModeBase):
 
     def on_message(self, msg: Message):
         match msg:
+            case HeadYesNo():
+                value = msg.intensity ** 2
+
+                red = 0
+                green = 0
+                blue = 0
+
+                match msg.gesture:
+                    case "meh":
+                        # Meh
+                        red = value
+                        green = value / 3
+                    case "yes":
+                        # Yes
+                        green = value
+                    case "no":
+                        # No
+                        red = value
+
+                red = self.filter_red(red)
+                green = self.filter_green(green)
+                blue = self.filter_blue(blue)
+
+                color = Color(
+                    red=numpy.clip(red, 0, 1),
+                    green=numpy.clip(green, 0, 1),
+                    blue=numpy.clip(blue, 0, 1),
+                )
+
+                self.scene.send(SetGroupColor(
+                    group=self.scene.get_group(),
+                    color=color))
+
             case HeadMoved():
                 def norm(val: float, min_angle=0, max_angle=80) -> float:
                     return ((abs(val) - min_angle) / (max_angle - min_angle)) ** 2

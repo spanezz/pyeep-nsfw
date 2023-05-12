@@ -3,12 +3,10 @@ from __future__ import annotations
 import inspect
 import json
 import math
-from collections import deque
 from pathlib import Path
 from typing import Iterator, Type
 
 import numpy
-import scipy
 
 from pyeep import bluetooth
 from pyeep.app import Message, export
@@ -19,15 +17,18 @@ from pyeep.inputs.muse2.aio_muse import Muse
 from . import dsp
 
 
-class HeadShaken(Message):
-    def __init__(self, *, axis: str, freq: float, power: float, **kwargs):
+class HeadYesNo(Message):
+    def __init__(self, *, frames: int, gesture: str, delay: float, intensity: float, **kwargs):
         super().__init__(**kwargs)
-        self.axis = axis
-        self.freq = freq
-        self.power = power
+        self.frames = frames
+        self.gesture = gesture
+        self.delay = delay
+        self.intensity = intensity
 
     def __str__(self):
-        return super().__str__() + f"(axis={self.axis}, freq={self.freq}, power={self.power})"
+        return super().__str__() + (
+            f"(frames={self.frames}, gesture={self.gesture}, delay={self.delay}, intensity={self.intensity})"
+        )
 
 
 class HeadMoved(Message):
@@ -126,37 +127,67 @@ class GyroAxisBase:
             if self.bias is None:
                 self.bias = numpy.mean(self.bias_samples)
                 self.calibration_path.write_text(json.dumps({"bias": self.bias}))
-            self.process_sample(timestamp, sample)
+            self.process_sample(timestamp, sample - self.bias)
 
     def add_samples(self, timestamps: list[float], samples: numpy.ndarray):
         for ts, sample in zip(timestamps, samples):
-            self.add(ts, sample - self.bias)
+            self.add(ts, sample)
 
 
-class GyroAxisFFT(GyroAxisBase):
-    def __init__(self, name: str):
+# class GyroAxisFFT(GyroAxisBase):
+#     def __init__(self, name: str):
+#         super().__init__(name)
+#         # sample rate = 52
+#         self.window_len = 64
+#         self.window: deque[float] = deque(maxlen=self.window_len)
+#         self.hamming = scipy.signal.windows.hamming(self.window_len, sym=False)
+#
+#     def process_sample(self, timestamp: float, sample: float):
+#         self.window.append(sample - self.bias)
+#
+#     def value(self) -> tuple[float, float]:
+#         """
+#         Return frequency and power for the frequency band with the highest
+#         power, computed on the samples in the window
+#         """
+#         if len(self.window) == self.window_len:
+#             signal = self.hamming * self.window
+#             powers = abs(scipy.fft.rfft(signal))
+#             freqs = numpy.fft.fftfreq(len(self.window), 1/52)
+#             idx = numpy.argmax(powers[:32])
+#             return freqs[idx], powers[idx]
+#         else:
+#             return 0, 0
+
+
+class GyroAxisSwing(GyroAxisBase):
+    def __init__(self, name: str, gesture: str, max_dps: float):
         super().__init__(name)
-        # sample rate = 52
-        self.window_len = 64
-        self.window: deque[float] = deque(maxlen=self.window_len)
-        self.hamming = scipy.signal.windows.hamming(self.window_len, sym=False)
+        self.gesture = gesture
+        self.max_dps = max_dps
+        self.sign: float | None = None
+        self.gesture_start: float | None = None
+        self.gesture_end: float | None = None
+        self.total_angle: float = 0
 
     def process_sample(self, timestamp: float, sample: float):
-        self.window.append(sample - self.bias)
+        sign = math.copysign(1, sample)
+        if self.sign is None or self.sign != sign:
+            # Start a new gesture
+            self.sign = sign
+            self.gesture_start = timestamp
+            self.total_angle = 0
+        self.total_angle += sample
+        self.gesture_end = timestamp
 
     def value(self) -> tuple[float, float]:
         """
-        Return frequency and power for the frequency band with the highest
-        power, computed on the samples in the window
+        Return the gesture duration (seconds) and intensity (from 0 to 1) since
+        the last direction change
         """
-        if len(self.window) == self.window_len:
-            signal = self.hamming * self.window
-            powers = abs(scipy.fft.rfft(signal))
-            freqs = numpy.fft.fftfreq(len(self.window), 1/52)
-            idx = numpy.argmax(powers[:32])
-            return freqs[idx], powers[idx]
-        else:
-            return 0, 0
+        elapsed = self.gesture_end - self.gesture_start
+        dps = abs(self.total_angle / 52 / elapsed)
+        return elapsed, numpy.clip(dps / self.max_dps, 0, 1)
 
 
 class GyroAxisLast(GyroAxisBase):
@@ -174,15 +205,15 @@ class GyroAxisLast(GyroAxisBase):
         return self.last
 
 
-class ModeHeadGestures(ModeBase):
+class ModeHeadYesNo(ModeBase):
     """
-    Head gestures
+    Head yes/no
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.x_axis = GyroAxisFFT("x")
-        self.y_axis = GyroAxisFFT("y")
-        self.z_axis = GyroAxisFFT("z")
+        self.x_axis = GyroAxisSwing("x", "meh", max_dps=200)
+        self.y_axis = GyroAxisSwing("y", "yes", max_dps=150)
+        self.z_axis = GyroAxisSwing("z", "no", max_dps=200)
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):
         self.x_axis.add_samples(timestamps, data[0, :])
@@ -191,19 +222,22 @@ class ModeHeadGestures(ModeBase):
 
         selected = None
         for axis in (self.x_axis, self.y_axis, self.z_axis):
-            freq, power = axis.value()
-            if selected is None or selected[2] < power:
-                selected = (axis.name, freq, power)
+            delay, intensity = axis.value()
+            if delay < 0.05:
+                continue
+            if selected is None or selected[2] < intensity:
+                selected = (axis.gesture, delay, intensity)
 
-        if selected[2] > 500:
+        # if selected[2] > 500:
+        if selected is not None:
             self.muse2.send(
-                HeadShaken(axis=selected[0], freq=selected[1], power=10*math.log10(selected[2] ** 2))
+                HeadYesNo(frames=len(timestamps), gesture=selected[0], delay=selected[1], intensity=selected[2])
             )
 
 
 class ModeHeadTurn(ModeBase):
     """
-    Head turn
+    Head gyro
     """
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -238,7 +272,7 @@ class Muse2(Input, bluetooth.BluetoothComponent):
     MODES = {
         "default": ModeDefault,
         "headpos": ModeHeadPosition,
-        "headgest": ModeHeadGestures,
+        "headgest": ModeHeadYesNo,
         "headturn": ModeHeadTurn,
     }
 

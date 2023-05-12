@@ -43,7 +43,7 @@ class ScanAction(Component):
         self.hub.app.gtk_app.add_action(self.action)
 
     def on_activate(self, action, parameter):
-        self.send(pyeep.messages.DeviceScanRequest(duration=4.0))
+        self.send(pyeep.messages.DeviceScanRequest(duration=3.0))
 
 
 class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
