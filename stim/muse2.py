@@ -11,6 +11,7 @@ import numpy
 from pyeep import bluetooth
 from pyeep.app import Message, export
 from pyeep.app.component import ModeInfo
+from pyeep.gtk import Gtk
 from pyeep.inputs.base import Input, InputController, InputSetActive
 from pyeep.inputs.muse2.aio_muse import Muse
 
@@ -41,6 +42,12 @@ class HeadMoved(Message):
     def __str__(self):
         return super().__str__() + f"(frames={self.frames}, pitch={self.pitch}, roll={self.roll})"
 
+    def _distance2(self) -> float:
+        """
+        Experiment with comparing messages
+        """
+        return self.pitch ** 2 + self.roll ** 2
+
 
 class HeadTurn(Message):
     def __init__(self, *, frames: int, x: float, y: float, z: float, **kwargs):
@@ -52,6 +59,12 @@ class HeadTurn(Message):
 
     def __str__(self):
         return super().__str__() + f"(frames={self.frames}, x={self.x}, y={self.y}, z={self.z})"
+
+    def _distance2(self) -> float:
+        """
+        Experiment with comparing messages
+        """
+        return self.x ** 2 + self.y ** 2 + self.z ** 2
 
 
 class ModeBase:
@@ -283,7 +296,7 @@ class Muse2(Input, bluetooth.BluetoothComponent):
         self.muse = Muse(self.client)
 
     def get_input_controller(self) -> Type["InputController"]:
-        return InputController
+        return Muse2InputController
 
     @property
     def is_active(self) -> bool:
@@ -332,6 +345,41 @@ class Muse2(Input, bluetooth.BluetoothComponent):
             case InputSetActive():
                 if msg.input == self:
                     self.active = msg.value
+
+
+class Muse2InputController(InputController):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.monitor = Gtk.EntryBuffer()
+        self.last_msg_ht: HeadTurn | None = None
+        self.last_msg_mv: HeadMoved | None = None
+
+    def on_reset(self, button):
+        self.last_msg_ht = None
+        self.last_msg_mv = None
+
+    def build(self) -> Gtk.Box:
+        grid = super().build()
+        monitor = Gtk.Text(buffer=self.monitor)
+        grid.attach(monitor, 0, 3, 1, 1)
+        reset = Gtk.Button(label="reset")
+        reset.connect("clicked", self.on_reset)
+        grid.attach(reset, 0, 4, 1, 1)
+        return grid
+
+    def receive(self, msg: Message):
+        match msg:
+            case HeadTurn():
+                if self.last_msg_ht is None or self.last_msg_ht._distance2() < msg._distance2():
+                    self.last_msg_ht = msg
+                    text = f"x={msg.x:.3f} y={msg.y:.3f} z={msg.z:.3f}"
+                    self.monitor.set_text(text, len(text))
+
+            case HeadMoved():
+                if self.last_msg_mv is None or self.last_msg_mv._distance2() < msg._distance2():
+                    self.last_msg_mv = msg
+                    text = f"pitch={msg.pitch:.1f} roll={msg.roll:.1f}"
+                    self.monitor.set_text(text, len(text))
 
 
 # Old lsl-based components
