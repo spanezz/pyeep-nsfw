@@ -7,7 +7,7 @@ import numpy
 
 from pyeep.app import Message, check_hub, export
 from pyeep.app.component import ModeMixin, ModeInfo
-from pyeep.gtk import GLib, Gtk
+from pyeep.gtk import GLib, Gtk, Gio
 from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
@@ -113,6 +113,18 @@ class Consent(SingleGroupScene):
         super().__init__(**kwargs)
         self.timeout: int | None = None
 
+        self.instant_no = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-") + "-instant_no",
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(False))
+        self.hub.app.gtk_app.add_action(self.instant_no)
+
+        self.decay = Gio.SimpleAction.new_stateful(
+                name=self.name.replace("_", "-") + "-decay",
+                parameter_type=None,
+                state=GLib.Variant.new_boolean(True))
+        self.hub.app.gtk_app.add_action(self.decay)
+
     @check_hub
     def pause(self):
         if self.timeout is not None:
@@ -129,7 +141,25 @@ class Consent(SingleGroupScene):
         if self.timeout is not None:
             GLib.source_remove(self.timeout)
             self.timeout = None
+
+        if not self.decay.get_state().get_boolean():
+            return
+
         self.timeout = GLib.timeout_add(500, self._tick)
+
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = expander.get_child()
+
+        decay = Gtk.ToggleButton(label="Decay")
+        decay.set_action_name("app." + self.decay.get_name())
+        grid.attach(decay, 0, 1, 1, 1)
+
+        instant_no = Gtk.ToggleButton(label="Instant NO")
+        instant_no.set_action_name("app." + self.instant_no.get_name())
+        grid.attach(instant_no, 1, 1, 1, 1)
+
+        return expander
 
     @check_hub
     def receive(self, msg: Message):
@@ -138,14 +168,23 @@ class Consent(SingleGroupScene):
 
         match msg:
             case HeadYesNo():
+                instant_no = self.instant_no.get_state().get_boolean()
+
+                if msg.intensity < 0.1:
+                    return
+
                 # Time in seconds it takes to reach from min to max at the maximum speed
                 match msg.gesture:
                     case "meh":
                         min_time_to_max = 10
                     case "no":
                         min_time_to_max = 2
+                        if instant_no and msg.intensity < 0.3:
+                            return
                     case "yes":
                         min_time_to_max = 5
+
+                # print(msg.gesture, f"{msg.intensity:.3f}")
 
                 value = msg.intensity / 52 * msg.frames / min_time_to_max
                 if value > 0.001:
@@ -154,6 +193,8 @@ class Consent(SingleGroupScene):
                             self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
                             self._reset_timeout()
                         case "no":
+                            if instant_no:
+                                value = 1.0
                             self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
                             self._reset_timeout()
                         case "yes":
