@@ -31,38 +31,47 @@ class HeadPosition(SingleGroupScene):
 
         # TODO: replace with a Gtk backend for mode selection
         self.mode: str = "center_zero"
+        self.ui_grid_columns = max(self.ui_grid_columns, 3)
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
+        row = grid.max_row
 
         zero_center = Gtk.CheckButton(label="Zero on center")
         zero_center.connect("toggled", self.set_mode, "center_zero")
         zero_center.set_active(True)
-        grid.attach(zero_center, 0, 1, 2, 1)
+        grid.attach(zero_center, 0, row, height=1)
+        row += 1
 
         mid_center_increase_up = Gtk.CheckButton(label="Middle on center, up increases")
         mid_center_increase_up.set_group(zero_center)
         mid_center_increase_up.connect("toggled", self.set_mode, "center_middle_increase_up")
-        grid.attach(mid_center_increase_up, 0, 2, 2, 1)
+        grid.attach(mid_center_increase_up, 0, row, height=1)
+        row += 1
 
         mid_center_increase_down = Gtk.CheckButton(label="Middle on center, down increases")
         mid_center_increase_down.set_group(zero_center)
         mid_center_increase_down.connect("toggled", self.set_mode, "center_middle_increase_down")
-        grid.attach(mid_center_increase_down, 0, 3, 2, 1)
+        grid.attach(mid_center_increase_down, 0, row, height=1)
+        row += 1
 
         max_center = Gtk.CheckButton(label="Max on center")
         max_center.set_group(zero_center)
         max_center.connect("toggled", self.set_mode, "center_max")
-        grid.attach(max_center, 0, 4, 2, 1)
+        grid.attach(max_center, 0, row, height=1)
+        row += 1
 
+        grid.attach(Gtk.Label(label="Control angle"), 0, row, 1, 1)
         control_angle_button = Gtk.SpinButton()
         control_angle_button.set_adjustment(self.control_angle)
-        grid.attach(control_angle_button, 0, 5, 2, 1)
+        grid.attach(control_angle_button, 1, row, height=1)
+        row += 1
 
         center = Gtk.Button.new_with_label("Recenter")
         center.connect("clicked", self.set_center)
-        grid.attach(center, 0, 6, 2, 1)
+        grid.attach(center, 0, row, height=1)
+        row += 1
 
         return expander
 
@@ -153,14 +162,15 @@ class Consent(SingleGroupScene):
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
+        row = grid.max_row
 
         decay = Gtk.ToggleButton(label="Decay")
         decay.set_action_name("app." + self.decay.get_name())
-        grid.attach(decay, 0, 1, 1, 1)
+        grid.attach(decay, 0, row, 1, 1)
 
         instant_no = Gtk.ToggleButton(label="Instant NO")
         instant_no.set_action_name("app." + self.instant_no.get_name())
-        grid.attach(instant_no, 1, 1, 1, 1)
+        grid.attach(instant_no, 1, row, 1, 1)
 
         return expander
 
@@ -352,6 +362,7 @@ class ColorDance(ModeMixin, SingleGroupScene):
         grid = expander.get_child()
 
         if len(self.modes) > 1:
+            row = grid.max_row
             modes = Gtk.ComboBox(model=self.modes)
             modes.set_id_column(0)
             renderer = Gtk.CellRendererText()
@@ -359,7 +370,7 @@ class ColorDance(ModeMixin, SingleGroupScene):
             modes.add_attribute(renderer, "text", 1)
             modes.set_active_id("default")
             modes.connect("changed", self.on_mode_changed)
-            grid.attach(modes, 0, 1, 2, 1)
+            grid.attach(modes, 0, row, 2, 1)
 
         return expander
 

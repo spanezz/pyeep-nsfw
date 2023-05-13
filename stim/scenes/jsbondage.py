@@ -82,13 +82,12 @@ class JSBondage(SingleGroupScene):
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
-
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        expander.set_child(box)
+        grid = expander.get_child()
+        row = grid.max_row
 
         reset = Gtk.Button.new_with_label("Reset")
         reset.connect("clicked", self.reset)
-        box.append(reset)
+        grid.attach(reset, 0, row, height=1)
 
         return expander
 

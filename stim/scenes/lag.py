@@ -32,13 +32,14 @@ class Lag(KeyboardShortcutMixin, SingleGroupScene):
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
+        row = grid.max_row
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.lag)
         spinbutton.set_digits(1)
-        grid.attach(spinbutton, 0, 1, 1, 1)
+        grid.attach(spinbutton, 0, row, height=1)
 
-        grid.attach(Gtk.Label(label="seconds of lag"), 1, 1, 1, 1)
+        grid.attach(Gtk.Label(label="seconds of lag"), 1, row, height=1)
 
         return expander
 

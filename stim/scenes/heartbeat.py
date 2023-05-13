@@ -24,13 +24,14 @@ class Heartbeat(SingleGroupScene):
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
+        row = grid.max_row
 
-        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, row, height=1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.atrial_duration_ratio)
         spinbutton.set_digits(1)
-        grid.attach(spinbutton, 1, 1, 1, 1)
+        grid.attach(spinbutton, 1, row, 1, 1)
 
         return expander
 

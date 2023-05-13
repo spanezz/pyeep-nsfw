@@ -271,12 +271,12 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
 
         power_min = Gtk.SpinButton()
         power_min.set_adjustment(self.power_min)
-        grid.attach(power_min, 0, 4, 1, 1)
+        grid.attach(power_min, 0, 3, 1, 1)
 
-        grid.attach(Gtk.Label(label="to"), 1, 3, 1, 1)
+        grid.attach(Gtk.Label(label="to"), 1, 3, 2, 1)
 
         power_max = Gtk.SpinButton()
         power_max.set_adjustment(self.power_max)
-        grid.attach(power_max, 2, 4, 1, 1)
+        grid.attach(power_max, 3, 3, 1, 1)
 
         return grid

@@ -5,12 +5,12 @@ from pyeep.gtk import GLib, Gtk
 from pyeep.messages import EmergencyStop, Resume, Shortcut
 
 from .. import output
-from .base import SingleGroupScene, register
+from .base import SingleGroupPowerScene, register
 from .default import KeyboardShortcutMixin
 
 
 @register
-class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
+class Eagerness(KeyboardShortcutMixin, SingleGroupPowerScene):
     TITLE = "Eagerness"
     BPM_START = 6
     INCREMENT_START = 2
@@ -23,24 +23,27 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
         self.increment = Gtk.Adjustment(
                 lower=0, upper=100, step_increment=1, page_increment=5, value=self.INCREMENT_START)
         self.timeout: int | None = None
+        self.ui_grid_columns = max(self.ui_grid_columns, 3)
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
+        row = grid.max_row
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.bpm)
-        grid.attach(spinbutton, 0, 1, 1, 1)
+        grid.attach(spinbutton, 0, row, 1, 1)
 
-        grid.attach(Gtk.Label(label="times per minute, increase by"), 1, 1, 1, 1)
+        grid.attach(Gtk.Label(label="times per minute, increase by"), 1, row, 1, 1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.increment)
-        grid.attach(spinbutton, 2, 1, 1, 1)
+        grid.attach(spinbutton, 2, row, 1, 1)
+        row += 1
 
         stop = Gtk.Button(label="Stop!")
         stop.connect("clicked", self.on_stop)
-        grid.attach(stop, 0, 2, 4, 1)
+        grid.attach(stop, 0, row, height=1)
 
         return expander
 
