@@ -132,12 +132,14 @@ class JSBondage(SingleGroupPowerScene):
 
     @check_hub
     def receive(self, msg: Message):
+        if not self.is_active:
+            return
+
         match msg:
             case JoystickAxisMoved():
-                if self.is_active():
-                    if (axis := self.axes.get(msg.axis)) is None:
-                        axis = Axis()
-                        self.axes[msg.axis] = axis
+                if (axis := self.axes.get(msg.axis)) is None:
+                    axis = Axis()
+                    self.axes[msg.axis] = axis
 
-                    axis.add(msg.value)
-                    self._check_variance()
+                axis.add(msg.value)
+                self._check_variance()

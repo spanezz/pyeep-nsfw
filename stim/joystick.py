@@ -56,8 +56,11 @@ class Joystick(Input, pyeep.pygame.PygameComponent):
             return
         match event.type:
             case pygame.JOYAXISMOTION:
-                if event.axis in (4, 5):
-                    self.send(JoystickAxisMoved(joystick=self, axis=event.axis, value=event.value))
+                self.mode(event)
+
+    def mode_default(self, event: pygame.event.Event):
+        if event.axis in (4, 5):
+            self.send(JoystickAxisMoved(joystick=self, axis=event.axis, value=event.value))
 
 
 class Joysticks(pyeep.pygame.PygameComponent):
