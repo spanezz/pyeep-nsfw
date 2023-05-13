@@ -4,7 +4,6 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.messages import EmergencyStop, Resume, Shortcut
 
-from .. import output
 from .base import SingleGroupPowerScene, register
 from .default import KeyboardShortcutMixin
 
@@ -76,11 +75,11 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupPowerScene):
 
     def on_tick(self):
         amount = self.increment.get_value()
-        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=amount / 100.0))
+        self.increment_power(amount / 100.0)
         return True
 
     def do_stop(self):
-        self.send(output.SetGroupPower(group=self.get_group(), power=0))
+        self.set_power(0)
         self.do_speed_up()
 
     def do_speed_up(self):
@@ -108,7 +107,7 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupPowerScene):
             case "REDO":
                 self.bpm.set_value(self.BPM_START)
                 self.increment.set_value(self.INCREMENT_START)
-                self.send(output.SetGroupPower(group=self.get_group(), power=0))
+                self.set_power(0)
             case _:
                 super().handle_keyboard_shortcut(shortcut)
 

@@ -42,19 +42,17 @@ class KeyboardShortcutMixin:
                     group=self.get_group(),
                     color=animation.ColorPulse(color=Color(1, 0, 0), duration=0.5)))
             case "SWIPE UP":
-                self.send(messages.Decrement(group=self.get_group()))
+                self.increment_power(-0.05)
             case "SWIPE DOWN":
-                self.send(messages.Increment(group=self.get_group()))
+                self.increment_power(0.05)
             case "SWIPE RIGHT":
-                self.send(messages.Increment(group=self.get_group()))
-                self.send(messages.Increment(group=self.get_group()))
+                self.increment_power(0.1)
             case "SWIPE LEFT":
-                self.send(messages.Decrement(group=self.get_group()))
-                self.send(messages.Decrement(group=self.get_group()))
+                self.increment_power(-0.1)
             case "VOLUME UP":
-                self.send(output.SetGroupPower(group=self.get_group(), power=1))
+                self.set_power(1)
             case "VOLUME DOWN":
-                self.send(output.SetGroupPower(group=self.get_group(), power=0))
+                self.set_power(0)
             case "TAP":
                 self.send(output.IncreaseGroupPower(
                     group=self.get_group(),

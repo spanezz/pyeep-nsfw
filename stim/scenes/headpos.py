@@ -11,7 +11,6 @@ from pyeep.gtk import GLib, Gtk, Gio
 from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
-from .. import output
 from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
 from .base import Scene, SingleGroupPowerScene, register
 from .. import dsp
@@ -111,7 +110,7 @@ class HeadPosition(SingleGroupPowerScene):
                             self.logger.warning("Unknown mode %r", self.mode)
                             power = 0
 
-                    self.send(output.SetGroupPower(group=self.get_group(), power=power))
+                    self.set_power(power)
 
 
 @register
@@ -146,7 +145,7 @@ class Consent(SingleGroupPowerScene):
 
     def _tick(self):
         # Slow decay
-        self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-0.02))
+        self.increment_power(-0.02)
         return True
 
     def _reset_timeout(self):
@@ -210,17 +209,17 @@ class Consent(SingleGroupPowerScene):
                 if value > 0.001:
                     match msg.gesture:
                         case "meh":
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
+                            self.increment_power(-value)
                             self._reset_timeout()
                         case "no":
                             if instant_no:
                                 value = 1.0
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=-value))
+                            self.increment_power(-value)
                             self._reset_timeout()
                         case "yes":
                             if in_streak:
                                 value *= in_streak + 1
-                            self.send(output.IncreaseGroupPower(group=self.get_group(), amount=value))
+                            self.increment_power(value)
                             self._reset_timeout()
 
 

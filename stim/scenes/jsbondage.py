@@ -10,7 +10,6 @@ import numpy
 from pyeep.app import Message, check_hub
 from pyeep.gtk import Gtk, GLib
 
-from .. import output
 from ..joystick import JoystickAxisMoved
 from .base import SingleGroupPowerScene, register
 
@@ -95,7 +94,7 @@ class JSBondage(SingleGroupPowerScene):
     def reset(self, button):
         for axis in self.axes.values():
             axis.values.clear()
-        self.send(output.SetGroupPower(group=self.get_group(), power=0))
+        self.set_power(0)
 
     def _check_variance(self):
         if self.axes:
@@ -110,10 +109,10 @@ class JSBondage(SingleGroupPowerScene):
         if movement > threshold:
             power = numpy.clip((movement - threshold) / cap, 0, 1)
             print(f"EEK! {movement:.5f} {power}")
-            self.send(output.SetGroupPower(group=self.get_group(), power=power))
+            self.set_power(power)
         else:
             print(f"OK {movement:.5f}")
-            self.send(output.SetGroupPower(group=self.get_group(), power=0))
+            self.set_power(0)
 
         # if msg.axis not in self.reference_values:
         #     self.reference_values[msg.axis] = msg.value

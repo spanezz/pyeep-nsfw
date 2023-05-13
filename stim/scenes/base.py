@@ -134,6 +134,15 @@ class SingleGroupPowerScene(SingleGroupScene):
         val = round(adj.get_value())
         self.send(output.SetGroupPower(group=self.get_group(), power=val / 100.0))
 
+    @check_hub
+    def increment_power(self, value: float):
+        self.power.set_value(
+                self.power.get_value() + value * 100.0)
+
+    @check_hub
+    def set_power(self, value: float):
+        self.power.set_value(value * 100.0)
+
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
