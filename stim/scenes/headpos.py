@@ -12,7 +12,7 @@ from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from .. import output
-from ..muse2 import HeadMoved, HeadYesNo, HeadTurn
+from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
 from .base import Scene, SingleGroupScene, register
 from .. import dsp
 
@@ -290,7 +290,7 @@ class Dance(ModeBase):
                 self.scene.send(SetGroupColor(
                     group=self.scene.get_group(),
                     color=color))
-            case HeadTurn():
+            case HeadGyro():
                 min_dps = 0.0
                 max_dps = 200.0
 

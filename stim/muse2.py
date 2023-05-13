@@ -49,7 +49,7 @@ class HeadMoved(Message):
         return self.pitch ** 2 + self.roll ** 2
 
 
-class HeadTurn(Message):
+class HeadGyro(Message):
     def __init__(self, *, frames: int, x: float, y: float, z: float, **kwargs):
         super().__init__(**kwargs)
         self.frames = frames
@@ -248,7 +248,7 @@ class ModeHeadYesNo(ModeBase):
             )
 
 
-class ModeHeadTurn(ModeBase):
+class ModeHeadGyro(ModeBase):
     """
     Head gyro
     """
@@ -270,7 +270,7 @@ class ModeHeadTurn(ModeBase):
         z = self.z_axis.value()
 
         self.muse2.send(
-            HeadTurn(
+            HeadGyro(
                 frames=len(timestamps),
                 x=round(x),
                 y=round(y),
@@ -286,7 +286,7 @@ class Muse2(Input, bluetooth.BluetoothComponent):
         "default": ModeDefault,
         "headpos": ModeHeadPosition,
         "headgest": ModeHeadYesNo,
-        "headturn": ModeHeadTurn,
+        "headturn": ModeHeadGyro,
     }
 
     # This has been tested with a Moofit HW401
@@ -351,7 +351,7 @@ class Muse2InputController(InputController):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.monitor = Gtk.EntryBuffer()
-        self.last_msg_ht: HeadTurn | None = None
+        self.last_msg_ht: HeadGyro | None = None
         self.last_msg_mv: HeadMoved | None = None
 
     def on_reset(self, button):
@@ -369,7 +369,7 @@ class Muse2InputController(InputController):
 
     def receive(self, msg: Message):
         match msg:
-            case HeadTurn():
+            case HeadGyro():
                 if self.last_msg_ht is None or self.last_msg_ht._distance2() < msg._distance2():
                     self.last_msg_ht = msg
                     text = f"x={msg.x:.3f} y={msg.y:.3f} z={msg.z:.3f}"
