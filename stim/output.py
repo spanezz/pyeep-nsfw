@@ -4,7 +4,7 @@ import logging
 from typing import Type
 
 import pyeep.aio
-from pyeep.app import Message, Shutdown, check_hub, export
+from pyeep.app import Message, Shutdown, check_hub, export, Component
 from pyeep.gtk import GLib, Gtk
 from pyeep.animation import PowerAnimation, PowerAnimator
 import pyeep.outputs.base
@@ -115,6 +115,8 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
 
         self.power_animator = PowerAnimator(self.name, self.output.rate, self.set_animated_power)
 
+        self.power_levels: dict[Component, float] = {}
+
     # Controller/UI handlers
 
     @check_hub
@@ -157,12 +159,15 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
     # High-level actions
 
     @check_hub
-    def set_power(self, power: int):
+    def set_source_power(self, src: Component, power: float):
         """
         Set power to use when not in manual mode and not paused
         """
-        if not self.is_manual:
-            self.power.set_value(power)
+        if self.is_manual:
+            return
+        self.power_levels[src] = power
+        combined = sum(self.power_levels.values())
+        self.power.set_value(round(combined * 100.0))
 
     @check_hub
     def set_animated_power(self, power: float):
@@ -175,15 +180,6 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
             if value > 1:
                 value = 1
             self.output.set_power(value)
-
-    @check_hub
-    def adjust_power(self, delta: int):
-        """
-        Add the given amount to the current power value
-        """
-        if not self.is_manual:
-            self.set_power(
-                self.power.get_value() + delta)
 
     @check_hub
     def set_manual_power(self, power: int):
@@ -225,7 +221,8 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
 
     @check_hub
     def emergency_stop(self):
-        self.set_power(0)
+        self.power.set_value(0)
+        self.power_levels.clear()
         super().emergency_stop()
 
     @check_hub
@@ -233,12 +230,10 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
         match msg:
             case SetGroupPower():
                 if self.in_group(msg.group):
-                    self.set_power(round(msg.power * 100.0))
+                    self.set_source_power(msg.src, msg.power)
             case IncreaseGroupPower():
                 if self.in_group(msg.group):
                     match msg.amount:
-                        case float() | int():
-                            self.adjust_power(msg.amount * 100.0)
                         case PowerAnimation():
                             self.power_animator.start(msg.amount)
             case _:
