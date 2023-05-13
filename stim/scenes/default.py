@@ -14,9 +14,9 @@ class KeyboardShortcutMixin:
     @check_hub
     def handle_keyboard_shortcut(self, shortcut: str):
         match shortcut:
-            case "STOP":
+            case "STOP" | "NEXT":
                 self.send(Pause(group=self.get_group()))
-            case "CYCLE START":
+            case "CYCLE START" | "PREVIOUS":
                 self.send(Resume(group=self.get_group()))
             case "F+":
                 self.increment_power(0.05)
