@@ -148,83 +148,29 @@ class PowerControl:
         grid.attach(group, grid.max_column - 1, row, 1, 1)
 
 
-class SingleGroupScene(Scene):
+class SingleGroupPowerScene(Scene):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # Output group
-        self.group = Gtk.Adjustment(
-                value=1,
-                lower=1,
-                upper=99,
-                step_increment=1,
-                page_increment=1,
-                page_size=0)
+        self.power = PowerControl(self, "default", group=1)
         self.ui_grid_columns = 2
 
+    @check_hub
     def get_group(self) -> int:
-        return self.group.get_value()
+        return self.power.get_group()
+
+    @check_hub
+    def increment_power(self, value: float):
+        self.power.increment_power(value)
+
+    @check_hub
+    def set_power(self, value: float):
+        self.power.set_power(value)
 
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = SceneGrid(max_column=self.ui_grid_columns)
         expander.set_child(grid)
 
-        grid.attach(Gtk.Label(label="Output group"), 0, 0, self.ui_grid_columns - 1, 1)
-
-        group = Gtk.SpinButton(adjustment=self.group, climb_rate=1.0, digits=0)
-        grid.attach(group, self.ui_grid_columns - 1, 0, 1, 1)
-
-        return expander
-
-
-class SingleGroupPowerScene(SingleGroupScene):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self.power = Gtk.Adjustment(
-                value=0,
-                lower=0,
-                upper=100,
-                step_increment=5,
-                page_increment=10,
-                page_size=0)
-        self.power.connect("value_changed", self.on_power)
-
-    @check_hub
-    def on_power(self, adj):
-        """
-        Manually set this scene's power
-        """
-        val = round(adj.get_value())
-        self.send(output.SetGroupPower(group=self.get_group(), power=val / 100.0))
-
-    @check_hub
-    def increment_power(self, value: float):
-        self.power.set_value(
-                self.power.get_value() + value * 100.0)
-
-    @check_hub
-    def set_power(self, value: float):
-        self.power.set_value(value * 100.0)
-
-    def build(self) -> Gtk.Expander:
-        expander = super().build()
-        grid = expander.get_child()
-        row = grid.max_row
-
-        power = Gtk.Scale(
-                orientation=Gtk.Orientation.HORIZONTAL,
-                adjustment=self.power)
-        power.set_digits(2)
-        power.set_draw_value(False)
-        power.set_hexpand(True)
-        for mark in (25, 50, 75):
-            power.add_mark(
-                value=mark,
-                position=Gtk.PositionType.BOTTOM,
-                markup=None
-            )
-        grid.attach(power, 0, row, height=1)
+        self.power.attach_to_grid(grid)
 
         return expander

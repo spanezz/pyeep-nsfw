@@ -6,7 +6,7 @@ from pyeep.messages import Pause, Resume, Shortcut
 from pyeep.types import Color
 from pyeep.outputs.color import SetGroupColor
 
-from .. import animation, messages, output
+from .. import animation, output
 from .base import SingleGroupPowerScene, register
 
 
