@@ -11,7 +11,6 @@ import pyeep.outputs.base
 from pyeep.outputs.color import ColorOutput, ColorOutputController
 from pyeep.outputs.base import Output
 
-from .messages import Decrement, Increment
 from pyeep.types import Color
 
 log = logging.getLogger(__name__)
@@ -232,12 +231,6 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
     @check_hub
     def receive(self, msg: Message):
         match msg:
-            case Increment():
-                if self.in_group(msg.group):
-                    self.adjust_power(2)
-            case Decrement():
-                if self.in_group(msg.group):
-                    self.adjust_power(-2)
             case SetGroupPower():
                 if self.in_group(msg.group):
                     self.set_power(round(msg.power * 100.0))

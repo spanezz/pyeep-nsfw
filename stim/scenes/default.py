@@ -18,22 +18,10 @@ class KeyboardShortcutMixin:
                 self.send(Pause(group=self.get_group()))
             case "CYCLE START":
                 self.send(Resume(group=self.get_group()))
-            case "+X":
-                self.send(messages.Increment(group=1))
-            case "-X":
-                self.send(messages.Decrement(group=1))
-            case "+Y":
-                self.send(messages.Increment(group=2))
-            case "-Y":
-                self.send(messages.Decrement(group=2))
-            case "+Z":
-                self.send(messages.Increment(group=3))
-            case "-Z":
-                self.send(messages.Decrement(group=3))
-            case "+A":
-                self.send(messages.Increment(group=4))
-            case "-A":
-                self.send(messages.Decrement(group=4))
+            case "F+":
+                self.increment_power(0.05)
+            case "F-":
+                self.increment_power(-0.05)
             case "PULSE":
                 self.send(output.IncreaseGroupPower(
                     group=self.get_group(),

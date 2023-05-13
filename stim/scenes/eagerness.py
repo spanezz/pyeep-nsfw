@@ -100,9 +100,9 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupPowerScene):
                 self.do_speed_up()
             case "SLOW DOWN":
                 self.do_slow_down()
-            case "F+":
+            case "J+":
                 self.increment.set_value(self.increment.get_value() + 1)
-            case "F-":
+            case "J-":
                 self.increment.set_value(self.increment.get_value() - 1)
             case "REDO":
                 self.bpm.set_value(self.BPM_START)
