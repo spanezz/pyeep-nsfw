@@ -166,6 +166,11 @@ class SingleGroupPowerScene(Scene):
     def set_power(self, value: float):
         self.power.set_power(value)
 
+    @check_hub
+    def set_active(self, value: bool):
+        super().set_active(value)
+        self.power.set_power(0)
+
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = SceneGrid(max_column=self.ui_grid_columns)

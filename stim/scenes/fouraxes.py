@@ -26,6 +26,12 @@ class FourAxes(Scene):
         self.ui_grid_columns = 3
 
     @check_hub
+    def set_active(self, value: bool):
+        super().set_active(value)
+        for axis in self.axes.values():
+            axis.set_power(0)
+
+    @check_hub
     def receive(self, msg: Message):
         if not self.is_active:
             return
