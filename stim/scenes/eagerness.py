@@ -45,21 +45,14 @@ class Eagerness(KeyboardShortcutMixin, SingleGroupScene):
         return expander
 
     @check_hub
-    def start(self):
-        super().start()
-        self.update_timer()
-
-    @check_hub
-    def pause(self):
-        if self.timeout is not None:
-            GLib.source_remove(self.timeout)
-            self.timeout = None
-        super().pause()
-
-    @check_hub
-    def cleanup(self):
-        self.pause()
-        super().cleanup()
+    def set_active(self, value: bool):
+        if value:
+            self.update_timer()
+        else:
+            if self.timeout is not None:
+                GLib.source_remove(self.timeout)
+                self.timeout = None
+        super().set_active(value)
 
     @check_hub
     def update_timer(self):

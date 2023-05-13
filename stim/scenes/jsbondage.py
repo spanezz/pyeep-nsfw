@@ -12,7 +12,7 @@ from pyeep.gtk import Gtk, GLib
 
 from .. import output
 from ..joystick import JoystickAxisMoved
-from .base import Scene, register
+from .base import SingleGroupScene, register
 
 
 class Sample(NamedTuple):
@@ -49,7 +49,7 @@ class Axis:
 
 
 @register
-class JSBondage(Scene):
+class JSBondage(SingleGroupScene):
     TITLE = "Joystick bondage"
 
     def __init__(self, **kwargs):
@@ -58,16 +58,14 @@ class JSBondage(Scene):
         self.timeout: int | None = None
 
     @check_hub
-    def start(self):
-        super().start()
-        self.timeout = GLib.timeout_add(100, self.on_tick)
-
-    @check_hub
-    def pause(self):
-        if self.timeout is not None:
-            GLib.source_remove(self.timeout)
-            self.timeout = None
-        super().pause()
+    def set_active(self, value: bool):
+        if value:
+            self.timeout = GLib.timeout_add(100, self.on_tick)
+        else:
+            if self.timeout is not None:
+                GLib.source_remove(self.timeout)
+                self.timeout = None
+        super().set_active(value)
 
     @check_hub
     def update_timer(self):

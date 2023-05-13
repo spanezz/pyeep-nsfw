@@ -43,11 +43,7 @@ class Scene(GtkComponent):
 
     def on_active_changed(self, switch, value):
         new_state = not self.active.get_state().get_boolean()
-        self.active.set_state(GLib.Variant.new_boolean(new_state))
-        if new_state:
-            self.start()
-        else:
-            self.pause()
+        self.set_active(new_state)
 
     @property
     @check_hub
@@ -55,12 +51,13 @@ class Scene(GtkComponent):
         return self.active.get_state().get_boolean()
 
     @check_hub
-    def start(self):
-        pass
+    def set_active(self, value: bool):
+        self.active.set_state(GLib.Variant.new_boolean(value))
 
     @check_hub
-    def pause(self):
-        pass
+    def cleanup(self):
+        self.set_active(False)
+        super().cleanup()
 
 
 class SingleGroupScene(Scene):

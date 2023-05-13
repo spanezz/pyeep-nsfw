@@ -129,11 +129,11 @@ class Consent(SingleGroupScene):
         self.hub.app.gtk_app.add_action(self.decay)
 
     @check_hub
-    def pause(self):
-        if self.timeout is not None:
+    def set_active(self, value: bool):
+        if not value and self.timeout is not None:
             GLib.source_remove(self.timeout)
             self.timeout = None
-        super().pause()
+        super().set_active(value)
 
     def _tick(self):
         # Slow decay
@@ -195,8 +195,6 @@ class Consent(SingleGroupScene):
                             return
                     case "yes":
                         min_time_to_max = 5
-
-                # print(msg.gesture, f"{msg.intensity:.3f}", in_streak, self.streak_start.ts, self.streak_last.ts, msg.ts)
 
                 value = msg.intensity / 52 * msg.frames / min_time_to_max
                 if value > 0.001:

@@ -21,6 +21,14 @@ class Lag(KeyboardShortcutMixin, SingleGroupScene):
                 lower=0.0, upper=10.0, step_increment=0.5, page_increment=2.0, value=self.LAG_START)
         self.timeout: int | None = None
 
+    @check_hub
+    def set_active(self, value: bool):
+        if not value:
+            if self.timeout is not None:
+                GLib.source_remove(self.timeout)
+                self.timeout = None
+        super().set_active(value)
+
     def build(self) -> Gtk.Expander:
         expander = super().build()
         grid = expander.get_child()
