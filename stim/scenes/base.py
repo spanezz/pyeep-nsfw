@@ -18,10 +18,10 @@ def register(c: Type["Scene"]) -> Type["Scene"]:
 class SceneGrid(Gtk.Grid):
     REST = -1
 
-    def __init__(self, *args, max_column=1, max_row=1, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.max_column = 0
-        self.max_row = 0
+    def __init__(self, *, max_column: int = 1, max_row: int = 1, **kwargs):
+        super().__init__(**kwargs)
+        self.max_column = max_column
+        self.max_row = max_row
 
     def attach(self, child: Gtk.Widget, column: int, row: int, width: int = REST, height: int = REST):
         if width == self.REST:
@@ -29,10 +29,10 @@ class SceneGrid(Gtk.Grid):
         if height == self.REST:
             height = self.max_row - row
         super().attach(child, column, row, width, height)
-        if (row := row + height) > self.max_row:
-            self.max_row = row
-        if (column := column + width) > self.max_column:
-            self.max_column = column
+        if (mrow := row + height) > self.max_row:
+            self.max_row = mrow
+        if (mcolumn := column + width) > self.max_column:
+            self.max_column = mcolumn
 
 
 class Scene(GtkComponent):
@@ -81,6 +81,71 @@ class Scene(GtkComponent):
     def cleanup(self):
         self.set_active(False)
         super().cleanup()
+
+
+class PowerControl:
+    def __init__(self, scene: Scene, name: str, group: int = 1):
+        self.scene = scene
+        self.name = name
+
+        # Output group
+        self.group = Gtk.Adjustment(
+                value=group,
+                lower=1,
+                upper=99,
+                step_increment=1,
+                page_increment=1,
+                page_size=0)
+
+        # Power for the group
+        self.power = Gtk.Adjustment(
+                value=0,
+                lower=0,
+                upper=100,
+                step_increment=5,
+                page_increment=10,
+                page_size=0)
+        self.power.connect("value_changed", self.on_power)
+
+    def on_power(self, adj):
+        """
+        Manually set this scene's power
+        """
+        val = round(adj.get_value())
+        self.scene.send(output.SetGroupPower(group=self.get_group(), power=val / 100.0))
+
+    def get_group(self) -> int:
+        return self.group.get_value()
+
+    def increment_power(self, value: float):
+        self.power.set_value(
+                self.power.get_value() + value * 100.0)
+
+    def set_power(self, value: float):
+        self.power.set_value(value * 100.0)
+
+    def attach_to_grid(self, grid: SceneGrid):
+        power = Gtk.Scale(
+                orientation=Gtk.Orientation.HORIZONTAL,
+                adjustment=self.power)
+        power.set_digits(2)
+        power.set_draw_value(False)
+        power.set_hexpand(True)
+        for mark in (25, 50, 75):
+            power.add_mark(
+                value=mark,
+                position=Gtk.PositionType.BOTTOM,
+                markup=None
+            )
+
+        row = grid.max_row
+
+        grid.attach(power, 0, row, grid.max_column - 1, 1)
+
+        group = Gtk.SpinButton(adjustment=self.group, climb_rate=1.0, digits=0)
+        group.set_tooltip_text("Output group")
+
+        grid.attach(group, grid.max_column - 1, row, 1, 1)
 
 
 class SingleGroupScene(Scene):
