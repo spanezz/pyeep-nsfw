@@ -7,11 +7,11 @@ from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from .. import animation
-from .base import SingleGroupPowerScene, register
+from .base import SingleGroupScene, SceneGrid, register
 
 
 @register
-class Heartbeat(SingleGroupPowerScene):
+class Heartbeat(SingleGroupScene):
     TITLE = "Heartbeat"
 
     def __init__(self, **kwargs):
@@ -21,17 +21,26 @@ class Heartbeat(SingleGroupPowerScene):
         self.atrial_duration_ratio = Gtk.Adjustment(
                 lower=0.0, upper=1.0, step_increment=0.1, page_increment=0.2, value=0.2)
 
+    @check_hub
+    def set_active(self, value: bool):
+        super().set_active(value)
+        if not value:
+            if self.timeout is not None:
+                GLib.source_remove(self.timeout)
+                self.timeout = None
+
     def build(self) -> Gtk.Expander:
         expander = super().build()
-        grid = expander.get_child()
+        grid = SceneGrid(max_column=self.ui_grid_columns)
+        expander.set_child(grid)
         row = grid.max_row
 
-        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, row, height=1)
+        grid.attach(Gtk.Label(label="Ratio of atrial animation"), 0, row, self.ui_grid_columns - 1, 1)
 
         spinbutton = Gtk.SpinButton()
         spinbutton.set_adjustment(self.atrial_duration_ratio)
         spinbutton.set_digits(1)
-        grid.attach(spinbutton, 1, row, 1, 1)
+        grid.attach(spinbutton, self.ui_grid_columns - 1, row, 1, 1)
 
         return expander
 

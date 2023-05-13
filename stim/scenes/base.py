@@ -148,6 +148,37 @@ class PowerControl:
         grid.attach(group, grid.max_column - 1, row, 1, 1)
 
 
+class SingleGroupScene(Scene):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.ui_grid_columns = 2
+
+        # Output group
+        self.group = Gtk.Adjustment(
+                value=1,
+                lower=1,
+                upper=99,
+                step_increment=1,
+                page_increment=1,
+                page_size=0)
+
+    def get_group(self) -> int:
+        return self.group.get_value()
+
+    def build(self) -> Gtk.Expander:
+        expander = super().build()
+        grid = SceneGrid(max_column=self.ui_grid_columns)
+        expander.set_child(grid)
+        row = grid.max_row
+
+        grid.attach(Gtk.Label(label="Output group"), 0, row, self.ui_grid_columns - 1, 1)
+
+        group = Gtk.SpinButton(adjustment=self.group, climb_rate=1.0, digits=0)
+        grid.attach(group, self.ui_grid_columns - 1, row, 1, 1)
+
+        return expander
+
+
 class SingleGroupPowerScene(Scene):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

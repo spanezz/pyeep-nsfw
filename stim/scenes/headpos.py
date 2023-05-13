@@ -12,7 +12,7 @@ from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
-from .base import Scene, SingleGroupPowerScene, register
+from .base import Scene, SingleGroupScene, SingleGroupPowerScene, register
 from .. import dsp
 
 
@@ -323,7 +323,7 @@ class Dance(ModeBase):
 
 
 @register
-class ColorDance(ModeMixin, SingleGroupPowerScene):
+class ColorDance(ModeMixin, SingleGroupScene):
     TITLE = "Color dance"
 
     MODES = {
@@ -350,6 +350,13 @@ class ColorDance(ModeMixin, SingleGroupPowerScene):
         """
         for name, value in self.MODES.items():
             yield ModeInfo(name, inspect.getdoc(value))
+
+    @check_hub
+    def set_active(self, value: bool):
+        super().set_active(value)
+        self.send(SetGroupColor(
+            group=self.get_group(),
+            color=Color(0, 0, 0)))
 
     @check_hub
     def receive(self, msg: Message):
