@@ -50,21 +50,39 @@ class HeadMoved(Message):
 
 
 class HeadGyro(Message):
-    def __init__(self, *, frames: int, x: float, y: float, z: float, **kwargs):
+    def __init__(
+            self, *,
+            frames: int,
+            x: float, y: float, z: float,
+            ax: float, ay: float, az: float,
+            **kwargs):
         super().__init__(**kwargs)
         self.frames = frames
         self.x = x
         self.y = y
         self.z = z
+        self.ax = ax
+        self.ay = ay
+        self.az = az
 
     def __str__(self):
-        return super().__str__() + f"(frames={self.frames}, x={self.x}, y={self.y}, z={self.z})"
+        return super().__str__() + (
+            f"(frames={self.frames},"
+            f" x={self.x}, y={self.y}, z={self.z})"
+            f" ax={self.ax}, ay={self.ay}, az={self.az})"
+        )
 
     def _distance2(self) -> float:
         """
         Experiment with comparing messages
         """
         return self.x ** 2 + self.y ** 2 + self.z ** 2
+
+    def _adistance2(self) -> float:
+        """
+        Experiment with comparing messages
+        """
+        return self.ax ** 2 + self.ay ** 2 + self.az ** 2
 
 
 class ModeBase:
@@ -207,15 +225,17 @@ class GyroAxisLast(GyroAxisBase):
     def __init__(self, name: str):
         super().__init__(name)
         self.last: float = 0
+        self.alast: float = 0
 
     def process_sample(self, timestamp: float, sample: float):
+        self.alast = sample - self.last
         self.last = sample
 
     def value(self) -> float:
         """
         Return the angular velocity along this axis
         """
-        return self.last
+        return self.last, self.alast
 
 
 class ModeHeadYesNo(ModeBase):
@@ -265,16 +285,20 @@ class ModeHeadGyro(ModeBase):
         self.y_axis.add_samples(timestamps, data[1, :])
         self.z_axis.add_samples(timestamps, data[2, :])
 
-        x = self.x_axis.value()
-        y = self.y_axis.value()
-        z = self.z_axis.value()
+        x, ax = self.x_axis.value()
+        y, ay = self.y_axis.value()
+        z, az = self.z_axis.value()
 
         self.muse2.send(
             HeadGyro(
                 frames=len(timestamps),
                 x=round(x),
                 y=round(y),
-                z=round(z))
+                z=round(z),
+                ax=ax,
+                ay=ay,
+                az=az,
+            )
         )
 
 
@@ -351,12 +375,15 @@ class Muse2InputController(InputController):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.monitor = Gtk.EntryBuffer()
-        self.last_msg_ht: HeadGyro | None = None
+        self.last_msg_hg: HeadGyro | None = None
+        self.last_msg_hga: HeadGyro | None = None
         self.last_msg_mv: HeadMoved | None = None
 
     def on_reset(self, button):
-        self.last_msg_ht = None
+        self.last_msg_hg = None
+        self.last_msg_hga = None
         self.last_msg_mv = None
+        self.monitor.set_text("", 0)
 
     def build(self) -> Gtk.Box:
         grid = super().build()
@@ -370,9 +397,21 @@ class Muse2InputController(InputController):
     def receive(self, msg: Message):
         match msg:
             case HeadGyro():
-                if self.last_msg_ht is None or self.last_msg_ht._distance2() < msg._distance2():
-                    self.last_msg_ht = msg
-                    text = f"x={msg.x:.3f} y={msg.y:.3f} z={msg.z:.3f}"
+                maxxed = False
+                if self.last_msg_hg is None or self.last_msg_hg._distance2() < msg._distance2():
+                    self.last_msg_hg = msg
+                    maxxed = True
+                if self.last_msg_hga is None or self.last_msg_hga._adistance2() < msg._adistance2():
+                    self.last_msg_hga = msg
+                    maxxed = True
+                if maxxed:
+                    text = ""
+                    if (m := self.last_msg_hg):
+                        text += f"x={m.x:.2f} y={m.y:.2f} z={m.z:.2f}"
+                    if (m := self.last_msg_hga):
+                        if text:
+                            text += " "
+                        text += f"ax={m.ax:.2f} ay={m.ay:.2f} az={m.az:.2f}"
                     self.monitor.set_text(text, len(text))
 
             case HeadMoved():
