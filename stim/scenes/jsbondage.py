@@ -12,7 +12,7 @@ from pyeep.gtk import Gtk, GLib
 
 from .. import output
 from ..joystick import JoystickAxisMoved
-from .base import SingleGroupScene, register
+from .base import SingleGroupPowerScene, register
 
 
 class Sample(NamedTuple):
@@ -49,7 +49,7 @@ class Axis:
 
 
 @register
-class JSBondage(SingleGroupScene):
+class JSBondage(SingleGroupPowerScene):
     TITLE = "Joystick bondage"
 
     def __init__(self, **kwargs):

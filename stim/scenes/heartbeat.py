@@ -7,11 +7,11 @@ from pyeep.outputs.color import SetGroupColor
 from pyeep.types import Color
 
 from .. import animation
-from .base import SingleGroupScene, register
+from .base import SingleGroupPowerScene, register
 
 
 @register
-class Heartbeat(SingleGroupScene):
+class Heartbeat(SingleGroupPowerScene):
     TITLE = "Heartbeat"
 
     def __init__(self, **kwargs):

@@ -7,7 +7,7 @@ from pyeep.types import Color
 from pyeep.outputs.color import SetGroupColor
 
 from .. import animation, messages, output
-from .base import SingleGroupScene, register
+from .base import SingleGroupPowerScene, register
 
 
 class KeyboardShortcutMixin:
@@ -65,7 +65,7 @@ class KeyboardShortcutMixin:
 
 
 @register
-class Default(KeyboardShortcutMixin, SingleGroupScene):
+class Default(KeyboardShortcutMixin, SingleGroupPowerScene):
     TITLE = "Default"
 
     def __init__(self, **kwargs):

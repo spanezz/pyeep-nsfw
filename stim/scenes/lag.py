@@ -6,12 +6,12 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.messages import Shortcut, EmergencyStop
 
-from .base import SingleGroupScene, register
+from .base import SingleGroupPowerScene, register
 from .default import KeyboardShortcutMixin
 
 
 @register
-class Lag(KeyboardShortcutMixin, SingleGroupScene):
+class Lag(KeyboardShortcutMixin, SingleGroupPowerScene):
     TITLE = "Lag"
     LAG_START = 1.5
 

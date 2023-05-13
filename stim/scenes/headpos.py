@@ -13,12 +13,12 @@ from pyeep.types import Color
 
 from .. import output
 from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
-from .base import Scene, SingleGroupScene, register
+from .base import Scene, SingleGroupPowerScene, register
 from .. import dsp
 
 
 @register
-class HeadPosition(SingleGroupScene):
+class HeadPosition(SingleGroupPowerScene):
     TITLE = "Head position"
 
     def __init__(self, **kwargs):
@@ -115,7 +115,7 @@ class HeadPosition(SingleGroupScene):
 
 
 @register
-class Consent(SingleGroupScene):
+class Consent(SingleGroupPowerScene):
     TITLE = "Consent"
 
     def __init__(self, **kwargs):
@@ -324,7 +324,7 @@ class Dance(ModeBase):
 
 
 @register
-class ColorDance(ModeMixin, SingleGroupScene):
+class ColorDance(ModeMixin, SingleGroupPowerScene):
     TITLE = "Color dance"
 
     MODES = {
