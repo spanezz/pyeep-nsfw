@@ -4,7 +4,7 @@ from pyeep.app import Message, check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.inputs.heartrate import HeartBeat
 from pyeep.outputs.color import SetGroupColor
-from pyeep.types import Color
+from pyeep.color import Color
 
 from .. import animation
 from .base import SingleGroupScene, SceneGrid, register

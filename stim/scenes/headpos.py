@@ -9,7 +9,7 @@ from pyeep.app import Message, check_hub, export
 from pyeep.app.component import ModeMixin, ModeInfo
 from pyeep.gtk import GLib, Gtk, Gio
 from pyeep.outputs.color import SetGroupColor
-from pyeep.types import Color
+from pyeep.color import Color
 
 from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
 from .base import Scene, SingleGroupScene, SingleGroupPowerScene, register

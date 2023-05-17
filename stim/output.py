@@ -11,7 +11,7 @@ import pyeep.outputs.base
 from pyeep.outputs.color import ColorOutput, ColorOutputController
 from pyeep.outputs.base import Output
 
-from pyeep.types import Color
+from pyeep.color import Color
 
 log = logging.getLogger(__name__)
 

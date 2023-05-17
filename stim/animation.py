@@ -5,7 +5,7 @@ import math
 from typing import Generator
 
 from pyeep.animation import PowerAnimation, ColorAnimation
-from pyeep.types import Color
+from pyeep.color import Color
 
 log = logging.getLogger(__name__)
 
