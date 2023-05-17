@@ -4,14 +4,13 @@ import logging
 from typing import Type
 
 import pyeep.aio
-from pyeep.app import Message, Shutdown, check_hub, export, Component
-from pyeep.gtk import GLib, Gtk
-from pyeep.animation import PowerAnimation, PowerAnimator
 import pyeep.outputs.base
-from pyeep.outputs.color import ColorOutput, ColorOutputController
-from pyeep.outputs.base import Output
-
+from pyeep.animation import PowerAnimation, PowerAnimator
+from pyeep.app import Component, Message, Shutdown, check_hub, export
 from pyeep.color import Color
+from pyeep.gtk import ControllerWidget, GLib, Gtk
+from pyeep.outputs.base import Output
+from pyeep.outputs.color import ColorOutput, ColorOutputController
 
 log = logging.getLogger(__name__)
 
@@ -218,8 +217,8 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
             case _:
                 super().receive(msg)
 
-    def build(self) -> Gtk.Grid:
-        grid = super().build()
+    def build(self) -> ControllerWidget:
+        cw = super().build()
 
         power = Gtk.Scale(
                 orientation=Gtk.Orientation.HORIZONTAL,
@@ -234,16 +233,16 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
                 position=Gtk.PositionType.BOTTOM,
                 markup=None
             )
-        grid.attach(power, 0, 2, 4, 1)
+        cw.grid.attach(power, 0, 2, 4, 1)
 
         power_min = Gtk.SpinButton()
         power_min.set_adjustment(self.power_min)
-        grid.attach(power_min, 0, 3, 1, 1)
+        cw.grid.attach(power_min, 0, 3, 1, 1)
 
-        grid.attach(Gtk.Label(label="to"), 1, 3, 2, 1)
+        cw.grid.attach(Gtk.Label(label="to"), 1, 3, 2, 1)
 
         power_max = Gtk.SpinButton()
         power_max.set_adjustment(self.power_max)
-        grid.attach(power_max, 3, 3, 1, 1)
+        cw.grid.attach(power_max, 3, 3, 1, 1)
 
-        return grid
+        return cw

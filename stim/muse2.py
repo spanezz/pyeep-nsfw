@@ -11,7 +11,7 @@ import numpy
 from pyeep import bluetooth
 from pyeep.app import Message, export
 from pyeep.app.component import ModeInfo
-from pyeep.gtk import Gtk
+from pyeep.gtk import ControllerWidget, Gtk
 from pyeep.inputs.base import Input, InputController, InputSetActive
 from pyeep.inputs.muse2.aio_muse import Muse
 
@@ -385,14 +385,14 @@ class Muse2InputController(InputController):
         self.last_msg_mv = None
         self.monitor.set_text("", 0)
 
-    def build(self) -> Gtk.Box:
-        grid = super().build()
+    def build(self) -> ControllerWidget:
+        cw = super().build()
         monitor = Gtk.Text(buffer=self.monitor)
-        grid.attach(monitor, 0, 3, 1, 1)
+        cw.grid.attach(monitor, 0, 3, 1, 1)
         reset = Gtk.Button(label="reset")
         reset.connect("clicked", self.on_reset)
-        grid.attach(reset, 0, 4, 1, 1)
-        return grid
+        cw.grid.attach(reset, 0, 4, 1, 1)
+        return cw
 
     def receive(self, msg: Message):
         match msg:
