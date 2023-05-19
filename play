@@ -80,7 +80,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
                 logging.getLogger(name).setLevel(logging.INFO)
 
     def _add_input_ui(self, input: Input):
-        input_controller = self.add_component(input.get_input_controller(), input=input)
+        input_controller = self.add_component(input.get_controller(), input=input)
         self.inputs_box.append(input_controller.widget)
 
     def _add_input(self, input: Input):

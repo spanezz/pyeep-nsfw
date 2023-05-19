@@ -10,9 +10,9 @@ import numpy
 
 from pyeep import bluetooth
 from pyeep.app import Message, export
-from pyeep.app.component import ModeInfo
+from pyeep.app.component import BasicActiveMixin, ModeInfo
 from pyeep.gtk import ControllerWidget, Gtk
-from pyeep.inputs.base import BasicActiveMixin, Input, InputController
+from pyeep.inputs.base import Input, InputController
 from pyeep.inputs.muse2.aio_muse import Muse
 
 from . import dsp
@@ -318,7 +318,7 @@ class Muse2(BasicActiveMixin, Input, bluetooth.BluetoothComponent):
         super().__init__(**kwargs)
         self.muse = Muse(self.client)
 
-    def get_input_controller(self) -> Type["InputController"]:
+    def get_controller(self) -> Type["InputController"]:
         return Muse2InputController
 
     async def on_connect(self):
