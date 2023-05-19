@@ -12,7 +12,7 @@ from pyeep import bluetooth
 from pyeep.app import Message, export
 from pyeep.app.component import ModeInfo
 from pyeep.gtk import ControllerWidget, Gtk
-from pyeep.inputs.base import Input, InputController, InputSetActive
+from pyeep.inputs.base import BasicActiveMixin, Input, InputController
 from pyeep.inputs.muse2.aio_muse import Muse
 
 from . import dsp
@@ -302,7 +302,7 @@ class ModeHeadGyro(ModeBase):
         )
 
 
-class Muse2(Input, bluetooth.BluetoothComponent):
+class Muse2(BasicActiveMixin, Input, bluetooth.BluetoothComponent):
     """
     Monitor a Bluetooth LE heart rate monitor
     """
@@ -316,15 +316,10 @@ class Muse2(Input, bluetooth.BluetoothComponent):
     # This has been tested with a Moofit HW401
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.active = False
         self.muse = Muse(self.client)
 
     def get_input_controller(self) -> Type["InputController"]:
         return Muse2InputController
-
-    @property
-    def is_active(self) -> bool:
-        return self.active
 
     async def on_connect(self):
         await super().on_connect()
@@ -363,12 +358,6 @@ class Muse2(Input, bluetooth.BluetoothComponent):
         self.mode = self.MODES[name](muse2=self)
 
     # TODO: send keep_alive messages every once in a while
-
-    async def run_message(self, msg: Message):
-        match msg:
-            case InputSetActive():
-                if msg.input == self:
-                    self.active = msg.value
 
 
 class Muse2InputController(InputController):

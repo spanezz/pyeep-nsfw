@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import pyeep.pygame
-from pyeep.app import Message, check_hub, export
+from pyeep.app import Message, check_hub
 from pyeep.pygame import pygame
 
-from pyeep.inputs.base import Input, InputSetActive
+from pyeep.inputs.base import BasicActiveMixin, Input
 
 
 class JoystickAxisMoved(Message):
@@ -18,7 +18,7 @@ class JoystickAxisMoved(Message):
         return super().__str__() + f"(joystick={self.joystick}, axis={self.axis}, value={self.value})"
 
 
-class Joystick(Input, pyeep.pygame.PygameComponent):
+class Joystick(BasicActiveMixin, Input, pyeep.pygame.PygameComponent):
     EVENTS = (
         pygame.JOYAXISMOTION,
         pygame.JOYBALLMOTION,
@@ -30,23 +30,10 @@ class Joystick(Input, pyeep.pygame.PygameComponent):
     def __init__(self, *, joystick: pygame.joystick.Joystick, **kwargs):
         super().__init__(**kwargs)
         self.joystick = joystick
-        self.active = False
-
-    @export
-    @property
-    def is_active(self) -> bool:
-        return self.active
 
     @property
     def description(self) -> str:
         return self.joystick.get_name()
-
-    @check_hub
-    def receive(self, msg: "Message"):
-        match msg:
-            case InputSetActive():
-                if msg.input == self:
-                    self.active = msg.value
 
     @check_hub
     def pygame_event(self, event: pygame.event.Event):

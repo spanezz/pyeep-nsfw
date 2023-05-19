@@ -40,7 +40,7 @@ class ColorPulse(ColorAnimation):
         frame_count = math.floor(self.duration * rate)
         for frame in range(frame_count):
             envelope = (frame_count - frame) / frame_count
-            yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
+            yield Color(self.color.red * envelope, self.color.green * envelope, self.color.blue * envelope)
         yield Color(0, 0, 0)
 
 
