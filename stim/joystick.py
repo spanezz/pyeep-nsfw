@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pyeep.pygame
-from pyeep.app import check_hub
-from pyeep.app.component import BasicActiveMixin
+from pyeep.component.base import check_hub
+from pyeep.component.active import SimpleActiveComponent
 from pyeep.inputs.base import Input
 from pyeep.messages import Message
 from pyeep.pygame import pygame
@@ -19,7 +19,7 @@ class JoystickAxisMoved(Message):
         return super().__str__() + f"(joystick={self.joystick}, axis={self.axis}, value={self.value})"
 
 
-class Joystick(BasicActiveMixin, Input, pyeep.pygame.PygameComponent):
+class Joystick(SimpleActiveComponent, Input, pyeep.pygame.PygameComponent):
     EVENTS = (
         pygame.JOYAXISMOTION,
         pygame.JOYBALLMOTION,

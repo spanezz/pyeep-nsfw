@@ -19,7 +19,7 @@ import pyeep.pygame
 import stim.buttplug
 import stim.muse2
 import stim.output
-from pyeep.app import Component
+from pyeep.component.base import Component
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
 from pyeep.outputs.base import NewOutput, Output, OutputsModel
@@ -80,7 +80,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
                 logging.getLogger(name).setLevel(logging.INFO)
 
     def _add_input_ui(self, input: Input):
-        input_controller = self.add_component(input.get_controller(), input=input)
+        input_controller = self.add_component(input.get_controller(), component=input)
         self.inputs_box.append(input_controller.widget)
 
     def _add_input(self, input: Input):
@@ -93,7 +93,7 @@ class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
         # Notify of the new output
         self.send(NewOutput(output=output))
 
-    def add_component(self, component_cls: Type[pyeep.app.Component], **kwargs) -> pyeep.app.Component:
+    def add_component(self, component_cls: Type[Component], **kwargs) -> Component:
         component = super().add_component(component_cls, **kwargs)
         match component:
             case Input():

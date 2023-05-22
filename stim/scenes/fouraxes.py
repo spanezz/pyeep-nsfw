@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pyeep.app import Message, check_hub
+from pyeep.messages import Message
+from pyeep.component.base import check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.messages import Shortcut
 

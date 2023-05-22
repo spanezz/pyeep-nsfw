@@ -6,9 +6,12 @@ from typing import Type
 import pyeep.aio
 import pyeep.outputs.base
 from pyeep.animation import PowerAnimation, PowerAnimator
-from pyeep.app import Component, Message, Shutdown, check_hub, export
 from pyeep.color import Color
-from pyeep.gtk import ControllerWidget, GLib, Gtk
+from pyeep.component.aio import AIOComponent
+from pyeep.component.base import Component, check_hub, export
+from pyeep.component.controller import ControllerWidget
+from pyeep.gtk import GLib, Gtk
+from pyeep.messages import Message, Shutdown
 from pyeep.outputs.base import Output
 from pyeep.outputs.color import ColorOutput, ColorOutputController
 
@@ -46,7 +49,7 @@ class IncreaseGroupPower(Message):
         return super().__str__() + f"(group={self.group}, amount={self.amount})"
 
 
-class NullOutput(PowerOutput, ColorOutput, pyeep.aio.AIOComponent):
+class NullOutput(PowerOutput, ColorOutput, AIOComponent):
     """
     Output that does nothing besides tracking the last set power value
     """

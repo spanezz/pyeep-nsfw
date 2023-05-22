@@ -6,8 +6,9 @@ from typing import Type
 import buttplug
 import pyeep.aio
 import pyeep.outputs
-from pyeep.app import Message, Shutdown, export
-from pyeep.messages import DeviceScanRequest
+from pyeep.component.aio import AIOComponent
+from pyeep.component.base import export
+from pyeep.messages import DeviceScanRequest, Message, Shutdown
 
 from .output import PowerOutput, PowerOutputController
 
@@ -24,7 +25,7 @@ class SetPower(Message):
         return super().__str__() + f"(power={self.power})"
 
 
-class Actuator(PowerOutput, pyeep.aio.AIOComponent):
+class Actuator(PowerOutput, AIOComponent):
     """
     Component driving an actuator
     """
@@ -54,7 +55,7 @@ class Actuator(PowerOutput, pyeep.aio.AIOComponent):
                     await self.actuator.command(msg.power)
 
 
-class ButtplugClient(pyeep.aio.AIOComponent):
+class ButtplugClient(AIOComponent):
     def __init__(self, client_name: str, iface: str, **kwargs):
         kwargs.setdefault("name", "buttplug_client")
         super().__init__(**kwargs)

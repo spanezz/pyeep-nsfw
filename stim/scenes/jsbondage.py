@@ -7,8 +7,9 @@ from typing import NamedTuple
 
 import numpy
 
-from pyeep.app import Message, check_hub
-from pyeep.gtk import Gtk, GLib
+from pyeep.component.base import check_hub
+from pyeep.gtk import GLib, Gtk
+from pyeep.messages import Message
 
 from ..joystick import JoystickAxisMoved
 from .base import SingleGroupPowerScene, register

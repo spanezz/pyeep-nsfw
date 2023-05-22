@@ -5,8 +5,9 @@ from typing import Iterator
 
 import numpy
 
-from pyeep.app import Message, check_hub, export
-from pyeep.app.component import ModeMixin, ModeInfo
+from pyeep.messages import Message
+from pyeep.component.base import check_hub, export
+from pyeep.component.modes import ModeComponent, ModeInfo
 from pyeep.gtk import GLib, Gtk, Gio
 from pyeep.outputs.color import SetGroupColor
 from pyeep.color import Color
@@ -323,7 +324,7 @@ class Dance(ModeBase):
 
 
 @register
-class ColorDance(ModeMixin, SingleGroupScene):
+class ColorDance(ModeComponent, SingleGroupScene):
     TITLE = "Color dance"
 
     MODES = {

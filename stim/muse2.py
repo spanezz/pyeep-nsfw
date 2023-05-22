@@ -9,11 +9,14 @@ from typing import Iterator, Type
 import numpy
 
 from pyeep import bluetooth
-from pyeep.app import Message, export
-from pyeep.app.component import BasicActiveMixin, ModeInfo
-from pyeep.gtk import ControllerWidget, Gtk
+from pyeep.component.active import SimpleActiveComponent
+from pyeep.component.modes import ModeInfo
+from pyeep.component.controller import ControllerWidget
+from pyeep.component.base import export
+from pyeep.gtk import Gtk
 from pyeep.inputs.base import Input, InputController
 from pyeep.inputs.muse2.aio_muse import Muse
+from pyeep.messages import Message
 
 from . import dsp
 
@@ -302,7 +305,7 @@ class ModeHeadGyro(ModeBase):
         )
 
 
-class Muse2(BasicActiveMixin, Input, bluetooth.BluetoothComponent):
+class Muse2(SimpleActiveComponent, Input, bluetooth.BluetoothComponent):
     """
     Monitor a Bluetooth LE heart rate monitor
     """

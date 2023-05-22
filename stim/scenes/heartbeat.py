@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from pyeep.app import Message, check_hub
+from pyeep.color import Color
+from pyeep.component.base import check_hub
 from pyeep.gtk import GLib, Gtk
 from pyeep.inputs.heartrate import HeartBeat
+from pyeep.messages import Message
 from pyeep.outputs.color import SetGroupColor
-from pyeep.color import Color
 
 from .. import animation
-from .base import SingleGroupScene, SceneGrid, register
+from .base import SceneGrid, SingleGroupScene, register
 
 
 @register

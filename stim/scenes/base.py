@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Type
 
-from pyeep.app import check_hub
-from pyeep.gtk import Gio, GLib, Gtk, GtkComponent
+from pyeep.component.base import check_hub
+from pyeep.component.gtk import GtkComponent
+from pyeep.gtk import Gio, GLib, Gtk
 
 from .. import output
 

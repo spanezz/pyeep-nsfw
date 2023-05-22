@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import functools
 
-from pyeep.app import Message, check_hub
+from pyeep.component.base import check_hub
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import Shortcut, EmergencyStop
+from pyeep.messages import EmergencyStop, Message, Shortcut
 
 from .base import SingleGroupPowerScene, register
 from .default import KeyboardShortcutMixin
