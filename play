@@ -7,10 +7,7 @@ import pkgutil
 import sys
 from typing import Type
 
-from pyeep.app.aio import AIOApp
-import pyeep.app
 import pyeep.bluetooth
-import pyeep.gtk
 import pyeep.inputs.heartrate
 import pyeep.inputs.keyboards
 import pyeep.inputs.manual
@@ -19,10 +16,13 @@ import pyeep.pygame
 import stim.buttplug
 import stim.muse2
 import stim.output
+from pyeep.app.aio import AIOApp
+from pyeep.app.jack import JackApp
+from pyeep.app.gtk import GtkApp
 from pyeep.component.base import Component
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
-from pyeep.outputs.base import NewOutput, Output, OutputsModel
+from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from stim import joystick, scenes
 from stim.output import NullOutput
@@ -46,14 +46,14 @@ class ScanAction(Component):
         self.send(pyeep.messages.DeviceScanRequest(duration=3.0))
 
 
-class App(pyeep.gtk.GtkApp, AIOApp):
+class App(GtkApp, JackApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)
         self.outputs = self.add_component(OutputsModel)
         self.inputs: list[Input] = []
 
-        self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=args.iface)
+        self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
@@ -89,17 +89,11 @@ class App(pyeep.gtk.GtkApp, AIOApp):
         if hasattr(self, "inputs_box"):
             self._add_input_ui(input)
 
-    def _add_output(self, output: Output):
-        # Notify of the new output
-        self.send(NewOutput(output=output))
-
     def add_component(self, component_cls: Type[Component], **kwargs) -> Component:
         component = super().add_component(component_cls, **kwargs)
         match component:
             case Input():
                 GLib.idle_add(self._add_input, component)
-            case Output():
-                GLib.idle_add(self._add_output, component)
         return component
 
     def build_main_window(self):
@@ -148,7 +142,7 @@ class App(pyeep.gtk.GtkApp, AIOApp):
 
 
 def main():
-    parser = App.argparser("Play with nonconventional inputs and outputs")
+    parser = App.argparser(name="play", description="Play with nonconventional inputs and outputs")
     parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
                         help="Intiface Engine address to connect to")
     args = parser.parse_args()
