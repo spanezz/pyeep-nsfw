@@ -78,6 +78,5 @@ class Heartbeat(SingleGroupScene):
             return
         match msg:
             case HeartBeat():
-                if self.is_active:
-                    self.last_rate = msg.sample.rate
-                    self._check_timeout()
+                self.last_rate = msg.sample.rate
+                self._check_timeout()

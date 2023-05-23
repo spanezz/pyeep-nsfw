@@ -11,14 +11,15 @@ import pyeep.bluetooth
 import pyeep.inputs.heartrate
 import pyeep.inputs.keyboards
 import pyeep.inputs.manual
+import pyeep.inputs.midi
 import pyeep.messages
 import pyeep.pygame
 import stim.buttplug
 import stim.muse2
 import stim.output
 from pyeep.app.aio import AIOApp
-from pyeep.app.jack import JackApp
 from pyeep.app.gtk import GtkApp
+from pyeep.app.jack import JackApp
 from pyeep.component.base import Component
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
@@ -55,6 +56,7 @@ class App(GtkApp, JackApp, AIOApp):
 
         self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
+        self.add_component(pyeep.inputs.midi.MidiInput)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
             pyeep.bluetooth.Device("21:04:99:10:35:05", HappyLights),
