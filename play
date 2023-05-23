@@ -7,7 +7,7 @@ import pkgutil
 import sys
 from typing import Type
 
-import pyeep.aio
+from pyeep.app.aio import AIOApp
 import pyeep.app
 import pyeep.bluetooth
 import pyeep.gtk
@@ -46,7 +46,7 @@ class ScanAction(Component):
         self.send(pyeep.messages.DeviceScanRequest(duration=3.0))
 
 
-class App(pyeep.gtk.GtkApp, pyeep.aio.AIOApp):
+class App(pyeep.gtk.GtkApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)

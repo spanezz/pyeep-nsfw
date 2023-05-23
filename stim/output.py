@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import Type
 
-import pyeep.aio
 import pyeep.outputs.base
 from pyeep.animation import PowerAnimation, PowerAnimator
 from pyeep.color import Color

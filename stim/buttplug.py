@@ -4,7 +4,6 @@ import asyncio
 from typing import Type
 
 import buttplug
-import pyeep.aio
 import pyeep.outputs
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
