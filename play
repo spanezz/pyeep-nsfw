@@ -17,6 +17,7 @@ import pyeep.pygame
 import stim.buttplug
 import stim.muse2
 import stim.output
+import stim.outputs.synth
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
@@ -71,6 +72,7 @@ class App(GtkApp, JackApp, AIOApp):
             "bluetooth-22c:28:c6:3f:39:91:1b": pyeep.inputs.keyboards.RingRemote,
         })
         self.add_component(NullOutput, name="null_output")
+        self.add_component(stim.outputs.synth.Synth)
 
     def setup_logging(self):
         super().setup_logging()
