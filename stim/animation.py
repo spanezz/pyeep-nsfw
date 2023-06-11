@@ -62,10 +62,10 @@ class ColorHeartPulse(ColorAnimation):
 
         for frame in range(atrial_frames):
             envelope = 0.5 * (atrial_frames - frame) / atrial_frames
-            yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
+            yield Color(self.color.red * envelope, self.color.green * envelope, self.color.blue * envelope)
 
         for frame in range(ventricular_frames):
             envelope = (ventricular_frames - frame) / ventricular_frames
-            yield Color(self.color[0] * envelope, self.color[1] * envelope, self.color[2] * envelope)
+            yield Color(self.color.red * envelope, self.color.green * envelope, self.color.blue * envelope)
 
         yield Color(0, 0, 0)
