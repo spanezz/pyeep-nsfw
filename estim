@@ -9,9 +9,9 @@ from typing import Generator, Optional
 
 import numpy
 
-import pyeep.aio
-import pyeep.app
-from pyeep.app import Shutdown
+from pyeep.component.aio import AIOComponent
+import pyeep.app.aio
+from pyeep.messages import Shutdown
 from pyeep import shape, volume
 from pyeep.audio import PyAudioPlayer
 from pyeep.pattern import Pattern, PatternSequence, Silence, Wave
@@ -138,8 +138,9 @@ class PulseWaveEscalate(PulseWaveEscalateBase):
     """
     Pulse wave escalate
     """
-    PULSE_VOLUME = 0.9
-    WAVE_VOLUME = 0.95
+    PULSE_VOLUME = 0.95
+    WAVE_VOLUME = 1
+    # WAVE_VOLUME = 0.95
 
     def patterns(self) -> Generator[Pattern, None, None]:
         # TODO: implement adding an override pattern in the player, which gets
@@ -149,9 +150,14 @@ class PulseWaveEscalate(PulseWaveEscalateBase):
         # patterns in case things get interesting
         for i, f in zip(self.duration_pattern(), self.freq_pattern()):
             f = 2000
-            yield Pulses(count=i * 2, duration=0.1, freq=f, volume=self.PULSE_VOLUME, gap=10.0/100.0)
+            yield Pulses(
+                    count=i * 2, duration=0.15, freq=f,
+                    # volume=self.PULSE_VOLUME,
+                    volume=volume.RampUp(vmin=self.PULSE_VOLUME*0.7, vmax=self.PULSE_VOLUME),
+                    gap=15.0/100.0)
             yield Wave(
-                    volume=volume.Sine(vmin=self.WAVE_VOLUME * 0.93, vmax=self.WAVE_VOLUME, freq=3),
+                    # volume=volume.Sine(vmin=self.WAVE_VOLUME * 0.93, vmax=self.WAVE_VOLUME, freq=3),
+                    volume=self.WAVE_VOLUME,
                     duration=self.MIN_DURATION + i / 2, freq=f)
             yield Silence(duration=5.0/100.0)
 
@@ -560,7 +566,7 @@ class TestVolumeSlide(PatternSequence):
         yield Wave(volume=volume.RampDown(0.0, 1.0), duration=1, freq=1000)
 
 
-class MonitorHeartbeat(pyeep.aio.AIOComponent):
+class MonitorHeartbeat(AIOComponent):
     def __init__(self, *, path: Path | None, **kwargs):
         super().__init__(**kwargs)
         self.path = path
@@ -586,7 +592,7 @@ class MonitorHeartbeat(pyeep.aio.AIOComponent):
             cb(self.excitement)
 
 
-class App(pyeep.aio.AIOApp, pyeep.app.App):
+class App(pyeep.app.aio.AIOApp, pyeep.app.App):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
         self.args = args
