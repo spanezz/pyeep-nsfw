@@ -305,10 +305,12 @@ class Dance(ModeBase):
                 def norm(val: float) -> float:
                     return ((abs(val) - min_dps) / (max_dps - min_dps)) ** 2
 
-                for i in range(msg.frames):
-                    red = self.filter_red(norm(msg.y))
-                    green = self.filter_green(norm(msg.x))
-                    blue = self.filter_blue(norm(msg.z))
+                for sample in msg.x:
+                    red = self.filter_red(norm(sample))
+                for sample in msg.y:
+                    green = self.filter_green(norm(sample))
+                for sample in msg.z:
+                    blue = self.filter_blue(norm(sample))
 
                 color = Color(
                     red=numpy.clip(red, 0, 1),
