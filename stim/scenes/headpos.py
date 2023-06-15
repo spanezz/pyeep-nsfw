@@ -5,16 +5,16 @@ from typing import Iterator
 
 import numpy
 
-from pyeep.messages import Message
+from pyeep import dsp
+from pyeep.color import Color
 from pyeep.component.base import check_hub, export
 from pyeep.component.modes import ModeComponent, ModeInfo
-from pyeep.gtk import GLib, Gtk, Gio
+from pyeep.gtk import Gio, GLib, Gtk
+from pyeep.messages import Message
 from pyeep.outputs.color import SetGroupColor
-from pyeep.color import Color
 
-from ..muse2 import HeadMoved, HeadYesNo, HeadGyro
-from .base import Scene, SingleGroupScene, SingleGroupPowerScene, register
-from .. import dsp
+from ..muse2 import HeadGyro, HeadMoved, HeadYesNo
+from .base import Scene, SingleGroupPowerScene, SingleGroupScene, register
 
 
 @register

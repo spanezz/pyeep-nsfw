@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from pyeep.messages import Message
-from pyeep.component.base import check_hub
-
 import numpy
 
+from pyeep.component.base import check_hub
+from pyeep.messages import Message
+
 from ..muse2 import HeadGyro
-from .base import SingleGroupPowerScene, register
-# from .. import dsp
 from ..output import SetGroupPower
+from .base import SingleGroupPowerScene, register
 
 
 @register
