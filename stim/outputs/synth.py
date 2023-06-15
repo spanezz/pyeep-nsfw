@@ -105,11 +105,9 @@ class Player(Output, JackComponent, AIOComponent):
         self.synth.add_output(self.instruments)
 
     def jack_process(self, frames: int) -> None:
-        audio = self.instruments.generate(
+        self.instruments.generate(
                     self.jack_client.last_frame_time,
-                    frames)
-
-        self.outport.get_array()[:] = audio
+                    self.outport.get_array())
 
     async def run(self) -> None:
         while True:

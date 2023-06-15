@@ -3,12 +3,10 @@ from __future__ import annotations
 from pyeep.component.base import check_hub
 from pyeep.inputs.midi import MidiMessages
 from pyeep.messages import Message
-from pyeep import midisynth
 
 from .. import animation
 from .base import SingleGroupScene, register
 from ..output import IncreaseGroupPower
-from ..outputs.synth import PlayAudio
 
 
 @register
