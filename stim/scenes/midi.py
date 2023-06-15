@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 from pyeep.component.base import check_hub
-from pyeep.inputs.midi import MidiMessage
+from pyeep.inputs.midi import MidiMessages
 from pyeep.messages import Message
+from pyeep import midisynth
 
 from .. import animation
 from .base import SingleGroupScene, register
 from ..output import IncreaseGroupPower
+from ..outputs.synth import PlayAudio
 
 
 @register
-class MIDI(SingleGroupScene):
-    TITLE = "MIDI"
+class MIDIPower(SingleGroupScene):
+    TITLE = "MIDIPower"
 
     # def build(self) -> Gtk.Expander:
     #     expander = super().build()
@@ -33,14 +35,15 @@ class MIDI(SingleGroupScene):
         if not self.is_active:
             return
         match msg:
-            case MidiMessage():
-                match (midi := msg.msg).type:
-                    case "note_on":
-                        power = (midi.note - 47) / (72 - 47)
-                        duration = 0.5 * midi.velocity / 127
+            case MidiMessages():
+                for midi in msg.messages:
+                    match midi.type:
+                        case "note_on":
+                            power = (midi.note - 47) / (72 - 47)
+                            duration = 0.5 * midi.velocity / 127
 
-                        self.send(IncreaseGroupPower(
-                            group=self.get_group(),
-                            amount=animation.PowerPulse(
-                                duration=duration,
-                                power=power)))
+                            self.send(IncreaseGroupPower(
+                                group=self.get_group(),
+                                amount=animation.PowerPulse(
+                                    duration=duration,
+                                    power=power)))
