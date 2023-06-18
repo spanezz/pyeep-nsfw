@@ -87,8 +87,24 @@ class Player(Output, JackComponent, AIOComponent):
         self.synth: midisynth.MidiSynth
         self.instruments: midisynth.Instruments
 
+    def jack_add_messages(self, msg: MidiMessages):
+        """
+        Enqueue notes to be played.
+
+        This function is called from the Jack realtime thread
+        """
+        self.synth.add_messages(
+                msg.last_frame_time,
+                msg.messages)
+
     def set_jack_client(self, jack_client: jack.Client):
         super().set_jack_client(jack_client)
+
+        # Direcly hook this as a MIDI consumer that gets messages from the MIDI
+        # input in the RT thread
+        reader = self.hub.app.get_component("midiinput")
+        reader.add_midi_sink(self.jack_add_messages)
+
         self.outport = self.jack_client.outports.register('player')
         self.rate = jack_client.samplerate
 
@@ -100,8 +116,9 @@ class Player(Output, JackComponent, AIOComponent):
                     in_samplerate=self.rate,
                     out_samplerate=self.rate,
                     dtype=numpy.float32))
-        self.instruments.set(0, midisynth.Sine)
-        self.instruments.set(1, midisynth.Saw)
+        envelope = midisynth.EnvelopeShape(attack_time=0.03, decay_time=0.01, release_time=0.1)
+        self.instruments.set(0, midisynth.Sine, envelope=envelope)
+        self.instruments.set(1, midisynth.Saw, envelope=envelope)
         self.synth.add_output(self.instruments)
 
     def jack_process(self, frames: int) -> None:
@@ -115,7 +132,7 @@ class Player(Output, JackComponent, AIOComponent):
             match msg:
                 case Shutdown():
                     break
-                case MidiMessages():
-                    self.synth.add_messages(
-                            msg.last_frame_time,
-                            msg.messages)
+                # case MidiMessages():
+                #     self.synth.add_messages(
+                #             msg.last_frame_time,
+                #             msg.messages)
