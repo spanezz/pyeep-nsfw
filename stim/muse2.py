@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterator, Type
 
 import numpy
+import scipy.signal
 
 from pyeep import bluetooth, dsp
 from pyeep.component.active import SimpleActiveComponent
@@ -83,6 +84,31 @@ class HeadGyro(Message):
     #     return self.ax ** 2 + self.ay ** 2 + self.az ** 2
 
 
+class BrainWaves(Message):
+    def __init__(
+            self, *,
+            timestamp: float,
+            alpha: float,
+            beta: float,
+            gamma: float,
+            delta: float,
+            theta: float,
+            **kwargs):
+        super().__init__(**kwargs)
+        self.timestamp = timestamp
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.delta = delta
+        self.theta = theta
+
+    def __str__(self):
+        return super().__str__() + (
+            f"(timestamp={self.timestamp},"
+            f" alpha={self.alpha}, beta={self.beta}, gamma={self.gamma}, delta={self.delta}, theta={self.theta})"
+        )
+
+
 class ModeBase:
     """
     Base class for Muse2 data processing modes
@@ -137,6 +163,94 @@ class ModeHeadPosition(ModeBase):
             pitch = self.filter_pitch(pitch)
 
         self.muse2.send(HeadMoved(frames=frames, pitch=pitch, roll=roll))
+
+
+class ModeBrainWaves(ModeBase):
+    """
+    Brain waves
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.win_size = 256 * 2
+        self.hop = 16
+        self.hamming = scipy.signal.windows.hamming(self.win_size, sym=False)
+        self.freqs = numpy.fft.fftfreq(self.win_size, 1 / 256)
+        self.timestamps: numpy.ndarray | None = None
+        self.samples: dict[str, numpy.ndarray] = {}
+        self.channels = ["TP9", "AF7", "AF8", "TP10"]
+        self.dend: int | None = None
+        self.tend: int | None = None
+        self.aend: int | None = None
+        self.bend: int | None = None
+        self.gend: int | None = None
+        for idx, val in enumerate(self.freqs):
+            if self.dend is None and val >= 4:
+                self.dend = idx
+            elif self.tend is None and val >= 7.5:
+                self.tend = idx
+            elif self.aend is None and val >= 12:
+                self.aend = idx
+            elif self.bend is None and val >= 40:
+                self.bend = idx
+            elif self.gend is None and val >= 70:
+                self.gend = idx
+
+    def on_eeg(self, data: numpy.ndarray, timestamps: numpy.ndarray):
+        if self.timestamps is None:
+            self.timestamps = timestamps
+            for idx, name in enumerate(self.channels, start=1):
+                self.samples[name] = data[idx, :]
+            return
+
+        self.timestamps = numpy.concatenate((self.timestamps, timestamps))
+        for idx, name in enumerate(self.channels, start=0):
+            old = self.samples.get(name)
+            self.samples[name] = numpy.concatenate((old, data[idx, :]))
+
+        if len(self.timestamps) >= self.win_size:
+            window_end_time = self.timestamps[self.win_size - 1]
+
+            all_delta: float = 0.0
+            all_theta: float = 0.0
+            all_alpha: float = 0.0
+            all_beta: float = 0.0
+            all_gamma: float = 0.0
+
+            for idx, name in enumerate(self.channels, start=1):
+                arr = self.samples[name]
+
+                signal = arr[:self.win_size] * self.hamming
+                powers = abs(scipy.fft.rfft(signal))
+
+                ch_delta = numpy.mean(20 * numpy.log10(powers[0:self.dend]))
+                ch_theta = numpy.mean(20 * numpy.log10(powers[self.dend:self.tend]))
+                ch_alpha = numpy.mean(20 * numpy.log10(powers[self.tend:self.aend]))
+                ch_beta = numpy.mean(20 * numpy.log10(powers[self.aend:self.bend]))
+                ch_gamma = numpy.mean(20 * numpy.log10(powers[self.bend:self.gend]))
+
+                all_delta += ch_delta
+                all_theta += ch_theta
+                all_alpha += ch_alpha
+                all_beta += ch_beta
+                all_gamma += ch_gamma
+
+                self.samples[name] = arr[self.hop:]
+
+            self.timestamps = self.timestamps[self.hop:]
+
+            delta = all_delta / 4
+            theta = all_theta / 4
+            alpha = all_alpha / 4
+            beta = all_beta / 4
+            gamma = all_gamma / 4
+            # print(f"{window_end_time} {delta=:.1f} {theta=:.1f} {alpha=:.1f} {beta=:.1f} {gamma=:.1f}")
+            self.muse2.send(BrainWaves(
+                timestamp=window_end_time,
+                alpha=alpha,
+                beta=beta,
+                gamma=gamma,
+                delta=delta,
+                theta=theta))
 
 
 class GyroAxisBase:
@@ -294,6 +408,7 @@ class Muse2(SimpleActiveComponent, Input, bluetooth.BluetoothComponent):
         "headpos": ModeHeadPosition,
         "headgest": ModeHeadYesNo,
         "headturn": ModeHeadGyro,
+        "brainwaves": ModeBrainWaves,
     }
 
     # This has been tested with a Moofit HW401
@@ -308,7 +423,7 @@ class Muse2(SimpleActiveComponent, Input, bluetooth.BluetoothComponent):
         await super().on_connect()
         await self.muse.subscribe_gyro(self.on_gyro)
         await self.muse.subscribe_acc(self.on_acc)
-        # await self.muse.subscribe_eeg(self.on_eeg)
+        await self.muse.subscribe_eeg(self.on_eeg)
         await self.muse.start()
 
     def on_gyro(self, data: numpy.ndarray, timestamps: list[float]):

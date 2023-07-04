@@ -13,7 +13,7 @@ from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.messages import Message
 from pyeep.outputs.color import SetGroupColor
 
-from ..muse2 import HeadGyro, HeadMoved, HeadYesNo
+from ..muse2 import HeadGyro, HeadMoved, HeadYesNo, BrainWaves
 from .base import Scene, SingleGroupPowerScene, SingleGroupScene, register
 
 
@@ -245,6 +245,7 @@ class Dance(ModeBase):
         self.filter_red = dsp.Butterworth(rate=self.input_rate, cutoff=10)
         self.filter_green = dsp.Butterworth(rate=self.input_rate, cutoff=10)
         self.filter_blue = dsp.Butterworth(rate=self.input_rate, cutoff=10)
+        self.last_bw_ts: float | None = None
 
     def on_message(self, msg: Message):
         match msg:
@@ -321,6 +322,21 @@ class Dance(ModeBase):
                 self.scene.send(SetGroupColor(
                     group=self.scene.get_group(),
                     color=color))
+            case BrainWaves():
+                # min_db = 30
+                # max_db = 60
+                if self.last_bw_ts is None or msg.timestamp - self.last_bw_ts > 0.05:
+                    self.last_bw_ts = msg.timestamp
+                    bwmin = min((msg.alpha, msg.beta, msg.theta))
+                    bwmax = max((msg.alpha, msg.beta, msg.theta))
+                    color = Color(
+                        red=numpy.clip((msg.alpha - bwmin) / (bwmax - bwmin), 0, 1),
+                        green=numpy.clip((msg.beta - bwmin) / (bwmax - bwmin), 0, 1),
+                        blue=numpy.clip((msg.theta - bwmin) / (bwmax - bwmin), 0, 1),
+                    )
+                    self.scene.send(SetGroupColor(
+                        group=self.scene.get_group(),
+                        color=color))
             case _:
                 super().on_message(msg)
 
