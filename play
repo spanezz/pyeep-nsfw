@@ -18,6 +18,7 @@ import stim.buttplug
 import stim.muse2
 import stim.output
 import stim.outputs.synth
+import stim.outputs.pattern
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
@@ -74,6 +75,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.add_component(NullOutput, name="null_output")
         self.add_component(stim.outputs.synth.Synth)
         self.add_component(stim.outputs.synth.Pulses)
+        self.add_component(stim.outputs.pattern.PatternPlayer)
 
     def setup_logging(self):
         super().setup_logging()
