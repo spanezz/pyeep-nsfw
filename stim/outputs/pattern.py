@@ -1,30 +1,51 @@
 from __future__ import annotations
 
+import math
 from typing import Type
 
 import jack
 import numpy
 
-from pyeep.midisynth import SineWave
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
 from pyeep.component.jack import JackComponent
 from pyeep.messages import Message, Shutdown
+from pyeep.midisynth import SineWave
 
 from ..output import Output, PowerOutput, PowerOutputController
 
 
 class Pattern:
     def __init__(self):
-        pass
+        self.rate: int
 
     def set_rate(self, rate: int):
-        pass
+        self.rate = rate
 
     def make_envelopes(self, frames: int) -> tuple[numpy.ndarray, numpy.ndarray]:
         # TODO: pattern generation for envelopes
         dummy = numpy.full(frames, 0.5, dtype=numpy.float64)
         return dummy, dummy
+
+
+class Pan(Pattern):
+    def __init__(self, freq: float):
+        super().__init__()
+        self.freq = freq
+        self.lfo: SineWave
+
+    def set_rate(self, rate: int):
+        super().set_rate(rate)
+        self.lfo = SineWave(self.rate)
+
+    def make_envelopes(self, frames: int) -> tuple[numpy.ndarray, numpy.ndarray]:
+        lfo = numpy.zeros(frames)
+        self.lfo.wave(lfo, self.freq)
+
+        left = 0.5 + lfo / 2
+        right = 0.5 - lfo / 2
+
+        return left, right
 
 
 class PatternPlayer(Output, JackComponent, AIOComponent):
@@ -34,7 +55,6 @@ class PatternPlayer(Output, JackComponent, AIOComponent):
         self.sine_right: SineWave
         self.frequency = frequency
         self.pattern: Pattern | None = None
-        self.set_pattern(Pattern())
 
     def set_jack_client(self, jack_client: jack.Client):
         super().set_jack_client(jack_client)
@@ -43,6 +63,7 @@ class PatternPlayer(Output, JackComponent, AIOComponent):
         self.sine_right = SineWave(self.rate)
         self.outport_l = self.jack_client.outports.register('pattern_L')
         self.outport_r = self.jack_client.outports.register('pattern_R')
+        self.set_pattern(Pan(freq=1.0))
 
     def set_pattern(self, pattern: Pattern):
         self.pattern = pattern
