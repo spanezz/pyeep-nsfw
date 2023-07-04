@@ -56,7 +56,7 @@ class SimpleSynth:
                 buf[i] = math.sin(self.phase) * power
 
 
-class Synth(PowerOutput, JackComponent, AIOComponent):
+class Pulses(PowerOutput, JackComponent, AIOComponent):
     def __init__(self, **kwargs):
         super().__init__(rate=0, **kwargs)
         self.power: float = 0.0
@@ -64,7 +64,7 @@ class Synth(PowerOutput, JackComponent, AIOComponent):
 
     def set_jack_client(self, jack_client: jack.Client):
         super().set_jack_client(jack_client)
-        self.outport = self.jack_client.outports.register('synth')
+        self.outport = self.jack_client.outports.register('pulses')
         self.rate = jack_client.samplerate
         self.synth = SimpleSynth(self.rate)
 
@@ -80,7 +80,7 @@ class Synth(PowerOutput, JackComponent, AIOComponent):
         self.power = power
 
 
-class Player(Output, JackComponent, AIOComponent):
+class Synth(Output, JackComponent, AIOComponent):
     def __init__(self, **kwargs):
         super().__init__(rate=0, **kwargs)
         # TODO: jack has a RingBuffer class for this
@@ -105,7 +105,7 @@ class Player(Output, JackComponent, AIOComponent):
         reader = self.hub.app.get_component("midiinput")
         reader.add_midi_sink(self.jack_add_messages)
 
-        self.outport = self.jack_client.outports.register('player')
+        self.outport = self.jack_client.outports.register('synth')
         self.rate = jack_client.samplerate
 
         self.synth = midisynth.MidiSynth(in_samplerate=self.rate)

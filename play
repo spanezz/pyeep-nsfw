@@ -73,7 +73,7 @@ class App(GtkApp, JackApp, AIOApp):
         })
         self.add_component(NullOutput, name="null_output")
         self.add_component(stim.outputs.synth.Synth)
-        self.add_component(stim.outputs.synth.Player)
+        self.add_component(stim.outputs.synth.Pulses)
 
     def setup_logging(self):
         super().setup_logging()
