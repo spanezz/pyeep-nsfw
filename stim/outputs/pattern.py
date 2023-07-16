@@ -29,9 +29,10 @@ class Pattern:
 
 
 class Pan(Pattern):
-    def __init__(self, freq: float):
+    def __init__(self, freq: float, val_min: float = 0.1):
         super().__init__()
         self.freq = freq
+        self.val_min = val_min
         self.lfo: SineWave
 
     def set_rate(self, rate: int):
@@ -42,14 +43,44 @@ class Pan(Pattern):
         lfo = numpy.zeros(frames)
         self.lfo.wave(lfo, self.freq)
 
-        left = 0.5 + lfo / 2
-        right = 0.5 - lfo / 2
+        left = numpy.clip(0.5 + lfo / 2, self.val_min, 1)
+        right = numpy.clip(0.5 - lfo / 2, self.val_min, 1)
+
+        return left, right
+
+
+class Pan2(Pattern):
+    def __init__(self, freq_left: float, freq_right: float, min_left: float = 0.1, min_right: float = 0.1):
+        super().__init__()
+        self.freq_left = freq_left
+        self.freq_right = freq_right
+        self.min_left = min_left
+        self.min_right = min_right
+        self.lfo_left: SineWave
+        self.lfo_right: SineWave
+
+    def set_rate(self, rate: int):
+        super().set_rate(rate)
+        self.lfo_left = SineWave(self.rate)
+        self.lfo_right = SineWave(self.rate)
+
+    def make_envelopes(self, frames: int) -> tuple[numpy.ndarray, numpy.ndarray]:
+        lfo_left = numpy.zeros(frames)
+        lfo_right = numpy.zeros(frames)
+        self.lfo_left.wave(lfo_left, self.freq_left)
+        self.lfo_right.wave(lfo_right, self.freq_right)
+
+        left_range = 1 - self.min_left
+        left = self.min_left + left_range / 2 + lfo_left * left_range / 2
+
+        right_range = 1 - self.min_right
+        right = self.min_right + right_range / 2 + lfo_right * right_range / 2
 
         return left, right
 
 
 class PatternPlayer(Output, JackComponent, AIOComponent):
-    def __init__(self, frequency: float = 440.0, **kwargs):
+    def __init__(self, frequency: float = 1000.0, **kwargs):
         super().__init__(rate=0, **kwargs)
         self.sine_left: SineWave
         self.sine_right: SineWave
@@ -63,7 +94,8 @@ class PatternPlayer(Output, JackComponent, AIOComponent):
         self.sine_right = SineWave(self.rate)
         self.outport_l = self.jack_client.outports.register('pattern_L')
         self.outport_r = self.jack_client.outports.register('pattern_R')
-        self.set_pattern(Pan(freq=1.0))
+        # self.set_pattern(Pan(freq=3))
+        self.set_pattern(Pan2(freq_left=2, freq_right=1, min_right=0.4))
 
     def set_pattern(self, pattern: Pattern):
         self.pattern = pattern
