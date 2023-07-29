@@ -37,11 +37,12 @@ class MIDIPower(SingleGroupScene):
                 for midi in msg.messages:
                     match midi.type:
                         case "note_on":
-                            power = (midi.note - 47) / (72 - 47)
+                            octave = (midi.note - 47) // 12
+                            power = (midi.note - 47 - octave * 12) / 12
                             duration = 0.5 * midi.velocity / 127
 
                             self.send(IncreaseGroupPower(
-                                group=self.get_group(),
+                                group=octave + 1,
                                 amount=animation.PowerPulse(
                                     duration=duration,
                                     power=power)))
