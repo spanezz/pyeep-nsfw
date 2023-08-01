@@ -23,6 +23,7 @@ from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
 from pyeep.component.base import Component
+from pyeep.component.configmanager import ConfigManager
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
 from pyeep.outputs.base import OutputsModel
@@ -53,8 +54,15 @@ class App(GtkApp, JackApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)
+        self.add_component(ConfigManager)
         self.outputs = self.add_component(OutputsModel)
         self.inputs: list[Input] = []
+
+        self.action_save_config = Gio.SimpleAction.new(
+                name="save-config",
+                parameter_type=None)
+        self.action_save_config.connect("activate", self.on_save_config)
+        self.gtk_app.add_action(self.action_save_config)
 
         self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
@@ -76,6 +84,9 @@ class App(GtkApp, JackApp, AIOApp):
         self.add_component(stim.outputs.synth.Synth)
         self.add_component(stim.outputs.synth.Pulses)
         self.add_component(stim.outputs.pattern.PatternPlayer)
+
+    def on_save_config(self, action, parameter):
+        self.send(pyeep.messages.ConfigSaveRequest())
 
     def setup_logging(self):
         super().setup_logging()
@@ -137,6 +148,7 @@ class App(GtkApp, JackApp, AIOApp):
 
         devices_menu = Gio.Menu()
         devices_menu.append("Device scan", "app.device-scan")
+        devices_menu.append("Save config", "app.save-config")
 
         menu = pyeep.gtk.Gio.Menu()
         menu.append_submenu("Devices", devices_menu)
