@@ -112,14 +112,12 @@ class PatternPlayer(Output, JackComponent, AIOComponent):
 
     @check_hub
     def load_config(self, config: dict[str, Any]):
-        print("PATTERN LC")
         super().load_config(config)
         kwargs: dict[str, Any] = {}
         for arg in ("freq_left", "freq_right", "lfo_freq_left", "lfo_freq_right", "min_level_left", "min_level_right"):
             if (val := config.get(arg)) is not None:
                 kwargs[arg] = val
         if kwargs:
-            print("PATTERN LC", kwargs)
             self.setup(**kwargs)
 
     @check_hub
@@ -139,7 +137,6 @@ class PatternPlayer(Output, JackComponent, AIOComponent):
                 case Shutdown():
                     break
                 case Configure():
-                    print("PATTERN CONFIG", msg.config)
                     # TODO: forward config to the controller? Does it exist
                     # yet? Change Hub to enqueue messages for not-yet-existing
                     # components?
@@ -151,8 +148,8 @@ class PatternOutputController(OutputController):
         super().__init__(**kwargs)
 
         # TODO: animated targets for the various parameters
-        # TODO: Wave shape left (sine, saw, square)
-        # TODO: Wave shape right (sine, saw, square)
+        # TODO: LFO shape left (sine, saw, square)
+        # TODO: LFO shape right (sine, saw, square)
 
         self.freq_left = Gtk.Adjustment(
                 value=self.output.left.osc_freq,
