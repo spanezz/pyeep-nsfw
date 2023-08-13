@@ -11,7 +11,7 @@ from pyeep.component.base import check_hub, export
 from pyeep.component.jack import JackComponent
 from pyeep.gtk import Gtk, Gio, GLib, GObject
 from pyeep.messages import Message, Shutdown
-from pyeep.midisynth import SineWave
+from pyeep.synth import Wave, SineWave, SawWave
 from pyeep.outputs.base import OutputController
 
 from ..output import PowerOutput, PowerOutputController
@@ -33,7 +33,7 @@ class Channel:
 
         self.volume = volume
 
-        self.osc: SineWave
+        self.osc: Wave
         self.osc_freq = osc_freq
 
         self.lfo: SineWave
@@ -80,7 +80,13 @@ class Channel:
         if max_level is not None:
             self.max_level = max_level
         if lfo_shape is not None:
-            print("TODO", self.label, lfo_shape)
+            match lfo_shape:
+                case "sine":
+                    if not isinstance(self.lfo, SineWave):
+                        self.lfo = SineWave(self.rate)
+                case "saw":
+                    if not isinstance(self.lfo, SawWave):
+                        self.lfo = SawWave(self.rate)
 
 
 class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
@@ -153,7 +159,6 @@ class ChannelController(GObject.Object):
         lfo_shapes = Gtk.ListStore(str, str)
         lfo_shapes.append(["sine", "Sine"])
         lfo_shapes.append(["saw", "Saw"])
-        lfo_shapes.append(["square", "Square"])
 
         self.lfo_shape = Gtk.ComboBox(model=lfo_shapes)
         self.lfo_shape.set_id_column(0)
@@ -246,8 +251,6 @@ class PatternOutputController(PowerOutputController):
         super().__init__(**kwargs)
 
         # TODO: animated targets for the various parameters
-        # TODO: LFO shape left (sine, saw, square)
-        # TODO: LFO shape right (sine, saw, square)
 
         self.left = ChannelController(channel_name="left")
         self.left.connect("changed", self.on_channel_changed)
