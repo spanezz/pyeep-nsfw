@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Type
+from typing import Any, Type
 
 import jack
 import numpy
@@ -9,7 +9,7 @@ from pyeep.component.controller import ControllerWidget
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import check_hub, export
 from pyeep.component.jack import JackComponent
-from pyeep.gtk import Gtk, Gio, GLib
+from pyeep.gtk import Gtk, Gio, GLib, GObject
 from pyeep.messages import Message, Shutdown
 from pyeep.midisynth import SineWave
 from pyeep.outputs.base import OutputController
@@ -64,6 +64,24 @@ class Channel:
         envelope = self.make_envelope(frames)
         self.osc.synth(array, self.osc_freq, envelope)
 
+    def setup(
+            self, *,
+            freq: float | None = None,
+            lfo_freq: float | None = None,
+            lfo_shape: str | None = None,
+            min_level: float | None = None,
+            max_level: float | None = None):
+        if freq is not None:
+            self.osc_freq = freq
+        if lfo_freq is not None:
+            self.lfo_freq = lfo_freq
+        if min_level is not None:
+            self.min_level = min_level
+        if max_level is not None:
+            self.max_level = max_level
+        if lfo_shape is not None:
+            print("TODO", self.label, lfo_shape)
+
 
 class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
     def __init__(self, frequency: float = 1000.0, **kwargs):
@@ -98,32 +116,9 @@ class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
         self.right.volume = power
 
     @export
-    def setup(
-            self, *,
-            freq_left: float | None = None,
-            freq_right: float | None = None,
-            lfo_freq_left: float | None = None,
-            lfo_freq_right: float | None = None,
-            min_level_left: float | None = None,
-            min_level_right: float | None = None,
-            max_level_left: float | None = None,
-            max_level_right: float | None = None):
-        if freq_left is not None:
-            self.left.osc_freq = freq_left
-        if freq_right is not None:
-            self.right.osc_freq = freq_right
-        if lfo_freq_left is not None:
-            self.left.lfo_freq = lfo_freq_left
-        if lfo_freq_right is not None:
-            self.right.lfo_freq = lfo_freq_right
-        if min_level_left is not None:
-            self.left.min_level = min_level_left
-        if min_level_right is not None:
-            self.right.min_level = min_level_right
-        if max_level_left is not None:
-            self.left.max_level = max_level_left
-        if max_level_right is not None:
-            self.right.max_level = max_level_right
+    def setup(self, *, left: dict[str, Any], right: dict[str, Any]):
+        self.left.setup(**left)
+        self.right.setup(**right)
 
     async def run(self) -> None:
         while True:
@@ -132,8 +127,9 @@ class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
                     break
 
 
-class ChannelController:
+class ChannelController(GObject.Object):
     def __init__(self, channel_name: str):
+        super().__init__()
         self.channel_name = channel_name
 
         self.freq = Gtk.Adjustment(
@@ -143,6 +139,7 @@ class ChannelController:
                 step_increment=10,
                 page_increment=100,
                 page_size=0)
+        self.freq.connect("value_changed", self.on_adjust_changed)
 
         self.lfo_freq = Gtk.Adjustment(
                 value=1.0,
@@ -151,6 +148,20 @@ class ChannelController:
                 step_increment=0.1,
                 page_increment=1,
                 page_size=0)
+        self.lfo_freq.connect("value_changed", self.on_adjust_changed)
+
+        lfo_shapes = Gtk.ListStore(str, str)
+        lfo_shapes.append(["sine", "Sine"])
+        lfo_shapes.append(["saw", "Saw"])
+        lfo_shapes.append(["square", "Square"])
+
+        self.lfo_shape = Gtk.ComboBox(model=lfo_shapes)
+        self.lfo_shape.set_id_column(0)
+        renderer = Gtk.CellRendererText()
+        self.lfo_shape.pack_start(renderer, True)
+        self.lfo_shape.add_attribute(renderer, "text", 1)
+        self.lfo_shape.set_active_id("sine")
+        self.lfo_shape.connect("changed", self.on_lfo_shape_changed)
 
         self.min_level = Gtk.Adjustment(
                 value=0.0,
@@ -159,6 +170,7 @@ class ChannelController:
                 step_increment=0.05,
                 page_increment=0.1,
                 page_size=0)
+        self.min_level.connect("value_changed", self.on_adjust_changed)
 
         self.max_level = Gtk.Adjustment(
                 value=1.0,
@@ -167,17 +179,31 @@ class ChannelController:
                 step_increment=0.01,
                 page_increment=0.1,
                 page_size=0)
+        self.max_level.connect("value_changed", self.on_adjust_changed)
 
-    def connect_value_changed(self, cb: Callable[[Gtk.Adjustement], None]):
-        self.freq.connect("value_changed", cb)
-        self.lfo_freq.connect("value_changed", cb)
-        self.min_level.connect("value_changed", cb)
-        self.max_level.connect("value_changed", cb)
+    @GObject.Signal
+    def changed(self):
+        pass
+
+    def on_adjust_changed(self, adj: Gtk.Adjustment):
+        self.emit("changed")
+
+    def on_lfo_shape_changed(self, combo: Gtk.ComboBox):
+        self.emit("changed")
+
+    def _get_lfo_shape(self) -> str | None:
+        tree_iter = self.lfo_shape.get_active_iter()
+        if tree_iter is None:
+            return None
+        model = self.lfo_shape.get_model()
+        mode = model[tree_iter][0]
+        return mode
 
     def get_config(self) -> dict[str, Any]:
         res: dict[str, Any] = {}
         for param in ("freq", "lfo_freq", "min_level", "max_level"):
             res[param] = getattr(self, param).get_value()
+        res["lfo_shape"] = self._get_lfo_shape()
         return res
 
     def load_config(self, config: dict[str, Any]):
@@ -185,13 +211,11 @@ class ChannelController:
             if (val := config.get(param)) is not None:
                 getattr(self, param).set_value(val)
 
+        if (val := config.get("lfo_shape")) is not None:
+            self.lfo_shape.set_active_id(val)
+
     def get_setup_kwargs(self) -> dict[str, Any]:
-        return {
-            f"freq_{self.channel_name}": self.freq.get_value(),
-            f"lfo_freq_{self.channel_name}": self.lfo_freq.get_value(),
-            f"min_level_{self.channel_name}": self.min_level.get_value(),
-            f"max_level_{self.channel_name}": self.max_level.get_value(),
-        }
+        return self.get_config()
 
     def attach_ui(self, cw: ControllerWidget, x: int, y: int):
         freq = Gtk.SpinButton(
@@ -204,15 +228,17 @@ class ChannelController:
             digits=1)
         cw.grid.attach(lfo_freq, x, y + 1, 2, 1)
 
+        cw.grid.attach(self.lfo_shape, x, y + 2, 2, 1)
+
         min_level = Gtk.SpinButton(
             adjustment=self.min_level,
             digits=2)
-        cw.grid.attach(min_level, x, y + 2, 2, 1)
+        cw.grid.attach(min_level, x, y + 3, 2, 1)
 
         max_level = Gtk.SpinButton(
             adjustment=self.max_level,
             digits=2)
-        cw.grid.attach(max_level, x, y + 3, 2, 1)
+        cw.grid.attach(max_level, x, y + 4, 2, 1)
 
 
 class PatternOutputController(PowerOutputController):
@@ -224,9 +250,9 @@ class PatternOutputController(PowerOutputController):
         # TODO: LFO shape right (sine, saw, square)
 
         self.left = ChannelController(channel_name="left")
-        self.left.connect_value_changed(self.on_change)
+        self.left.connect("changed", self.on_channel_changed)
         self.right = ChannelController(channel_name="right")
-        self.right.connect_value_changed(self.on_change)
+        self.right.connect("changed", self.on_channel_changed)
 
         self.auto_apply = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-auto-apply",
@@ -240,11 +266,11 @@ class PatternOutputController(PowerOutputController):
 
     def on_apply(self, button):
         self.output.setup(
-            **self.left.get_setup_kwargs(),
-            **self.right.get_setup_kwargs(),
+            left=self.left.get_setup_kwargs(),
+            right=self.right.get_setup_kwargs(),
         )
 
-    def on_change(self, element):
+    def on_channel_changed(self, channel: ChannelController):
         if not self.auto_apply.get_state().get_boolean():
             return
         self.on_apply(None)
@@ -256,19 +282,20 @@ class PatternOutputController(PowerOutputController):
         cw.grid.attach(Gtk.Label(label=self.output.right.label), 3, 4, 2, 1)
         cw.grid.attach(Gtk.Label(label="Freq"), 0, 5, 1, 1)
         cw.grid.attach(Gtk.Label(label="LFO"), 0, 6, 1, 1)
-        cw.grid.attach(Gtk.Label(label="Min"), 0, 7, 1, 1)
-        cw.grid.attach(Gtk.Label(label="Max"), 0, 8, 1, 1)
+        cw.grid.attach(Gtk.Label(label="Shape"), 0, 7, 1, 1)
+        cw.grid.attach(Gtk.Label(label="Min"), 0, 8, 1, 1)
+        cw.grid.attach(Gtk.Label(label="Max"), 0, 9, 1, 1)
 
         self.left.attach_ui(cw, 1, 5)
         self.right.attach_ui(cw, 3, 5)
 
         pulse = Gtk.Button(label="Apply")
         pulse.connect("clicked", self.on_apply)
-        cw.grid.attach(pulse, 0, 9, 1, 1)
+        cw.grid.attach(pulse, 0, 10, 1, 1)
 
         decay = Gtk.ToggleButton(label="Auto apply")
         decay.set_action_name("app." + self.auto_apply.get_name())
-        cw.grid.attach(decay, 1, 9, 1, 1)
+        cw.grid.attach(decay, 1, 10, 1, 1)
 
         return cw
 
