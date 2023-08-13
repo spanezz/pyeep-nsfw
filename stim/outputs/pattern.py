@@ -10,7 +10,7 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import check_hub, export
 from pyeep.component.jack import JackComponent
 from pyeep.gtk import Gtk, Gio, GLib
-from pyeep.messages import Shutdown, Configure
+from pyeep.messages import Message, Shutdown
 from pyeep.midisynth import SineWave
 from pyeep.outputs.base import OutputController
 
@@ -125,37 +125,11 @@ class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
         if max_level_right is not None:
             self.right.max_level = max_level_right
 
-    @check_hub
-    def load_config(self, config: dict[str, Any]):
-        super().load_config(config)
-        kwargs: dict[str, Any] = {}
-        for arg in ("freq_left", "freq_right", "lfo_freq_left", "lfo_freq_right", "min_level_left", "min_level_right"):
-            if (val := config.get(arg)) is not None:
-                kwargs[arg] = val
-        if kwargs:
-            self.setup(**kwargs)
-
-    @check_hub
-    def get_config(self) -> dict[str, Any]:
-        res = super().get_config()
-        res["frequency_left"] = self.frequency_left
-        res["frequency_right"] = self.frequency_right
-        res["lfo_freq_left"] = self.pattern.lfo_freq_left
-        res["lfo_freq_right"] = self.pattern.lfo_freq_right
-        res["min_level_left"] = self.pattern.min_level_left
-        res["min_level_right"] = self.pattern.min_level_right
-        return res
-
     async def run(self) -> None:
         while True:
-            match (msg := await self.next_message()):
+            match await self.next_message():
                 case Shutdown():
                     break
-                case Configure():
-                    # TODO: forward config to the controller? Does it exist
-                    # yet? Change Hub to enqueue messages for not-yet-existing
-                    # components?
-                    self.load_config(msg.config)
 
 
 class ChannelController:
@@ -200,7 +174,18 @@ class ChannelController:
         self.min_level.connect("value_changed", cb)
         self.max_level.connect("value_changed", cb)
 
-    def get_setup_kwargs(self) -> dict[str, str]:
+    def get_config(self) -> dict[str, Any]:
+        res: dict[str, Any] = {}
+        for param in ("freq", "lfo_freq", "min_level", "max_level"):
+            res[param] = getattr(self, param).get_value()
+        return res
+
+    def load_config(self, config: dict[str, Any]):
+        for param in ("freq", "lfo_freq", "min_level", "max_level"):
+            if (val := config.get(param)) is not None:
+                getattr(self, param).set_value(val)
+
+    def get_setup_kwargs(self) -> dict[str, Any]:
         return {
             f"freq_{self.channel_name}": self.freq.get_value(),
             f"lfo_freq_{self.channel_name}": self.lfo_freq.get_value(),
@@ -249,6 +234,10 @@ class PatternOutputController(PowerOutputController):
                 state=GLib.Variant.new_boolean(False))
         self.hub.app.gtk_app.add_action(self.auto_apply)
 
+        # Initialize the output with the initial UI values
+        self.on_power(self.power)
+        self.on_apply(None)
+
     def on_apply(self, button):
         self.output.setup(
             **self.left.get_setup_kwargs(),
@@ -282,3 +271,25 @@ class PatternOutputController(PowerOutputController):
         cw.grid.attach(decay, 1, 9, 1, 1)
 
         return cw
+
+    @check_hub
+    def load_config(self, config: dict[str, Any]):
+        super().load_config(config)
+        if (cfg := config.get("left")):
+            self.left.load_config(cfg)
+        if (cfg := config.get("right")):
+            self.right.load_config(cfg)
+        self.on_apply(None)
+
+    @check_hub
+    def get_config(self) -> dict[str, Any]:
+        res = super().get_config()
+        res["left"] = self.left.get_config()
+        res["right"] = self.right.get_config()
+        return res
+
+    @check_hub
+    def receive(self, msg: Message):
+        match msg:
+            case _:
+                super().receive(msg)

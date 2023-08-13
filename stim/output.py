@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Type
+from typing import Any, Type
 
 import pyeep.outputs.base
 from pyeep.animation import PowerAnimation, PowerAnimator
@@ -10,7 +10,7 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import Component, check_hub, export
 from pyeep.component.controller import ControllerWidget
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import Message, Shutdown
+from pyeep.messages import Configure, Message, Shutdown
 from pyeep.outputs.base import Output
 from pyeep.outputs.color import ColorOutput, ColorOutputController
 
@@ -206,6 +206,18 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
         super().emergency_stop()
 
     @check_hub
+    def get_config(self) -> dict[str, Any]:
+        res = super().get_config()
+        res["power"] = self.power.get_value()
+        return res
+
+    @check_hub
+    def load_config(self, config: dict[str, Any]):
+        super().load_config(config)
+        if (power := config.get("power")):
+            self.power.set_value(power)
+
+    @check_hub
     def receive(self, msg: Message):
         match msg:
             case SetGroupPower():
@@ -216,6 +228,11 @@ class PowerOutputController(pyeep.outputs.base.OutputController):
                     match msg.amount:
                         case PowerAnimation():
                             self.power_animator.start(msg.amount)
+            case Configure():
+                # TODO: forward config to the controller? Does it exist
+                # yet? Change Hub to enqueue messages for not-yet-existing
+                # components?
+                self.load_config(msg.config)
             case _:
                 super().receive(msg)
 
