@@ -25,19 +25,21 @@ class Channel:
             volume: float = 1.0,
             osc_freq: float = 1000,
             lfo_freq: float = 1,
+            lfo_shape: str = "sine",
             min_level: float = 0,
             max_level: float = 0.3):
         self.name = name
         self.label = label
-        self.rate: int
+        self.rate: int | None = None
 
         self.volume = volume
 
-        self.osc: Wave
+        self.osc: Wave | None = None
         self.osc_freq = osc_freq
 
-        self.lfo: SineWave
+        self.lfo: Wave | None = None
         self.lfo_freq = lfo_freq
+        self.lfo_shape = lfo_shape
 
         self.min_level = min_level
         self.max_level = max_level
@@ -45,7 +47,7 @@ class Channel:
     def set_rate(self, rate: int):
         self.rate = rate
         self.osc = SineWave(self.rate)
-        self.lfo = SineWave(self.rate)
+        self.setup()
 
     def make_envelope(self, frames: int) -> numpy.ndarray:
         lfo = numpy.zeros(frames)
@@ -57,7 +59,7 @@ class Channel:
     def synth(self, frames: int, array: numpy.ndarray):
         array.fill(0)
 
-        if self.volume == 0.0:
+        if self.volume == 0.0 or self.osc is None or self.lfo is None:
             # Skip computing waveforms if volume is 0
             return
 
@@ -79,13 +81,19 @@ class Channel:
             self.min_level = min_level
         if max_level is not None:
             self.max_level = max_level
+
+        # Hack to use setup at set_rate time to initialize the right LFO
+        # oscillators
+        if self.lfo is None and lfo_shape is None:
+            lfo_shape = self.lfo_shape
+
         if lfo_shape is not None:
-            match lfo_shape:
-                case "sine":
-                    if not isinstance(self.lfo, SineWave):
+            if self.lfo is None or self.lfo_shape != lfo_shape:
+                self.lfo_shape = lfo_shape
+                match lfo_shape:
+                    case "sine":
                         self.lfo = SineWave(self.rate)
-                case "saw":
-                    if not isinstance(self.lfo, SawWave):
+                    case "saw":
                         self.lfo = SawWave(self.rate)
 
 
