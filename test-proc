@@ -1,0 +1,74 @@
+#!/usr/bin/python3
+
+import argparse
+import asyncio
+import sys
+
+from pyeep.app.aio import AIOApp
+from pyeep.component.aio import AIOComponent
+from pyeep.messages import Shutdown
+
+
+class MessageIO(AIOComponent):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.backpressure_limit = 64 * 1024
+        self.msg_input: asyncio.StreamReader | None = None
+        self.msg_output: asyncio.StreamWriter | None = None
+        self.log_output: asyncio.StreamWriter | None = None
+
+    async def _read_task(self):
+        while (line := await self.msg_input.readline()):
+            print("READ", line)
+        print("READ DONE")
+        self.send(Shutdown())
+
+    async def run(self) -> None:
+        # TODO: wrap stdin and stdout
+        # TODO: loop reading stdin
+        # TODO: log on stderr?
+
+        # Wrap stdin and stdout
+        # see https://stackoverflow.com/questions/52089869/how-to-create-asyncio-stream-reader-writer-for-stdin-stdout
+
+        loop = asyncio.get_event_loop()
+        self.msg_input = asyncio.StreamReader(limit=self.backpressure_limit, loop=loop)
+        protocol = asyncio.StreamReaderProtocol(self.msg_input, loop=loop)
+        dummy = asyncio.Protocol()
+        await loop.connect_read_pipe(lambda: protocol, sys.stdin)
+
+        w_transport, _ = await loop.connect_write_pipe(lambda: dummy, sys.stdout)
+        self.msg_output = asyncio.StreamWriter(w_transport, protocol, self.msg_input, loop)
+
+        w_transport, _ = await loop.connect_write_pipe(lambda: dummy, sys.stderr)
+        self.log_output = asyncio.StreamWriter(w_transport, protocol, self.msg_input, loop)
+
+        asyncio.create_task(self._read_task())
+
+        while True:
+            match (msg := await self.next_message()):
+                case Shutdown():
+                    break
+                case _:
+                    print("MESSAGE", msg)
+
+
+class App(AIOApp):
+    def __init__(self, args: argparse.Namespace, **kwargs):
+        super().__init__(args, **kwargs)
+        self.add_component(MessageIO)
+
+    async def message_io(self):
+        pass
+
+
+def main():
+    parser = App.argparser(description="Test AIO subprocess")
+    args = parser.parse_args()
+
+    with App(args) as app:
+        app.main()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
