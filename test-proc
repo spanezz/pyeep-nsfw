@@ -2,6 +2,8 @@
 
 import argparse
 import asyncio
+import importlib
+import json
 import sys
 
 from pyeep.app.aio import AIOApp
@@ -18,14 +20,35 @@ class MessageIO(AIOComponent):
         self.log_output: asyncio.StreamWriter | None = None
 
     async def _read_task(self):
-        while (line := await self.msg_input.readline()):
-            print("READ", line)
-        print("READ DONE")
-        self.send(Shutdown())
+        try:
+            while (line := await self.msg_input.readline()):
+                try:
+                    msg_dict = json.loads(line)
+                    module_name = msg_dict.pop("__module__")
+                    class_name = msg_dict.pop("__class__")
+                    msg_dict["src"] = self
+                except Exception as e:
+                    self.logger.error("message malformed: %r: %s", line.strip(), e)
+                    continue
+
+                try:
+                    mod = importlib.import_module(module_name)
+                    cls = getattr(mod, class_name)
+                except Exception as e:
+                    self.logger.error("cannot find module class %s.%s: %s", module_name, class_name, e)
+                    continue
+
+                try:
+                    msg = cls(**msg_dict)
+                except Exception as e:
+                    self.logger.error("cannot instantiate message: %s", e)
+                    continue
+                self.logger.error("MSG %s", msg)
+                self.send(msg)
+        finally:
+            self.send(Shutdown())
 
     async def run(self) -> None:
-        # TODO: wrap stdin and stdout
-        # TODO: loop reading stdin
         # TODO: log on stderr?
 
         # Wrap stdin and stdout
@@ -50,7 +73,9 @@ class MessageIO(AIOComponent):
                 case Shutdown():
                     break
                 case _:
-                    print("MESSAGE", msg)
+                    if msg.src != self:
+                        line = json.dumps(msg.as_jsonable()) + "\n"
+                        self.msg_output.write(line.encode())
 
 
 class App(AIOApp):
