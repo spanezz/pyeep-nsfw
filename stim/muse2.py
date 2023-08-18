@@ -411,7 +411,6 @@ class Muse2(SimpleActiveComponent, Input, bluetooth.BluetoothComponent):
         "brainwaves": ModeBrainWaves,
     }
 
-    # This has been tested with a Moofit HW401
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.muse = Muse(self.client)

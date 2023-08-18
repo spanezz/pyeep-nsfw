@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Generator
+from typing import Any, Generator
 
 from pyeep.animation import PowerAnimation, ColorAnimation
 from pyeep.color import Color
@@ -26,6 +26,12 @@ class PowerPulse(PowerAnimation):
             yield self.power * envelope
         yield 0
 
+    def as_jsonable(self) -> dict[str, Any]:
+        res = super().as_jsonable()
+        res["power"] = self.power
+        res["duration"] = self.duration
+        return res
+
 
 class ColorPulse(ColorAnimation):
     def __init__(self, *, color=Color, duration: float = 0.2, **kwargs):
@@ -42,6 +48,12 @@ class ColorPulse(ColorAnimation):
             envelope = (frame_count - frame) / frame_count
             yield Color(self.color.red * envelope, self.color.green * envelope, self.color.blue * envelope)
         yield Color(0, 0, 0)
+
+    def as_jsonable(self) -> dict[str, Any]:
+        res = super().as_jsonable()
+        res["color"] = self.color
+        res["duration"] = self.duration
+        return res
 
 
 class ColorHeartPulse(ColorAnimation):
@@ -69,3 +81,10 @@ class ColorHeartPulse(ColorAnimation):
             yield Color(self.color.red * envelope, self.color.green * envelope, self.color.blue * envelope)
 
         yield Color(0, 0, 0)
+
+    def as_jsonable(self) -> dict[str, Any]:
+        res = super().as_jsonable()
+        res["color"] = self.color
+        res["duration"] = self.duration
+        res["atrial_duration_ratio"] = self.atrial_duration_ratio
+        return res

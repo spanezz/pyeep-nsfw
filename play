@@ -19,6 +19,8 @@ import stim.muse2
 import stim.output
 import stim.outputs.synth
 import stim.outputs.pattern
+import stim.outputs.coyote
+import stim.outputs.test
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
@@ -71,6 +73,7 @@ class App(GtkApp, JackApp, AIOApp):
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
             pyeep.bluetooth.Device("21:04:99:10:35:05", HappyLights),
             pyeep.bluetooth.Device("00:55:DA:B7:DE:A1", stim.muse2.Muse2),
+            # pyeep.bluetooth.Device("CF:1E:01:D4:1E:BC", stim.outputs.coyote.Coyote),
         ])
         # self.add_component(HeadPosition)
         # self.add_component(HeadMovement)
@@ -84,6 +87,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.add_component(stim.outputs.synth.Synth)
         self.add_component(stim.outputs.synth.Pulses)
         self.add_component(stim.outputs.pattern.PatternPlayer)
+        self.add_component(stim.outputs.test.TestOutput)
 
     def on_save_config(self, action, parameter):
         self.send(pyeep.messages.ConfigSaveRequest())

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import json
 from typing import Type
 
 import pyeep.outputs.base
 from pyeep.component.aio import AIOComponent
-from pyeep.component.base import check_hub, export
-from pyeep.gtk import GLib, Gtk
-from pyeep.messages import Configure, Message, Shutdown
+from pyeep.component.base import export
+from pyeep.messages import Shutdown, Jsonable
 from ..output import PowerOutput, PowerOutputController
 
 
@@ -36,33 +34,20 @@ class TestOutput(PowerOutput, AIOComponent):
 
     async def _read_stdout(self):
         try:
-            self.logger.error("RS0")
             while (line := await self.proc.stdout.readline()):
-                self.logger.error("RS1 %s", line)
-                # TODO: dedup
-                try:
-                    msg_dict = json.loads(line)
-                    module_name = msg_dict.pop("__module__")
-                    class_name = msg_dict.pop("__class__")
-                    # msg_dict.pop("src", None)
-                    msg_dict["src"] = self
-                except Exception as e:
-                    self.logger.error("message malformed: %r: %s", line.strip(), e)
+                jsonable = json.loads(line)
+                cls = Jsonable.jsonable_class(jsonable)
+                if cls is None:
                     continue
 
-                try:
-                    mod = importlib.import_module(module_name)
-                    cls = getattr(mod, class_name)
-                except Exception as e:
-                    self.logger.error("cannot find module class %s.%s: %s", module_name, class_name, e)
-                    continue
+                jsonable["src"] = self
 
                 try:
-                    msg = cls(**msg_dict)
+                    msg = cls(**jsonable)
                 except Exception as e:
                     self.logger.error("cannot instantiate message: %s", e)
                     continue
-                self.logger.error("RS2 %s", msg)
+
                 self.send(msg)
         finally:
             self.receive(Shutdown())
@@ -89,7 +74,6 @@ class TestOutput(PowerOutput, AIOComponent):
                             self.proc.stdin.write(line.encode())
                             await self.proc.stdin.drain()
         finally:
-            print("RUN4")
             if self.read_stdin_task is not None:
                 self.read_stdin_task.cancel()
                 await self.read_stdin_task

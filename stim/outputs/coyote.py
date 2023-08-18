@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import math
 import struct
-from typing import Iterator, Type
+from typing import Type
 
 import bleak
 
@@ -152,11 +154,45 @@ class Coyote(PowerOutput, bluetooth.BluetoothComponent):
     def __init__(self, **kwargs):
         super().__init__(rate=10, **kwargs)
 
+        self.ch_config: bleak.BleakGATTCharacteristic | None = None
+        self.ch_power: bleak.BleakGATTCharacteristic | None = None
+        self.ch_pattern_a: bleak.BleakGATTCharacteristic | None = None
+        self.ch_pattern_b: bleak.BleakGATTCharacteristic | None = None
+        self.ch_battery: bleak.BleakGATTCharacteristic | None = None
+
+        self.power_step: int | None = None
+        self.power_max: int | None = None
+
+        self.device_power_a: int = 0
+        self.device_power_b: int = 0
+        self.power_a: int = 0
+        self.power_b: int = 0
+
+        self.Ax: int = 0
+        self.Ay: int = 0
+        self.Az: int = 0
+
+        self.Bx: int = 0
+        self.By: int = 0
+        self.Bz: int = 0
+
     def get_output_controller(self) -> Type[CoyoteOutputController]:
         return CoyoteOutputController
 
+    def _encode_channel_power(self, power_a: int, power_b: int) -> bytes:
+        power_uint = (power_b << 10) + power_a
+        return bytes((
+            power_uint >> 16, (power_uint >> 8) & 0xff, power_uint & 0xff
+        ))
+
+    def _encode_pattern(self, Ax: int, Ay: int, Az: int):
+        pattern_uint = Ax + (Ay << 5) + (Az << 15)
+        return bytes((
+            (pattern_uint >> 16) & 0xff, (pattern_uint >> 8) & 0xff, pattern_uint & 0xff
+        ))
+
     def _parse_channel_power(self, value: bytes) -> tuple[int, int]:
-        power_uint = value[0] << 16 + value[1] << 8 + value[2]
+        power_uint = (value[0] << 16) + (value[1] << 8) + value[2]
         power_a = power_uint & 0x3ff
         power_b = (power_uint >> 10) & 0x3ff
         return power_a, power_b
@@ -179,43 +215,91 @@ class Coyote(PowerOutput, bluetooth.BluetoothComponent):
         print("CONNECT")
 
         service = self.client.services.get_service(self.COYOTE_SERVICE)
-        print("service", service)
+        self.ch_config = self.client.services.get_characteristic(self.CONFIG_CHARACTERISTIC)
+        self.ch_power = self.client.services.get_characteristic(self.POWER_CHARACTERISTIC)
+        self.ch_pattern_a = self.client.services.get_characteristic(self.PATTERNA_CHARACTERISTIC)
+        self.ch_pattern_b = self.client.services.get_characteristic(self.PATTERNB_CHARACTERISTIC)
 
-        config = self.client.services.get_characteristic(self.CONFIG_CHARACTERISTIC)
-        print("config", config)
+        char1 = await self.client.read_gatt_char(self.ch_config)
+        self.power_step, self.power_max = struct.unpack("<BH", char1)
+        print("POWER CONFIG", self.power_max, self.power_step)
 
-        char1 = await self.client.read_gatt_char(config)
-        power_step, max_power = struct.unpack("<BH", char1)
-        print("POWER CONFIG", max_power, power_step)
-
-        # PWM_AB2 AB two-channel intensity 23-22bit(Reserved) 21-11bit(B channel actual intensity) 10-0bit(A channel actual intensity)
-        power = self.client.services.get_characteristic(self.POWER_CHARACTERISTIC)
-        power_bytes = await self.client.read_gatt_char(power)
+        # PWM_AB2 AB two-channel intensity 23-22bit(Reserved) 21-11bit(B
+        # channel actual intensity) 10-0bit(A channel actual intensity)
+        power_bytes = await self.client.read_gatt_char(self.ch_power)
         power_a, power_b = self._parse_channel_power(power_bytes)
         print("CHANNEL POWER", power_a, power_b)
 
         # Subscribe to power notifications
-        await self.client.start_notify(power, self.on_power_changed)
+        await self.client.start_notify(self.ch_power, self.on_power_changed)
         print("SUBSCRIBED TO POWER")
 
         # Read current patterns
-        patternA = self.client.services.get_characteristic(self.PATTERNA_CHARACTERISTIC)
-        patternA_bytes = await self.client.read_gatt_char(patternA)
-        print("PATTERN A", self._parse_pattern(patternA_bytes))
-        patternB = self.client.services.get_characteristic(self.PATTERNB_CHARACTERISTIC)
-        patternB_bytes = await self.client.read_gatt_char(patternB)
-        print("PATTERN B", self._parse_pattern(patternB_bytes))
+        pattern_a_bytes = await self.client.read_gatt_char(self.ch_pattern_a)
+        self.Ax, self.Ay, self.Az = self._parse_pattern(pattern_a_bytes)
+        pattern_b_bytes = await self.client.read_gatt_char(self.ch_pattern_b)
+        self.Bx, self.By, self.Bz = self._parse_pattern(pattern_a_bytes)
+        print("PATTERN B", self._parse_pattern(pattern_b_bytes))
 
         # Subscribe to battery notifications
-        battery = self.client.services.get_characteristic(self.BATTERY_CHARACTERISTIC)
-
-        battery_bytes = await self.client.read_gatt_char(battery)
+        battery_bytes = await self.client.read_gatt_char(self.ch_battery)
         print("BATTERY%", battery_bytes[0])
 
-        await self.client.start_notify(battery, self.on_battery_changed)
+        await self.client.start_notify(self.ch_battery, self.on_battery_changed)
         print("SUBSCRIBED TO BATTERY")
 
-        # TODO: send a 100ms timer to drive the waveform
+        # TODO: set up a 100ms timer to drive the waveform
+
+    def on_power_changed(self, characteristic: bleak.backend.characteristic.BleakGATTCharacteristic, data: bytearray):
+        print("OPC")
+        self.device_power_a, self.device_power_b = self._parse_channel_power(data)
+        print("POWER UPDATE", self.device_power_a, self.device_power_b)
+
+    def on_battery_changed(self, characteristic: bleak.backend.characteristic.BleakGATTCharacteristic, data: bytearray):
+        print("OBC")
+
+        print("BATTERY UPDATE", data[0])
+
+    async def _timer_task(self):
+        while True:
+            # print(round(time.time() - start_time, 1), "Starting periodic function")
+            await asyncio.gather(
+                asyncio.sleep(0.1),
+                self._on_timer(),
+            )
+
+    async def _on_timer(self):
+        print("TIMER")
+
+        if self.device_power_a == self.power_a and self.device_power_b == self.power_b:
+            return
+
+        await self.client.write_gatt_char(self.ch_pattern_a, self._encode_pattern(self.Ax, self.Ay, self.Az))
+        await self.client.write_gatt_char(self.ch_pattern_b, self._encode_pattern(self.Bx, self.By, self.Bz))
+
+        coyote_power_a = self.power_max * self.power_a
+        coyote_power_b = self.power_max * self.power_b
+        coyote_power_a = math.ceil(coyote_power_a / self.power_step) * self.power_step
+        coyote_power_b = math.ceil(coyote_power_b / self.power_step) * self.power_step
+        print("normalised", coyote_power_a, coyote_power_b)
+        encoded = self._encode_channel_power(coyote_power_a, coyote_power_b)
+        print("encoded", encoded)
+
+        await self.client.write_gatt_char(self.ch_power, encoded)
+
+    async def run_start(self):
+        await super().run_start()
+        asyncio.create_task(self._timer_task())
+
+    @export
+    def set_power(self, power: float):
+        if self.power_max is None:
+            return
+
+        print("set power", power)
+
+        self.power_a = power
+        self.power_b = power
 
         # const timer = window.setInterval(()=> {
         #     const ax = parseInt(document.querySelector('#ax').value);
@@ -245,16 +329,6 @@ class Coyote(PowerOutput, bluetooth.BluetoothComponent):
         #     stopButton.disabled = true;
         # });
         # stopButton.disabled = false;
-
-    def on_power_changed(self, characteristic: bleak.backend.characteristic.BleakGATTCharacteristic, data: bytearray):
-        print("OPC")
-        power_a, power_b = self._parse_channel_power(data)
-        print("POWER UPDATE", power_a, power_b)
-
-    def on_battery_changed(self, characteristic: bleak.backend.characteristic.BleakGATTCharacteristic, data: bytearray):
-        print("OBC")
-
-        print("BATTERY UPDATE", data[0])
 
     # def list_modes(self) -> Iterator[ModeInfo, None]:
     #     """

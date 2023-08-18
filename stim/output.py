@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Type
 
 import pyeep.outputs.base
@@ -13,8 +12,6 @@ from pyeep.gtk import GLib, Gtk
 from pyeep.messages import Configure, Message, Shutdown
 from pyeep.outputs.base import Output
 from pyeep.outputs.color import ColorOutput, ColorOutputController
-
-log = logging.getLogger(__name__)
 
 
 class PowerOutput(Output):
@@ -34,6 +31,12 @@ class SetGroupPower(Message):
     def __str__(self) -> str:
         return super().__str__() + f"(group={self.group}, power={self.power})"
 
+    def as_jsonable(self) -> dict[str, Any]:
+        res = super().as_jsonable()
+        res["group"] = self.group
+        res["power"] = fun() if (fun := getattr(self.power, "as_jsonable", None)) else self.power
+        return res
+
 
 class IncreaseGroupPower(Message):
     """
@@ -46,6 +49,13 @@ class IncreaseGroupPower(Message):
 
     def __str__(self) -> str:
         return super().__str__() + f"(group={self.group}, amount={self.amount})"
+
+    def as_jsonable(self) -> dict[str, Any]:
+        res = super().as_jsonable()
+        res["group"] = self.group
+        fun = getattr(self.amount, "as_jsonable", None)
+        res["amount"] = fun() if fun is not None else self.amount
+        return res
 
 
 class NullOutput(PowerOutput, ColorOutput, AIOComponent):

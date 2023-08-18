@@ -2,13 +2,12 @@
 
 import argparse
 import asyncio
-import importlib
 import json
 import sys
 
 from pyeep.app.aio import AIOApp
 from pyeep.component.aio import AIOComponent
-from pyeep.messages import Shutdown
+from pyeep.messages import Jsonable, Shutdown
 
 
 class MessageIO(AIOComponent):
@@ -22,24 +21,15 @@ class MessageIO(AIOComponent):
     async def _read_task(self):
         try:
             while (line := await self.msg_input.readline()):
-                try:
-                    msg_dict = json.loads(line)
-                    module_name = msg_dict.pop("__module__")
-                    class_name = msg_dict.pop("__class__")
-                    msg_dict["src"] = self
-                except Exception as e:
-                    self.logger.error("message malformed: %r: %s", line.strip(), e)
+                jsonable = json.loads(line)
+                cls = Jsonable.jsonable_class(jsonable)
+                if cls is None:
                     continue
 
-                try:
-                    mod = importlib.import_module(module_name)
-                    cls = getattr(mod, class_name)
-                except Exception as e:
-                    self.logger.error("cannot find module class %s.%s: %s", module_name, class_name, e)
-                    continue
+                jsonable["src"] = self
 
                 try:
-                    msg = cls(**msg_dict)
+                    msg = cls(**jsonable)
                 except Exception as e:
                     self.logger.error("cannot instantiate message: %s", e)
                     continue
