@@ -6,7 +6,7 @@ from pyeep.component.base import check_hub
 from pyeep.component.gtk import GtkComponent
 from pyeep.gtk import Gio, GLib, Gtk
 
-from .. import output
+from ..outputs.power import SetGroupPower
 
 SCENES: list[Type["Scene"]] = []
 
@@ -113,7 +113,7 @@ class PowerControl:
         Manually set this scene's power
         """
         val = round(adj.get_value())
-        self.scene.send(output.SetGroupPower(group=self.get_group(), power=val / 100.0))
+        self.scene.send(SetGroupPower(group=self.get_group(), power=val / 100.0))
 
     def get_group(self) -> int:
         return self.group.get_value()

@@ -6,7 +6,7 @@ from pyeep.messages import Message
 
 from .. import animation
 from .base import SingleGroupScene, register
-from ..output import IncreaseGroupPower
+from ..outputs.power import IncreaseGroupPower
 
 
 @register

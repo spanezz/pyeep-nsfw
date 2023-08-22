@@ -12,9 +12,8 @@ import pyeep.inputs.manual
 import pyeep.inputs.midi
 import pyeep.messages
 import pyeep.pygame
-import pyeep.buttplug
+import pyeep.outputs.buttplug
 import pyeep.muse2
-import pyeep.output
 import pyeep.outputs.synth
 import pyeep.outputs.pattern
 import pyeep.outputs.coyote
@@ -29,7 +28,7 @@ from pyeep.inputs.base import Input
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from pyeep import joystick, scenes
-from pyeep.output import NullOutput
+from pyeep.outputs.power import NullOutput
 
 log = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.action_save_config.connect("activate", self.on_save_config)
         self.gtk_app.add_action(self.action_save_config)
 
-        self.add_component(pyeep.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
+        self.add_component(pyeep.outputs.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
         self.add_component(pyeep.inputs.midi.MidiInput)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[

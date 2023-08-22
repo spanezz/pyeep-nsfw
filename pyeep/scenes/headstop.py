@@ -6,7 +6,7 @@ from pyeep.component.base import check_hub
 from pyeep.messages import Message
 
 from ..muse2 import HeadGyro
-from ..output import SetGroupPower
+from ..outputs.power import SetGroupPower
 from .base import SingleGroupPowerScene, register
 
 

@@ -5,7 +5,7 @@ from pyeep.messages import Message
 
 from ..joystick import JoystickAxisMoved
 from .base import SingleGroupPowerScene, register
-from ..output import SetGroupPower
+from ..outputs.power import SetGroupPower
 
 
 @register

@@ -16,7 +16,7 @@ from pyeep.component.jack import JackComponent
 from pyeep.inputs.midi import MidiMessages
 from pyeep.messages import Message, Shutdown
 
-from ..output import Output, PowerOutput, PowerOutputController
+from .power import Output, PowerOutput, PowerOutputController
 
 
 class PlayAudio(Message):

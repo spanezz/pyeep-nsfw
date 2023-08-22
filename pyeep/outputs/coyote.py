@@ -12,7 +12,7 @@ from pyeep.component.base import check_hub, export
 from pyeep.component.controller import ControllerWidget
 from pyeep.gtk import Gio, GLib, GObject, Gtk
 
-from ..output import PowerOutput, PowerOutputController
+from .power import PowerOutput, PowerOutputController
 
 
 class Coyote(PowerOutput, bluetooth.BluetoothComponent):

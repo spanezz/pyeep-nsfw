@@ -9,7 +9,7 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
 from pyeep.messages import DeviceScanRequest, Message, Shutdown
 
-from .output import PowerOutput, PowerOutputController
+from .power import PowerOutput, PowerOutputController
 
 
 class SetPower(Message):

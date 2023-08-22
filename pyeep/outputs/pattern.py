@@ -14,7 +14,7 @@ from pyeep.messages import Message, Shutdown
 from pyeep.synth import Wave, SineWave, SawWave
 from pyeep.outputs.base import OutputController
 
-from ..output import PowerOutput, PowerOutputController
+from .power import PowerOutput, PowerOutputController
 
 
 class Channel:

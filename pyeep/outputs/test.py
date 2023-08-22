@@ -8,7 +8,7 @@ import pyeep.outputs.base
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
 from pyeep.messages import Shutdown, Jsonable
-from ..output import PowerOutput, PowerOutputController
+from .power import PowerOutput, PowerOutputController
 
 
 class TestOutput(PowerOutput, AIOComponent):

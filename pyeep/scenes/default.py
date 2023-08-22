@@ -6,7 +6,8 @@ from pyeep.gtk import GLib
 from pyeep.messages import Message, Pause, Resume, Shortcut
 from pyeep.outputs.color import SetGroupColor
 
-from .. import animation, output
+from .. import animation
+from ..outputs.power import IncreaseGroupPower
 from .base import SingleGroupPowerScene, register
 
 
@@ -23,7 +24,7 @@ class KeyboardShortcutMixin:
             case "F-":
                 self.increment_power(-0.05)
             case "PULSE":
-                self.send(output.IncreaseGroupPower(
+                self.send(IncreaseGroupPower(
                     group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
                 self.send(SetGroupColor(
@@ -42,7 +43,7 @@ class KeyboardShortcutMixin:
             case "VOLUME DOWN":
                 self.set_power(0)
             case "TAP":
-                self.send(output.IncreaseGroupPower(
+                self.send(IncreaseGroupPower(
                     group=self.get_group(),
                     amount=animation.PowerPulse(power=0.3, duration=0.5)))
                 self.send(SetGroupColor(
