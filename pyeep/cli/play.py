@@ -12,13 +12,13 @@ import pyeep.inputs.manual
 import pyeep.inputs.midi
 import pyeep.messages
 import pyeep.pygame
-import stim.buttplug
-import stim.muse2
-import stim.output
-import stim.outputs.synth
-import stim.outputs.pattern
-import stim.outputs.coyote
-import stim.outputs.test
+import pyeep.buttplug
+import pyeep.muse2
+import pyeep.output
+import pyeep.outputs.synth
+import pyeep.outputs.pattern
+import pyeep.outputs.coyote
+import pyeep.outputs.test
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
@@ -28,8 +28,8 @@ from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
-from stim import joystick, scenes
-from stim.output import NullOutput
+from pyeep import joystick, scenes
+from pyeep.output import NullOutput
 
 log = logging.getLogger(__name__)
 
@@ -64,14 +64,14 @@ class App(GtkApp, JackApp, AIOApp):
         self.action_save_config.connect("activate", self.on_save_config)
         self.gtk_app.add_action(self.action_save_config)
 
-        self.add_component(stim.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
+        self.add_component(pyeep.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
         self.add_component(pyeep.inputs.midi.MidiInput)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
             pyeep.bluetooth.Device("21:04:99:10:35:05", HappyLights),
-            pyeep.bluetooth.Device("00:55:DA:B7:DE:A1", stim.muse2.Muse2),
-            # pyeep.bluetooth.Device("CF:1E:01:D4:1E:BC", stim.outputs.coyote.Coyote),
+            pyeep.bluetooth.Device("00:55:DA:B7:DE:A1", pyeep.muse2.Muse2),
+            # pyeep.bluetooth.Device("CF:1E:01:D4:1E:BC", pyeep.outputs.coyote.Coyote),
         ])
         # self.add_component(HeadPosition)
         # self.add_component(HeadMovement)
@@ -82,10 +82,10 @@ class App(GtkApp, JackApp, AIOApp):
             "bluetooth-22c:28:c6:3f:39:91:1b": pyeep.inputs.keyboards.RingRemote,
         })
         self.add_component(NullOutput, name="null_output")
-        self.add_component(stim.outputs.synth.Synth)
-        self.add_component(stim.outputs.synth.Pulses)
-        self.add_component(stim.outputs.pattern.PatternPlayer)
-        # self.add_component(stim.outputs.test.TestOutput)
+        self.add_component(pyeep.outputs.synth.Synth)
+        self.add_component(pyeep.outputs.synth.Pulses)
+        self.add_component(pyeep.outputs.pattern.PatternPlayer)
+        # self.add_component(pyeep.outputs.test.TestOutput)
 
     def on_save_config(self, action, parameter):
         self.send(pyeep.messages.ConfigSaveRequest())
@@ -140,7 +140,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.grid.attach(self.outputs.widget, 2, 0, 1, 1)
 
         # Instantiate scenes
-        for importer, modname, ispkg in pkgutil.iter_modules(scenes.__path__, "stim.scenes."):
+        for importer, modname, ispkg in pkgutil.iter_modules(scenes.__path__, "pyeep.scenes."):
             importlib.import_module(modname)
         for scene_cls in scenes.base.SCENES:
             scene = self.add_component(scene_cls)

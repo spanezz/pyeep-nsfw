@@ -1,3 +1,5 @@
 #!/bin/sh
 
-pw-jack python3 -m stim.cli.play
+export PYTHONPATH="$(readlink -f $(dirname $0)/../pyeep)"
+
+pw-jack python3 -m pyeep.cli.play
