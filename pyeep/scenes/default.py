@@ -3,7 +3,8 @@ from __future__ import annotations
 from pyeep.color import Color
 from pyeep.component.base import check_hub
 from pyeep.gtk import GLib
-from pyeep.messages import Message, Pause, Resume, Shortcut
+from pyeep.messages.message import Message
+from pyeep.messages.input import Pause, Resume, Shortcut
 from pyeep.outputs.color import SetGroupColor
 
 from .. import animation

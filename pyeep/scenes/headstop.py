@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy
 
 from pyeep.component.base import check_hub
-from pyeep.messages import Message
+from ..messages.message import Message
 
 from ..muse2 import HeadGyro
 from ..outputs.power import SetGroupPower

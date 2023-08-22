@@ -14,7 +14,8 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
 from pyeep.component.jack import JackComponent
 from pyeep.inputs.midi import MidiMessages
-from pyeep.messages import Message, Shutdown
+from pyeep.messages.message import Message
+from pyeep.messages.component import Shutdown
 
 from .power import Output, PowerOutput, PowerOutputController
 

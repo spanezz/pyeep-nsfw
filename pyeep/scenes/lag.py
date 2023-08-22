@@ -4,7 +4,8 @@ import functools
 
 from pyeep.component.base import check_hub
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import EmergencyStop, Message, Shortcut
+from ..messages.message import Message
+from ..messages.input import EmergencyStop, Shortcut
 
 from .base import SingleGroupPowerScene, register
 from .default import KeyboardShortcutMixin

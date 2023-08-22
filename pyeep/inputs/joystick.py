@@ -4,7 +4,7 @@ import pyeep.pygame
 from pyeep.component.base import check_hub
 from pyeep.component.active import SimpleActiveComponent
 from pyeep.inputs.base import Input
-from pyeep.messages import Message
+from pyeep.messages.message import Message
 from pyeep.pygame import pygame
 
 

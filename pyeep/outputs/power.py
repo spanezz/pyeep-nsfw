@@ -9,7 +9,9 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import Component, check_hub, export
 from pyeep.component.controller import ControllerWidget
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import Configure, Message, Shutdown
+from pyeep.messages.config import Configure
+from pyeep.messages.message import Message
+from pyeep.messages.component import Shutdown
 from pyeep.outputs.base import Output
 from pyeep.outputs.color import ColorOutput, ColorOutputController
 

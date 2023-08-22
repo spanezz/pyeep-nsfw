@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pyeep.component.base import check_hub
 from pyeep.inputs.midi import MidiMessages
-from pyeep.messages import Message
+from ..messages.message import Message
 
 from .. import animation
 from .base import SingleGroupScene, register

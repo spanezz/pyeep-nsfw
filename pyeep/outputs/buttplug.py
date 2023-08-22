@@ -7,7 +7,8 @@ import buttplug
 import pyeep.outputs
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
-from pyeep.messages import DeviceScanRequest, Message, Shutdown
+from pyeep.messages.message import Message
+from pyeep.messages.component import DeviceScanRequest, Shutdown
 
 from .power import PowerOutput, PowerOutputController
 

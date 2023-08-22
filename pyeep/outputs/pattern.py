@@ -10,7 +10,8 @@ from pyeep.component.aio import AIOComponent
 from pyeep.component.base import check_hub, export
 from pyeep.component.jack import JackComponent
 from pyeep.gtk import Gtk, Gio, GLib, GObject
-from pyeep.messages import Message, Shutdown
+from pyeep.messages.message import Message
+from pyeep.messages.component import Shutdown
 from pyeep.synth import Wave, SineWave, SawWave
 from pyeep.outputs.base import OutputController
 

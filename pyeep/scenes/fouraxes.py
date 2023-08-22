@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pyeep.messages import Message
+from ..messages.message import Message
 from pyeep.component.base import check_hub
 from pyeep.gtk import GLib, Gtk
-from pyeep.messages import Shortcut
+from ..messages.input import Shortcut
 
 from .base import Scene, PowerControl, SceneGrid, register
 

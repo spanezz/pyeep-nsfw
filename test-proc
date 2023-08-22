@@ -7,7 +7,8 @@ import sys
 
 from pyeep.app.aio import AIOApp
 from pyeep.component.aio import AIOComponent
-from pyeep.messages import Jsonable, Shutdown
+from pyeep.messages.jsonable import Jsonable
+from pyeep.messages.component import Shutdown
 
 
 class MessageIO(AIOComponent):

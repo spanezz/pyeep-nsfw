@@ -11,12 +11,12 @@ import numpy
 
 from pyeep.component.aio import AIOComponent
 import pyeep.app.aio
-from pyeep.messages import Shutdown
+from pyeep.messages.core import Shutdown
 from pyeep import shape, volume
 from pyeep.audio import PyAudioPlayer
 from pyeep.pattern import Pattern, PatternSequence, Silence, Wave
 from pyeep.wav import WaveWriter
-from stim.heart.improvised import Excitement
+from pyeep.heart.improvised import Excitement
 
 
 class Pulses(Pattern):

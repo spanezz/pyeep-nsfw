@@ -7,7 +7,8 @@ from typing import Type
 import pyeep.outputs.base
 from pyeep.component.aio import AIOComponent
 from pyeep.component.base import export
-from pyeep.messages import Shutdown, Jsonable
+from pyeep.messages.component import Shutdown
+from pyeep.messages.jsonable import Jsonable
 from .power import PowerOutput, PowerOutputController
 
 
