@@ -25,9 +25,10 @@ from pyeep.component.base import Component
 from pyeep.component.configmanager import ConfigManager
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
+from pyeep.inputs.joystick import Joysticks
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
-from pyeep import joystick, scenes
+from pyeep import scenes
 from pyeep.outputs.power import NullOutput
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class App(GtkApp, JackApp, AIOApp):
         ])
         # self.add_component(HeadPosition)
         # self.add_component(HeadMovement)
-        self.add_component(joystick.Joysticks)
+        self.add_component(Joysticks)
         self.add_component(pyeep.inputs.evdev.EvdevDeviceManager, device_map={
             "usb-04d9_1203-event-kbd": pyeep.inputs.keyboards.CNCControlPanel,
             "bluetooth-40:28:c6:3f:39:91:1b-kbd": pyeep.inputs.keyboards.PageTurner,

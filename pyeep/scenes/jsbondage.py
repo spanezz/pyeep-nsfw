@@ -3,7 +3,7 @@ from __future__ import annotations
 from pyeep.component.base import check_hub
 from pyeep.messages import Message
 
-from ..joystick import JoystickAxisMoved
+from ..inputs.joystick import JoystickAxisMoved
 from .base import SingleGroupPowerScene, register
 from ..outputs.power import SetGroupPower
 
