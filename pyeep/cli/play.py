@@ -31,6 +31,7 @@ from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from pyeep import scenes
 from pyeep.outputs.power import NullOutput
+from pyeep.component.subprocess import SubprocessComponent
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +52,11 @@ class ScanAction(Component):
         self.send(pyeep.messages.DeviceScanRequest(duration=3.0))
 
 
+class MidiSynth(SubprocessComponent):
+    def get_commandline(self):
+        return ["python3", "-m", "pyeep.cli.midisynth", "--controller", self.workdir / "socket"]
+
+
 class App(GtkApp, JackApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
@@ -68,6 +74,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.add_component(pyeep.outputs.buttplug.ButtplugClient, client_name=self.title, iface=self.args.iface)
         self.add_component(pyeep.inputs.manual.Manual)
         self.add_component(pyeep.inputs.midi.MidiInput)
+        self.add_component(MidiSynth)
         self.add_component(pyeep.bluetooth.Bluetooth, devices=[
             pyeep.bluetooth.Device("CD:E3:36:F6:BB:74", pyeep.inputs.heartrate.HeartRateMonitor, ("0000180d-",)),
             pyeep.bluetooth.Device("21:04:99:10:35:05", HappyLights),

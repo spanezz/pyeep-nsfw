@@ -93,7 +93,7 @@ class SubprocessComponent(AIOComponent):
                             await self._terminate_process()
                         break
                     case _:
-                        if msg.src != self:
+                        if msg.src != self and self.writer is not None:
                             line = json.dumps(msg.as_jsonable()) + "\n"
                             self.writer.write(line.encode())
                             await self.writer.drain()
