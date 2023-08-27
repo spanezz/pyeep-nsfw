@@ -17,7 +17,6 @@ import pyeep.outputs.synth
 import pyeep.outputs.midisynth
 import pyeep.outputs.pattern
 import pyeep.outputs.coyote
-import pyeep.outputs.test
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.app.jack import JackApp
@@ -29,7 +28,7 @@ from pyeep.inputs.joystick import Joysticks
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from pyeep import scenes
-from pyeep.outputs.power import NullOutput
+from pyeep.outputs.power import NullOutput, PowerOutput
 from pyeep.component.subprocess import TopComponent
 
 log = logging.getLogger(__name__)
@@ -59,6 +58,11 @@ class MidiSynthesizer(TopComponent):
 class MidiInputReader(TopComponent):
     def get_commandline(self):
         return ["python3", "-m", "pyeep.cli.midievents", "--controller", self.workdir / "socket"]
+
+
+class PatternPlayer(TopComponent, PowerOutput):
+    def get_commandline(self):
+        return ["python3", "-m", "pyeep.cli.stimpattern", "--controller", self.workdir / "socket"]
 
 
 class App(GtkApp, JackApp, AIOApp):
@@ -95,7 +99,7 @@ class App(GtkApp, JackApp, AIOApp):
         })
         self.add_component(NullOutput, name="null_output")
         self.add_component(pyeep.outputs.synth.Pulses)
-        self.add_component(pyeep.outputs.pattern.PatternPlayer)
+        self.add_component(PatternPlayer, rate=0)
         # self.add_component(pyeep.outputs.test.TestOutput)
 
     def on_save_config(self, action, parameter):
