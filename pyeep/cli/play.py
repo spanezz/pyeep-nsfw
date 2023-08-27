@@ -15,6 +15,7 @@ import pyeep.pygame
 import pyeep.outputs.buttplug
 import pyeep.muse2
 import pyeep.outputs.synth
+import pyeep.outputs.midisynth
 import pyeep.outputs.pattern
 import pyeep.outputs.coyote
 import pyeep.outputs.test
@@ -82,7 +83,7 @@ class App(GtkApp, JackApp, AIOApp):
             "bluetooth-22c:28:c6:3f:39:91:1b": pyeep.inputs.keyboards.RingRemote,
         })
         self.add_component(NullOutput, name="null_output")
-        self.add_component(pyeep.outputs.synth.Synth)
+        self.add_component(pyeep.outputs.midisynth.Synth)
         self.add_component(pyeep.outputs.synth.Pulses)
         self.add_component(pyeep.outputs.pattern.PatternPlayer)
         # self.add_component(pyeep.outputs.test.TestOutput)
