@@ -49,9 +49,7 @@ class SubprocessComponent(AIOComponent):
                     self.logger.error("cannot instantiate message: %s", e)
                     continue
 
-                print("SESND", msg, msg.src)
                 self.send(msg)
-                print("SESN1D", msg, msg.src)
         finally:
             self.receive(Shutdown())
 
@@ -95,7 +93,6 @@ class SubprocessComponent(AIOComponent):
                             await self._terminate_process()
                         break
                     case _:
-                        print("ZA", msg, msg.src)
                         if msg.src != self:
                             line = json.dumps(msg.as_jsonable()) + "\n"
                             self.writer.write(line.encode())
