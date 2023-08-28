@@ -20,6 +20,9 @@ class PowerOutput(Output):
     def set_power(self, power: float):
         raise NotImplementedError(f"{self.__class__.__name__}.set_power not implemented")
 
+    def get_output_controller(self) -> Type["PowerOutputController"]:
+        return PowerOutputController
+
 
 class SetGroupPower(Message):
     """
