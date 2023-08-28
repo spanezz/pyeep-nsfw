@@ -13,7 +13,6 @@ import pyeep.messages
 import pyeep.pygame
 import pyeep.outputs.buttplug
 import pyeep.muse2
-import pyeep.outputs.synth
 import pyeep.outputs.midisynth
 import pyeep.outputs.pattern
 import pyeep.outputs.coyote
@@ -65,6 +64,11 @@ class PatternPlayer(TopComponent, PowerOutput):
         return ["python3", "-m", "pyeep.cli.stimpattern", "--controller", self.workdir / "socket"]
 
 
+class PulsesPlayer(TopComponent, PowerOutput):
+    def get_commandline(self):
+        return ["python3", "-m", "pyeep.cli.audiopulses", "--controller", self.workdir / "socket"]
+
+
 class App(GtkApp, JackApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
@@ -98,7 +102,7 @@ class App(GtkApp, JackApp, AIOApp):
             "bluetooth-22c:28:c6:3f:39:91:1b": pyeep.inputs.keyboards.RingRemote,
         })
         self.add_component(NullOutput, name="null_output")
-        self.add_component(pyeep.outputs.synth.Pulses)
+        self.add_component(PulsesPlayer, rate=0)
         self.add_component(PatternPlayer, rate=0)
         # self.add_component(pyeep.outputs.test.TestOutput)
 
