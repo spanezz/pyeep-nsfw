@@ -18,7 +18,6 @@ import pyeep.outputs.pattern
 import pyeep.outputs.coyote
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
-from pyeep.app.jack import JackApp
 from pyeep.component.base import Component
 from pyeep.component.configmanager import ConfigManager
 from pyeep.gtk import Gio, GLib, Gtk
@@ -69,7 +68,7 @@ class PulsesPlayer(TopComponent, PowerOutput):
         return ["python3", "-m", "pyeep.cli.audiopulses", "--controller", self.workdir / "socket"]
 
 
-class App(GtkApp, JackApp, AIOApp):
+class App(GtkApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.add_hub(pyeep.pygame.PygameHub)
@@ -182,7 +181,7 @@ class App(GtkApp, JackApp, AIOApp):
 
 
 def main():
-    parser = App.argparser(name="play", description="Play with nonconventional inputs and outputs")
+    parser = App.argparser(description="Play with nonconventional inputs and outputs")
     parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
                         help="Intiface Engine address to connect to")
     args = parser.parse_args()
