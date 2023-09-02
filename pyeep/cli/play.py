@@ -26,7 +26,7 @@ from pyeep.inputs.joystick import Joysticks
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
 from pyeep import scenes
-from pyeep.outputs.power import NullOutput, PowerOutput
+from pyeep.outputs.power import NullOutput, PowerOutputTop
 from pyeep.component.subprocess import TopComponent
 
 log = logging.getLogger(__name__)
@@ -58,12 +58,12 @@ class MidiInputReader(TopComponent):
         return ["python3", "-m", "pyeep.cli.midievents", "--controller", self.workdir / "socket"]
 
 
-class PatternPlayer(TopComponent, PowerOutput):
+class PatternPlayer(PowerOutputTop):
     def get_commandline(self):
         return ["python3", "-m", "pyeep.cli.stimpattern", "--controller", self.workdir / "socket"]
 
 
-class PulsesPlayer(TopComponent, PowerOutput):
+class PulsesPlayer(PowerOutputTop):
     def get_commandline(self):
         return ["python3", "-m", "pyeep.cli.audiopulses", "--controller", self.workdir / "socket"]
 

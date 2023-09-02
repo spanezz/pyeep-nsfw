@@ -9,7 +9,7 @@ from ..app.gtk import GtkApp
 from ..app.jack import JackApp
 from ..gtk import Gtk
 from ..outputs.pattern import PatternPlayer
-from ..component.subprocess import BottomComponent
+from ..outputs.power import PowerOutputBottom
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class App(GtkApp, JackApp, AIOApp):
         super().__init__(args, **kwargs)
         self.player = self.add_component(PatternPlayer)
         if args.controller:
-            self.add_component(BottomComponent, path=args.controller)
+            self.add_component(PowerOutputBottom, path=args.controller, output=self.player)
 
     def build_main_window(self):
         super().build_main_window()
