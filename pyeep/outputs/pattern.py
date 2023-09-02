@@ -109,7 +109,7 @@ class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
 
     def set_jack_client(self, jack_client: jack.Client):
         super().set_jack_client(jack_client)
-        self.rate = jack_client.samplerate
+        self.set_rate(jack_client.samplerate)
         self.left.set_rate(self.rate)
         self.right.set_rate(self.rate)
         self.outport_l = self.jack_client.outports.register('pattern_L')
