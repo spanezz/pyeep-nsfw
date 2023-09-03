@@ -231,28 +231,28 @@ class ChannelController(GObject.Object):
     def get_setup_kwargs(self) -> dict[str, Any]:
         return self.get_config()
 
-    def attach_ui(self, cw: ControllerWidget, x: int, y: int):
+    def attach_ui(self, grid: Gtk.Grid, x: int, y: int):
         freq = Gtk.SpinButton(
             adjustment=self.freq,
             digits=1)
-        cw.grid.attach(freq, x, y, 2, 1)
+        grid.attach(freq, x, y, 2, 1)
 
         lfo_freq = Gtk.SpinButton(
             adjustment=self.lfo_freq,
             digits=1)
-        cw.grid.attach(lfo_freq, x, y + 1, 2, 1)
+        grid.attach(lfo_freq, x, y + 1, 2, 1)
 
-        cw.grid.attach(self.lfo_shape, x, y + 2, 2, 1)
+        grid.attach(self.lfo_shape, x, y + 2, 2, 1)
 
         min_level = Gtk.SpinButton(
             adjustment=self.min_level,
             digits=2)
-        cw.grid.attach(min_level, x, y + 3, 2, 1)
+        grid.attach(min_level, x, y + 3, 2, 1)
 
         max_level = Gtk.SpinButton(
             adjustment=self.max_level,
             digits=2)
-        cw.grid.attach(max_level, x, y + 4, 2, 1)
+        grid.attach(max_level, x, y + 4, 2, 1)
 
 
 class PatternOutputController(PowerOutputController):
@@ -290,24 +290,32 @@ class PatternOutputController(PowerOutputController):
     def build(self) -> ControllerWidget:
         cw = super().build()
 
-        cw.grid.attach(Gtk.Label(label=self.output.left.label), 1, 4, 2, 1)
-        cw.grid.attach(Gtk.Label(label=self.output.right.label), 3, 4, 2, 1)
-        cw.grid.attach(Gtk.Label(label="Freq"), 0, 5, 1, 1)
-        cw.grid.attach(Gtk.Label(label="LFO"), 0, 6, 1, 1)
-        cw.grid.attach(Gtk.Label(label="Shape"), 0, 7, 1, 1)
-        cw.grid.attach(Gtk.Label(label="Min"), 0, 8, 1, 1)
-        cw.grid.attach(Gtk.Label(label="Max"), 0, 9, 1, 1)
+        grid = Gtk.Grid()
+        grid.set_hexpand(True)
+        cw.box.append(grid)
 
-        self.left.attach_ui(cw, 1, 5)
-        self.right.attach_ui(cw, 3, 5)
+        grid.attach(Gtk.Label(label=self.output.left.label), 1, 0, 2, 1)
+        grid.attach(Gtk.Label(label=self.output.right.label), 3, 0, 2, 1)
+        grid.attach(Gtk.Label(label="Freq"), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label="LFO"), 0, 2, 1, 1)
+        grid.attach(Gtk.Label(label="Shape"), 0, 3, 1, 1)
+        grid.attach(Gtk.Label(label="Min"), 0, 4, 1, 1)
+        grid.attach(Gtk.Label(label="Max"), 0, 5, 1, 1)
 
-        pulse = Gtk.Button(label="Apply")
-        pulse.connect("clicked", self.on_apply)
-        cw.grid.attach(pulse, 0, 10, 1, 1)
+        self.left.attach_ui(grid, 1, 1)
+        self.right.attach_ui(grid, 3, 1)
 
-        decay = Gtk.ToggleButton(label="Auto apply")
-        decay.set_action_name("app." + self.auto_apply.get_name())
-        cw.grid.attach(decay, 1, 10, 1, 1)
+        buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        buttons.set_hexpand(True)
+        cw.box.append(buttons)
+
+        apply = Gtk.Button(label="Apply")
+        apply.connect("clicked", self.on_apply)
+        buttons.append(apply)
+
+        autoapply = Gtk.ToggleButton(label="Auto apply")
+        autoapply.set_action_name("app." + self.auto_apply.get_name())
+        buttons.append(autoapply)
 
         return cw
 

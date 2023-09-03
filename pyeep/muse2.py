@@ -474,10 +474,11 @@ class Muse2InputController(InputController):
     def build(self) -> ControllerWidget:
         cw = super().build()
         monitor = Gtk.Text(buffer=self.monitor)
-        cw.grid.attach(monitor, 0, 3, 1, 1)
+        cw.box.append(monitor)
+
         reset = Gtk.Button(label="reset")
         reset.connect("clicked", self.on_reset)
-        cw.grid.attach(reset, 0, 4, 1, 1)
+        cw.box.append(reset)
         return cw
 
     def receive(self, msg: Message):
