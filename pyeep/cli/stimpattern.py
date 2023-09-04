@@ -18,8 +18,11 @@ class App(GtkApp, JackApp, AIOApp):
     def __init__(self, args: argparse.Namespace, **kwargs):
         super().__init__(args, **kwargs)
         self.player = self.add_component(PatternPlayer)
+        self.controller = self.add_component(
+            self.player.get_output_controller(bottom=bool(args.controller)),
+            output=self.player)
         if args.controller:
-            self.add_component(PowerOutputBottom, path=args.controller, output=self.player)
+            self.bottom = self.add_component(PowerOutputBottom, path=args.controller, controller=self.controller)
 
     def build_main_window(self):
         super().build_main_window()
@@ -28,11 +31,7 @@ class App(GtkApp, JackApp, AIOApp):
         self.grid.set_column_homogeneous(True)
         self.window.set_child(self.grid)
 
-        model = self.add_component(
-            self.player.get_output_controller(),
-            output=self.player)
-
-        self.grid.attach(model.widget, 0, 0, 1, 1)
+        self.grid.attach(self.controller.widget, 0, 0, 1, 1)
 
 
 def main():

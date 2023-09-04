@@ -13,9 +13,9 @@ from pyeep.gtk import Gtk, Gio, GLib, GObject
 from pyeep.messages.message import Message
 from pyeep.messages.component import Shutdown
 from pyeep.synth import Wave, SineWave, SawWave
-from pyeep.outputs.base import OutputController
+from pyeep.outputs.base import BaseOutputController
 
-from .power import PowerOutput, PowerOutputController
+from .power import PowerOutput
 
 
 class Channel:
@@ -104,8 +104,9 @@ class PatternPlayer(PowerOutput, JackComponent, AIOComponent):
         self.left = Channel(name="pattern_L", label="Left/A")
         self.right = Channel(name="pattern_R", label="Right/B")
 
-    def get_output_controller(self) -> Type[OutputController]:
-        return PatternOutputController
+    def get_output_controller(self, **kwargs) -> Type[BaseOutputController]:
+        base = super().get_output_controller(**kwargs)
+        return type("PatternOutputController", (PatternOutputController, base), {})
 
     def set_jack_client(self, jack_client: jack.Client):
         super().set_jack_client(jack_client)
@@ -255,26 +256,20 @@ class ChannelController(GObject.Object):
         grid.attach(max_level, x, y + 4, 2, 1)
 
 
-class PatternOutputController(PowerOutputController):
+class PatternOutputController(BaseOutputController):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        # TODO: animated targets for the various parameters
-
         self.left = ChannelController(channel_name="left")
         self.left.connect("changed", self.on_channel_changed)
         self.right = ChannelController(channel_name="right")
         self.right.connect("changed", self.on_channel_changed)
-
         self.auto_apply = Gio.SimpleAction.new_stateful(
                 name=self.name.replace("_", "-") + "-auto-apply",
                 parameter_type=None,
                 state=GLib.Variant.new_boolean(False))
         self.hub.app.gtk_app.add_action(self.auto_apply)
 
-        # Initialize the output with the initial UI values
-        self.on_power(self.power)
-        self.on_apply(None)
+        # TODO: animated ramp targets for the various parameters
 
     def on_apply(self, button):
         self.output.setup(
@@ -326,6 +321,7 @@ class PatternOutputController(PowerOutputController):
             self.left.load_config(cfg)
         if (cfg := config.get("right")):
             self.right.load_config(cfg)
+        self.on_power(self.power)
         self.on_apply(None)
 
     @check_hub

@@ -10,24 +10,25 @@ import pyeep.inputs.heartrate
 import pyeep.inputs.keyboards
 import pyeep.inputs.manual
 import pyeep.messages
-import pyeep.pygame
-import pyeep.outputs.buttplug
 import pyeep.muse2
+import pyeep.outputs.buttplug
+import pyeep.outputs.coyote
 import pyeep.outputs.midisynth
 import pyeep.outputs.pattern
-import pyeep.outputs.coyote
+import pyeep.pygame
+from pyeep import scenes
 from pyeep.app.aio import AIOApp
 from pyeep.app.gtk import GtkApp
 from pyeep.component.base import Component
 from pyeep.component.configmanager import ConfigManager
+from pyeep.component.subprocess import TopComponent
 from pyeep.gtk import Gio, GLib, Gtk
 from pyeep.inputs.base import Input
 from pyeep.inputs.joystick import Joysticks
 from pyeep.outputs.base import OutputsModel
 from pyeep.outputs.happylights import HappyLights
-from pyeep import scenes
-from pyeep.outputs.power import NullOutput, PowerOutputTop
-from pyeep.component.subprocess import TopComponent
+from pyeep.outputs.null import NullOutput
+from pyeep.outputs.power import PowerOutputTop
 
 log = logging.getLogger(__name__)
 
