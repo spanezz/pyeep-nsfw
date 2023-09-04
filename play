@@ -2,6 +2,6 @@
 
 export PYTHONPATH="$(readlink -f $(dirname $0)/../pyeep)"
 
-APP=${1:-"play"}
+APP=${1:-"nsfw"}
 
 pw-jack python3 -m pyeep.cli.$APP
