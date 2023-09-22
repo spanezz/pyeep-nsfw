@@ -20,3 +20,8 @@ consumption.
 
 At the moment it's mainly useful as a collection of example code that one is
 free to take and integrate in other projects.
+
+
+# Dependencies
+
+buttplug module from https://github.com/Siege-Wizard/buttplug-py
