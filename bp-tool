@@ -4,9 +4,12 @@ import argparse
 import logging
 import sys
 
-from pyeep.app import Shutdown
-import pyeep.aio
-from stim import toy, output
+from pyeep.app.aio import AIOApp
+from pyeep.component.aio import AIOComponent
+from pyeep.messages.component import DeviceScanRequest, NewComponent, Shutdown
+from pyeep.outputs.buttplug import ButtplugClient
+
+# from stim import toy, output
 
 import buttplug
 
@@ -31,9 +34,9 @@ async def dump_device(dev: buttplug.client.client.Device):
         print(f"* Sensor: {s.description} {s.__class__.__name__}: {value}")
 
 
-class Scan(pyeep.aio.AIOComponent):
+class Scan(AIOComponent):
     async def run(self):
-        self.send(toy.ScanRequest(dst="toys"))
+        self.send(DeviceScanRequest(duration=3.0))
 
         while True:
             msg = await self.next_message(timeout=0.2)
@@ -41,11 +44,12 @@ class Scan(pyeep.aio.AIOComponent):
             match msg:
                 case Shutdown():
                     break
-                case output.NewOutput():
-                    await dump_device(msg.actuator.actuator._device)
+                case NewComponent():
+                    # await dump_device(msg.actuator.actuator._device)
+                    pass
 
 
-class Dump(pyeep.aio.AIOComponent):
+class Dump(AIOComponent):
     async def run(self):
         while True:
             msg = await self.next_message(timeout=0.2)
@@ -60,10 +64,10 @@ class Dump(pyeep.aio.AIOComponent):
                     break
 
 
-class App(pyeep.aio.AIOApp):
+class App(AIOApp):
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
-        self.add_component(toy.Toys, client_name="bp-tool", iface=args.iface)
+        self.add_component(ButtplugClient, client_name="bp-tool", iface=args.iface)
         if self.args.scan:
             self.add_component(Scan)
         elif self.args.dump:
@@ -72,13 +76,17 @@ class App(pyeep.aio.AIOApp):
 
 def main():
     parser = App.argparser("Basic buttplug device management")
-    parser.add_argument("-i", "--iface", metavar="address", action="store", default="ws://127.0.0.1:12345",
-                        help="Intiface Engine address to connect to")
+    parser.add_argument(
+        "-i",
+        "--iface",
+        metavar="address",
+        action="store",
+        default="ws://localhost:12345",
+        help="Intiface Engine address to connect to",
+    )
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--scan", action="store_true",
-                       help="Scan for devices")
-    group.add_argument("--dump", action="store_true",
-                       help="Dump information about connected devices")
+    group.add_argument("--scan", action="store_true", help="Scan for devices")
+    group.add_argument("--dump", action="store_true", help="Dump information about connected devices")
     args = parser.parse_args()
 
     with App(args) as app:
