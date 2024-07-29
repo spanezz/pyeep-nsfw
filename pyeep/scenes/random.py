@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from typing import Any
 
 from pyeep import animation
 from pyeep.component.base import check_hub
@@ -18,7 +19,7 @@ class Random(Scene):
     TITLE = "Random"
     OUTPUTS = 3
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         # self.lag = Gtk.Adjustment(lower=0.0, upper=10.0, step_increment=0.5, page_increment=2.0, value=self.LAG_START)
         self.timeout: int | None = None
