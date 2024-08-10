@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import enum
+import math
 from typing import Any, Type
 
 import buttplug
@@ -74,6 +76,16 @@ class Actuator(PowerOutput, AIOComponent):
                     await self.actuator.command(msg.power)
 
 
+class LinearOutputState(enum.Enum):
+    """State machine for linear output controllers."""
+
+    INIT = enum.auto()
+    FORWARD = enum.auto()
+    FORWARD_PAUSE = enum.auto()
+    BACKWARD = enum.auto()
+    BACKWARD_PAUSE = enum.auto()
+
+
 class LinearOutputController(OutputController):
     """
     Base controller for linear actuators
@@ -93,27 +105,60 @@ class LinearOutputController(OutputController):
         )
         # self.position_max.connect("value_changed", self.on_position_max)
 
-        self.movement_time = Gtk.Adjustment(
-            value=500, lower=0, upper=1000, step_increment=5, page_increment=50, page_size=0
-        )
-        # self.movement_time.connect("value_changed", self.on_movement_time)
+        self.speed = Gtk.Adjustment(value=30, lower=0, upper=100, step_increment=5, page_increment=20, page_size=0)
+        # self.speed.connect("value_changed", self.on_speed)
 
-        self.forwards = True
+        # Pause at the end of each movement
+        self.pause_time = Gtk.Adjustment(value=0, lower=0, upper=100, step_increment=1, page_increment=3, page_size=0)
 
-        self.timeout = GLib.timeout_add(self.movement_time.get_value(), self.select_next_target)
+        self.next_action: LinearOutputState = LinearOutputState.INIT
+        self.last_target: float | None = None
+
+        self.timeout = GLib.timeout_add(10, self.select_next_target)
+
+    def _travel(self, time_ms: int, target: float) -> None:
+        if time_ms < 10:
+            time_ms = 10
+        print("TRAVEL", time_ms, target)
+        self.output.set_position(time_ms, target)
+        self.last_target = target
 
     @check_hub
     def select_next_target(self):
-        time_ms = int(self.movement_time.get_value())
-        if self.forwards:
-            target = self.position_max.get_value() / 100.0
-            self.output.set_position(time_ms, target)
-            self.forwards = False
-        else:
-            target = self.position_min.get_value() / 100.0
-            self.output.set_position(time_ms, target)
-            self.forwards = True
-        self.timeout = GLib.timeout_add(self.movement_time.get_value(), self.select_next_target)
+        min_speed, max_speed = 0.5, 4.5
+        speed = min_speed + (max_speed - min_speed) * self.speed.get_value() / 100.0
+        pause = ((self.pause_time.get_value() / 100.0) ** 2) * 5
+        print("SNT", self.next_action, speed, pause)
+        match self.next_action:
+            case LinearOutputState.INIT:
+                target = self.position_min.get_value() / 100.0
+                time_ms = 300
+                self._travel(time_ms, target)
+                self.next_action = LinearOutputState.BACKWARD_PAUSE
+            case LinearOutputState.FORWARD:
+                target = self.position_max.get_value() / 100.0
+                time_ms = int((abs(self.last_target - target) / speed) * 1000)
+                self._travel(time_ms, target)
+                if pause:
+                    self.next_action = LinearOutputState.FORWARD_PAUSE
+                else:
+                    self.next_action = LinearOutputState.BACKWARD
+            case LinearOutputState.FORWARD_PAUSE:
+                time_ms = pause * 1000
+                self.next_action = LinearOutputState.BACKWARD
+            case LinearOutputState.BACKWARD:
+                target = self.position_min.get_value() / 100.0
+                time_ms = int((abs(self.last_target - target) / speed) * 1000)
+                self._travel(time_ms, target)
+                if pause:
+                    self.next_action = LinearOutputState.BACKWARD_PAUSE
+                else:
+                    self.next_action = LinearOutputState.FORWARD
+            case LinearOutputState.BACKWARD_PAUSE:
+                time_ms = pause * 1000
+                self.next_action = LinearOutputState.FORWARD
+
+        self.timeout = GLib.timeout_add(time_ms, self.select_next_target)
         return False
 
     def build(self) -> ControllerWidget:
@@ -136,12 +181,19 @@ class LinearOutputController(OutputController):
         # position_max.connect("change-value", self.on_changed)
         grid.attach(position_max, 0, 1, 4, 1)
 
-        movement_time = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.movement_time)
-        movement_time.set_digits(2)
-        movement_time.set_draw_value(False)
-        movement_time.set_hexpand(True)
-        # movement_time.connect("change-value", self.on_changed)
-        grid.attach(movement_time, 0, 2, 4, 1)
+        speed = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.speed)
+        speed.set_digits(2)
+        speed.set_draw_value(False)
+        speed.set_hexpand(True)
+        # speed.connect("change-value", self.on_changed)
+        grid.attach(speed, 0, 2, 4, 1)
+
+        pause_time = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.pause_time)
+        pause_time.set_digits(2)
+        pause_time.set_draw_value(False)
+        pause_time.set_hexpand(True)
+        # speed.connect("change-value", self.on_changed)
+        grid.attach(pause_time, 0, 3, 4, 1)
 
         return cw
 
