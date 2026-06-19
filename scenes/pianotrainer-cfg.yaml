@@ -1,0 +1,14 @@
+groups:
+ - name: vibrators
+   label: Vibrators
+   icon: 👋
+   color: "#222277"
+   match:
+     - "match:buttplug.*"
+scenes:
+ - name: pianotrainer
+   label: Piano trainer
+   module: pyeep.scenes.pianotrainer
+   targets:
+     - ledstrip
+     - vibrators
