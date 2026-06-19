@@ -1,31 +1,91 @@
 import asyncio
 import argparse
-import logging
-import time as tm
-from typing import override, Any
+from typing import override, Any, Unpack
 
 import buttplug as bp
 
+from pyeep.app.base import BaseAppArgs
+from pyeep.models.messages import Message
+from pyeep.nodes import PublicComponent, ComponentArgs, Hub
+from pyeep.models.messages.power import SetPower
 from pyeep.app.asynccmd import ApplicationAsyncCmdClientApp
 
 # from .messages import HeartBeat, Sample
 
 
+class Device(PublicComponent):
+    def __init__(self, bp_dev: bp.ButtplugDevice, *, hub: Hub) -> None:
+        super().__init__(name=bp_dev.name, hub=hub)
+        self.dev = bp_dev
+        self.outputs: list[Output] = []
+        for feature in self.dev.features.values():
+            if not feature.outputs:
+                continue
+            for output_type, output in feature.outputs.items():
+                self.outputs.append(
+                    Output(
+                        feature,
+                        name=output_type,
+                        hub=self.hub,
+                        namespace=f"{self.routing_key}.{feature.index}",
+                    )
+                )
+
+    async def add_outputs_to_hub(self) -> None:
+        """Register the component's outputs in the hub."""
+        async with asyncio.TaskGroup() as tg:
+            for output in self.outputs:
+                tg.create_task(self.hub.add_component(output))
+
+    async def remove_outputs_from_hub(self) -> None:
+        """Remove the component's outputs from the hub."""
+        async with asyncio.TaskGroup() as tg:
+            for output in self.outputs:
+                tg.create_task(self.hub.remove_component(output))
+
+    # @override
+    # async def receive(self, msg: Message) -> None:
+    #   match msg:
+    #       TODO: handle emergency stops
+
+
+class Output(PublicComponent):
+    def __init__(
+        self, feature: bp.DeviceFeature, **kwargs: Unpack[ComponentArgs]
+    ) -> None:
+        super().__init__(**kwargs)
+        self.feature = feature
+
+    @override
+    async def receive(self, msg: Message) -> None:
+        match msg:
+            case SetPower():
+                if isinstance(msg.power, float):
+                    cmd = bp.DeviceOutputCommand(
+                        bp.OutputType(self.name), float(msg.power)
+                    )
+                else:
+                    self.log.warning(
+                        "Power of type %r not yet implemented", msg.power
+                    )
+                await self.feature.run_output(cmd)
+
+
 class Buttplug(ApplicationAsyncCmdClientApp):
     """Inspect the pyeep system."""
 
-    def __init__(self, *, handle_sigterm_sigint: bool = True) -> None:
-        super().__init__(
-            name="buttplug", handle_sigterm_sigint=handle_sigterm_sigint
-        )
+    def __init__(self, **kwargs: Unpack[BaseAppArgs]) -> None:
+        super().__init__(**kwargs)
         self.client = bp.ButtplugClient("NSFW buttplug component")
         self.client.on_device_added = self.on_device_added
         self.client.on_device_removed = self.on_device_removed
         self.client.on_scanning_finished = self.on_scanning_finished
         self.client.on_server_disconnect = self.on_server_disconnect
         # Connected devices
-        self.devices: dict[int, bp.ButtplugDevice] = {}
+        self.devices: dict[int, Device] = {}
 
+    @override
+    @classmethod
     def argparser(
         self, description: str | None = None
     ) -> argparse.ArgumentParser:
@@ -40,11 +100,16 @@ class Buttplug(ApplicationAsyncCmdClientApp):
 
     async def on_device_added(self, dev: bp.ButtplugDevice) -> None:
         self.log.info("Device added: %s", dev.name)
-        self.devices[dev.index] = dev
+        component = Device(dev, hub=self)
+        self.devices[dev.index] = component
+        await self.add_component(component)
+        await component.add_outputs_to_hub()
 
     async def on_device_removed(self, dev: bp.ButtplugDevice) -> None:
         self.log.info("Device removed: %s", dev.name)
-        self.devices.pop(dev.index, None)
+        if component := self.devices.pop(dev.index, None):
+            await component.remove_outputs_from_hub()
+            await self.remove_component(component)
 
     async def on_scanning_finished(self) -> None:
         self.log.info("Device scanning finished.")
@@ -69,7 +134,7 @@ class Buttplug(ApplicationAsyncCmdClientApp):
         await self.client.stop_scanning()
         self.log.info("Device scanning stopped after %.2f seconds.", duration)
 
-    async def cmd_scan(self, arg: str | None) -> None:
+    async def cmd_scan(self, duration: float | None = None) -> None:
         """
         Start a scan for devices.
 
@@ -77,17 +142,18 @@ class Buttplug(ApplicationAsyncCmdClientApp):
 
         Scan for the given number of seconds, 5 by default
         """
-        duration = float(arg) if arg else 5
+        duration = duration or 5.0
         self.main_task_group.create_task(self.scan_thread(duration))
 
-    async def cmd_connect(self, arg: str | None) -> None:
+    async def cmd_connect(self) -> None:
         """(re)connect to Intiface Central."""
         await self.client.disconnect()
         await self.client.connect(self.args.bp)
 
-    async def cmd_ls(self, arg: str | None) -> None:
+    async def cmd_ls(self) -> None:
         """List connected devices."""
-        for name, dev in self.devices.items():
+        for name, component in self.devices.items():
+            dev = component.dev
             self.interface.term.add_line(
                 [
                     ("", str(dev.index)),
@@ -96,7 +162,7 @@ class Buttplug(ApplicationAsyncCmdClientApp):
                 ]
             )
 
-    async def cmd_info(self, arg: str | None) -> None:
+    async def cmd_info(self, arg: int | None = None) -> None:
         """
         Get information about a device.
 
@@ -112,11 +178,11 @@ class Buttplug(ApplicationAsyncCmdClientApp):
                 await self.interface.print_error(
                     "Multiple devices found and no index given."
                 )
-                await self.print_usage(self.cmd_info)
+                await self.interface.print_usage(self.cmd_info)
                 return
         else:
             index = int(arg)
-        dev = self.devices[index]
+        dev = self.devices[index].dev
 
         def show_prop(name: str, value: Any) -> None:
             self.interface.term.add_line(
@@ -162,25 +228,17 @@ class Buttplug(ApplicationAsyncCmdClientApp):
         for feature in dev.features.values():
             show_feature(feature)
 
-    async def cmd_vibrate(self, arg: str | None) -> None:
+    async def cmd_vibrate(self, name: str, value: float) -> None:
         """
         Send a vibration command to the given device:feature.
 
         Usage: vibrate dev:feat value
         """
-        if arg is None:
-            await self.interface.print_error(
-                "Multiple devices found and no index given."
-            )
-            await self.print_usage(self.cmd_vibrate)
-            return
-        else:
-            outname, value = arg.split(None, 1)
-            devidx, featidx = (int(x) for x in outname.split(":", 1))
-            dev = self.devices[devidx]
-            feat = dev.features[featidx]
+        devidx, featidx = (int(x) for x in name.split(":", 1))
+        dev = self.devices[devidx].dev
+        feat = dev.features[featidx]
 
-        cmd = bp.DeviceOutputCommand(bp.OutputType.VIBRATE, float(value))
+        cmd = bp.DeviceOutputCommand(bp.OutputType.VIBRATE, value)
         await feat.run_output(cmd)
 
     # All command types
@@ -194,24 +252,24 @@ class Buttplug(ApplicationAsyncCmdClientApp):
     # POSITION = "Position"
     # POSITION_WITH_DURATION = "HwPositionWithDuration"
 
-    async def cmd_stop(self, arg: str | None) -> None:
+    async def cmd_stop(self, name: str | None = None) -> None:
         """
         Stop the given device:feature.
 
-        Usage: stop dev:feat
-        """
-        if arg is None:
-            await self.interface.print_error(
-                "Multiple devices found and no index given."
-            )
-            await self.print_usage(self.cmd_stop)
-            return
-        else:
-            devidx, featidx = (int(x) for x in arg.split(":", 1))
-            dev = self.devices[devidx]
-            feat = dev.features[featidx]
+        Usage: stop [dev:feat]
 
-        await feat.stop()
+        Stop all devices if no argument is given.
+        """
+        if name is None:
+            async with asyncio.TaskGroup() as tg:
+                for component in self.devices.values():
+                    for feat in component.dev.features.values():
+                        tg.create_task(feat.stop())
+        else:
+            devidx, featidx = (int(x) for x in name.split(":", 1))
+            dev = self.devices[devidx].dev
+            feat = dev.features[featidx]
+            await feat.stop()
 
 
 if __name__ == "__main__":
