@@ -118,8 +118,8 @@ class Buttplug(ApplicationAsyncCmdClientApp):
         self.log.info("Buttplug server disconnected.")
 
     @override
-    async def start_main_tasks(self) -> None:
-        await super().start_main_tasks()
+    async def init(self) -> None:
+        await super().init()
         await self.client.connect(self.args.bp)
 
     async def scan_thread(self, duration: float) -> None:

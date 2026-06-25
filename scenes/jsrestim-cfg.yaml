@@ -1,0 +1,7 @@
+scenes:
+ - name: jsrestim
+   label: Joystick restim control
+   module: nsfw.scenes.jsrestim
+   targets:
+     - ledstrip
+     - tcode

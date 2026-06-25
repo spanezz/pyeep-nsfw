@@ -1,0 +1,7 @@
+scenes:
+ - name: consent
+   label: Consent lights
+   module: pyeep.scenes.consent
+   targets:
+     - ledstrip
+     - vibrators

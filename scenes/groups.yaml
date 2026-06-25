@@ -1,0 +1,14 @@
+groups:
+ - name: vibrators
+   label: Vibrators
+   icon: 👋
+   color: "#222277"
+   match:
+     - "match:buttplug.*"
+ - name: tcode
+   label: T-Code
+   icon: ⚡️
+   color: "#777722"
+   match:
+     - "match:tcode*"
+

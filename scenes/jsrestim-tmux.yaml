@@ -1,0 +1,10 @@
+session_name: musictrainer
+windows:
+  - window_name: Main
+    layout: even-vertical
+    shell_command_before:
+      - cd ~/dev/pyeep-nsfw/
+    panes:
+      - python3 -m pyeep.hub -v --config ../pyeep/scenes/groups.yaml --config scenes/jsrestim-cfg.yaml
+      - python3 -m pyeep.joystick --hub .webtoken -v
+      - python3 -m nsfw.tcode --hub .webtoken -v
