@@ -4,7 +4,9 @@ from typing import override, Any, Unpack
 
 import buttplug as bp
 
+from pyeep.animator import PowerAnimator
 from pyeep.app.base import BaseAppArgs
+from pyeep.models.animation import AnimationPrimitive
 from pyeep.models.messages import Message
 from pyeep.nodes import PublicComponent, ComponentArgs, Hub
 from pyeep.models.messages.power import SetPower
@@ -50,25 +52,53 @@ class Device(PublicComponent):
 
 
 class Output(PublicComponent):
+    hub: "Buttplug"
+
     def __init__(
         self, feature: bp.DeviceFeature, **kwargs: Unpack[ComponentArgs]
     ) -> None:
         super().__init__(**kwargs)
         self.feature = feature
+        #: Power set by non-animated commands
+        self.base_power: float = 0.0
+        self.animator = PowerAnimator(
+            name="power", frame_duration_ns=50_000_000
+        )
+
+    async def animator_task(self) -> None:
+        async for value in self.animator.values():
+            await self.set_power(self.base_power + value)
+
+    async def set_power(self, value: float) -> None:
+        cmd = bp.DeviceOutputCommand(bp.OutputType(self.name), float(value))
+        await self.feature.run_output(cmd)
+
+    @override
+    async def init(self) -> None:
+        await super().init()
+        await self.start_task(self.animator_task())
 
     @override
     async def receive(self, msg: Message) -> None:
         match msg:
             case SetPower():
-                if isinstance(msg.power, float):
-                    cmd = bp.DeviceOutputCommand(
-                        bp.OutputType(self.name), float(msg.power)
-                    )
-                else:
-                    self.log.warning(
-                        "Power of type %r not yet implemented", msg.power
-                    )
-                await self.feature.run_output(cmd)
+                match msg.power:
+                    case float():
+                        self.base_power = msg.power
+                        if not self.animator.running:
+                            await self.set_power(msg.power)
+                    case AnimationPrimitive():
+                        self.hub.interface.term.add_line(
+                            [
+                                (
+                                    "",
+                                    f"Animate {msg.power}.",
+                                )
+                            ]
+                        )
+                        self.animator.add_at_next_tick(
+                            msg.power.get_animation()
+                        )
 
 
 class Buttplug(ApplicationAsyncCmdClientApp):
